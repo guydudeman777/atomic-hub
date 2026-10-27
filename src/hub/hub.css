@@ -313,3 +313,24 @@
     font-size: var(--step-3);
   }
 }
+
+/* ---- Error screen ---- */
+
+.crash {
+  padding: clamp(20px, 4vw, 56px);
+  gap: 14px;
+  justify-content: center;
+  align-items: flex-start;
+  max-width: none;
+}
+
+.crash p {
+  margin: 0;
+  max-width: 60ch;
+  font-size: var(--step-1);
+}
+
+.crash__actions {
+  display: flex;
+  gap: 10px;
+}

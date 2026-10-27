@@ -82,3 +82,13 @@ test('settings switch the phosphor color', async ({ page }) => {
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('data-phosphor', 'amber')
 })
+
+test('a game that fails to load offers a way out instead of a blank page', async ({ page }) => {
+  // Simulates an open tab after a redeploy replaced the game's files.
+  await page.route(/CaravanApp/, (route) => route.fulfill({ status: 404, body: '' }))
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Play Caravan' }).click()
+  await expect(page.getByRole('alert')).toContainText('This screen didn’t load', { timeout: 10_000 })
+  await page.getByRole('button', { name: 'Back to menu' }).click()
+  await expect(page.getByRole('heading', { name: 'The Atomic Hub' })).toBeVisible()
+})

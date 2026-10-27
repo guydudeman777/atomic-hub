@@ -2,9 +2,11 @@
 
 A retro-futurist game hub for the browser: a phosphor-green terminal menu leading to card tables, a casino floor and board games. Desktop-first, no server, no accounts. Your caps, records and cards live in your browser and can be exported as a save file.
 
-**Playable now:** Caravan, the card game from Fallout: New Vegas, against five AI opponents or a friend in hot-seat mode, with a card collection and deck builder.
+**Playable now:**
+- Caravan, the card game from Fallout: New Vegas, against five AI opponents or a friend in hot-seat mode, with a card collection and deck builder.
+- Blackjack at a blue-felt Vegas table, with a full table of regulars or one on one with the dealer, and a basic strategy coach.
 
-**On the way:** Blackjack, Texas Hold’em, Five-Card Draw, Solitaire, Video Poker, Roulette, Craps, Slots, Connect Four, Checkers, Reversi, Battleship and Tic-Tac-Toe. See [docs/PLAN.md](docs/PLAN.md).
+**On the way:** Texas Hold’em, Five-Card Draw, Solitaire, Video Poker, Roulette, Craps, Slots, Connect Four, Checkers, Reversi, Battleship and Tic-Tac-Toe. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Running it
 
@@ -31,10 +33,10 @@ npm run dev          # http://localhost:5173
 - **Vite + React + TypeScript**, Zustand for the saved state, a tiny hash router, Vitest and Playwright.
 - **Rules are plain TypeScript.** Each game’s engine (`engine.ts`) has no React in it: create a game, list legal moves, apply a move. The UI and the AI both drive games through that interface, which is what makes the rules testable.
 - **Seeded randomness** (`src/core/rng.ts`) so any game can be replayed from its seed.
-- **3D tables** are CSS 3D transforms, not WebGL. Caravan's play area tilts away from you in perspective, and cards land from the player's side and turn over as they're dealt and played (`src/games/caravan/caravan-3d.css`). It's on by default; switch to the flat view in Settings or with *3D view* at the table.
+- **3D tables** are CSS 3D transforms, not WebGL. Caravan's play area tilts away from you in perspective, and cards land from the player's side and turn over as they're dealt and played (`src/games/caravan/caravan-3d.css`). The Blackjack felt tilts the same way, with chip stacks that rise off it (`src/games/blackjack/blackjack-3d.css`). It's on by default; switch to the flat view in Settings or with *3D view* at the table.
 - **Screen transitions** are CSS animations driven by `src/navigation.ts`. Entering a game powers the terminal off and lights the table's lamp; leaving reverses it. They can be turned off in Settings and are skipped when the system asks for reduced motion.
-- **Everything is drawn in code.** Cards are SVG, all audio is synthesized with Web Audio, and fonts (VT323, Share Tech Mono) are bundled from Fontsource. There are no third-party image or audio assets.
-- **Sound** (`src/core/audio/`): warm card whooshes and landings, a small radio band playing generative swing, waltz and blues tunes (`score.ts` holds the music theory, and is unit tested), and saloon chatter from formant-synthesized voices. The terminal hears the saloon through a wall; at a table you're in the room. Repeated notes and phrases are recorded once and replayed, which keeps the CPU cost low.
+- **Everything is drawn in code.** Cards, chips and the Blackjack felt are SVG, all audio is synthesized with Web Audio, and fonts (VT323, Share Tech Mono, and Limelight for the casino) are bundled from Fontsource. There are no third-party image or audio assets.
+- **Sound** (`src/core/audio/`): warm card whooshes and landings, clay chips clacking, a small radio band playing generative swing, waltz and blues tunes (`score.ts` holds the music theory, and is unit tested), and saloon chatter from formant-synthesized voices. The terminal hears the saloon through a wall; at a table you're in the room. Repeated notes and phrases are recorded once and replayed, which keeps the CPU cost low.
 
 ```
 src/
@@ -44,6 +46,7 @@ src/
   hub/             terminal menu, records, settings, boot screen
   components/      shared UI (SVG playing cards)
   games/caravan/   engine.ts, ai.ts, banter.ts, content.ts (sets, opponents), ui/
+  games/blackjack/ engine.ts, strategy.ts, bots.ts, banter.ts, content.ts (tables, regulars), ui/
 e2e/               Playwright smoke tests
 ```
 
@@ -65,6 +68,17 @@ Every gambling game shares one caps balance. You start with 500. If you drop bel
   - Beating each of the five opponents wins cards from their set and unlocks the next opponent.
   - The Trader sells packs from sets whose owner you've beaten.
   - Decks need at least 30 cards, including at least 12 number cards, with one copy of each card.
+
+### Blackjack
+
+- **Rules:** a six-deck shoe with the cut card a deck and a half from the back. Dealer stands on soft 17 and checks for blackjack under an Ace or a ten. Blackjack pays 3 to 2, rounded down to whole caps. Double on any first two cards and after splitting; split any pair (two ten-value cards count) up to four hands; split Aces get one card each. Insurance pays 2 to 1. No surrender. The full text is under *How to play*, and in the header of `src/games/blackjack/engine.ts`.
+- **Tables:** you always sit in the middle of five spots. *Full table* puts four regulars around you; *One on one* is just you and the dealer. Pick low limit (5–100 caps), main floor (25–500) or high limit (100–2,000). Caps go on the felt when you bet, so leaving mid-round forfeits them, as in Caravan.
+- **The regulars:** seven of them, four at the table at a time (`content.ts`). Each has their own play and betting style (`bots.ts`): perfect basic strategy, a Hi-Lo card counter who bets up when the count is high, a never-bust player, one who plays like the dealer, a reckless doubler, a timid one, and a martingale bettor. They have their own caps; when one goes broke they get up, and someone else sits down. Self-play, flat betting (each over 200,000 rounds unless noted):
+  - Basic strategy loses 0.40% of what it bets over 2 million rounds, the published house edge for these rules.
+  - Playing like the dealer loses about 5.7%, never busting about 4.8%.
+  - The counter, betting 1 to 8 units with the count, comes out about 0.4% ahead.
+- **Coach and count:** the coach lights the basic strategy play for your hand and notes in the log when you play something else. *Count* shows the Hi-Lo running and true counts. The full chart is on the *Strategy chart* page, drawn from the same data the coach uses (`strategy.ts`).
+- **Table talk:** the regulars say hello, cheer a dealer bust, groan at a dealer blackjack, and have opinions about you splitting tens or taking the dealer's bust card. `banter.ts` decides who speaks and when; the dealer calls insurance, the peek and their total.
 
 ## Credits
 

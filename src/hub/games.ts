@@ -29,9 +29,9 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'Build three caravans worth 21 to 26 and outbid your rival on at least two. Win cards from five opponents and build your own deck.',
   },
   {
-    id: 'blackjack', name: 'Blackjack', category: 'cards', ready: false, path: '/blackjack', icon: 'cards',
-    modes: 'Against the dealer, up to 3 seats',
-    blurb: 'Six-deck shoe, dealer stands on soft 17, blackjack pays 3 to 2.',
+    id: 'blackjack', name: 'Blackjack', category: 'cards', ready: true, path: '/blackjack', icon: 'cards',
+    modes: 'A full table of regulars, or one on one with the dealer',
+    blurb: 'Blue felt, a six-deck shoe and caps on the line. Dealer stands on soft 17, blackjack pays 3 to 2, and a coach knows the book.',
   },
   {
     id: 'holdem', name: 'Texas Hold’em', category: 'cards', ready: false, path: '/holdem', icon: 'chip',

@@ -8,6 +8,8 @@
  *             the casing goes dark, and the game table's lamp flickers on.
  * exit-game:  the table lamp goes out and the terminal powers back on.
  * sit/stand:  a lighter push between a game's lobby and its table.
+ *
+ * Each game's room is .cv (Caravan) or .bj (Blackjack).
  */
 
 :root[data-leaving] body,
@@ -29,7 +31,7 @@
   animation: go-dark 220ms ease-in 340ms forwards;
 }
 
-:root[data-entering='enter-game'] .cv {
+:root[data-entering='enter-game'] :is(.cv, .bj) {
   animation: lamp-on 650ms ease-out backwards;
 }
 
@@ -134,7 +136,7 @@
 
 /* ---- Leaving a game ------------------------------------------------------- */
 
-:root[data-leaving='exit-game'] .cv {
+:root[data-leaving='exit-game'] :is(.cv, .bj) {
   animation: lamp-off 380ms ease-in forwards;
 }
 
@@ -189,19 +191,19 @@
 
 /* ---- Sitting down at a table and getting up ------------------------------- */
 
-:root[data-leaving='sit'] .cv {
+:root[data-leaving='sit'] :is(.cv, .bj) {
   animation: sit-out 300ms ease-in forwards;
 }
 
-:root[data-entering='sit'] .cv {
+:root[data-entering='sit'] :is(.cv, .bj) {
   animation: sit-in 560ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
 }
 
-:root[data-leaving='stand'] .cv {
+:root[data-leaving='stand'] :is(.cv, .bj) {
   animation: stand-out 300ms ease-in forwards;
 }
 
-:root[data-entering='stand'] .cv {
+:root[data-entering='stand'] :is(.cv, .bj) {
   animation: stand-in 480ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
 }
 

@@ -1,5 +1,6 @@
 /**
- * The persistent save: caps, settings, stats and the Caravan collection.
+ * The persistent save: caps, settings, stats, the Caravan collection and
+ * Blackjack's table preferences.
  * Stored in localStorage and exportable as a JSON file.
  */
 
@@ -55,12 +56,20 @@ export interface CaravanSave {
   beaten: Record<string, number>
 }
 
+export interface BlackjackSave {
+  /** Basic strategy advice for each decision. */
+  coach: boolean
+  /** The Hi-Lo count, for practice. */
+  count: boolean
+}
+
 export interface SaveData {
   version: 1
   wallet: WalletState
   settings: Settings
   stats: Record<string, GameStats>
   caravan: CaravanSave
+  blackjack: BlackjackSave
 }
 
 export type GameResult = 'win' | 'loss' | 'draw'
@@ -78,6 +87,7 @@ interface SaveActions {
   deleteCaravanDeck: (id: string) => void
   setActiveCaravanDeck: (id: string) => void
   markBeaten: (opponentId: string) => void
+  updateBlackjack: (patch: Partial<BlackjackSave>) => void
   importSave: (json: string) => { ok: true } | { ok: false; error: string }
   resetSave: () => void
 }
@@ -105,12 +115,13 @@ export const newSave = (): SaveData => ({
     activeDeckId: STARTER_DECK.id,
     beaten: {},
   },
+  blackjack: { coach: true, count: false },
 })
 
 /** Just the data fields, for export. */
 export function snapshot(state: SaveData): SaveData {
-  const { version, wallet, settings, stats, caravan } = state
-  return { version, wallet, settings, stats, caravan }
+  const { version, wallet, settings, stats, caravan, blackjack } = state
+  return { version, wallet, settings, stats, caravan, blackjack }
 }
 
 function isSaveData(value: unknown): value is SaveData {
@@ -196,6 +207,8 @@ export const useSave = create<SaveData & SaveActions>()(
           },
         })),
 
+      updateBlackjack: (patch) => set((s) => ({ blackjack: { ...s.blackjack, ...patch } })),
+
       importSave: (json) => {
         let parsed: unknown
         try {
@@ -205,7 +218,7 @@ export const useSave = create<SaveData & SaveActions>()(
         }
         if (!isSaveData(parsed)) return { ok: false, error: 'That file isn’t an Atomic Hub save.' }
         const base = newSave()
-        set({ ...parsed, settings: { ...base.settings, ...parsed.settings } })
+        set({ ...parsed, settings: { ...base.settings, ...parsed.settings }, blackjack: { ...base.blackjack, ...parsed.blackjack } })
         return { ok: true }
       },
 
@@ -229,6 +242,7 @@ export const useSave = create<SaveData & SaveActions>()(
           settings: { ...current.settings, ...p.settings },
           stats: { ...current.stats, ...p.stats },
           caravan: { ...caravan, beaten: { ...caravan.beaten } },
+          blackjack: { ...current.blackjack, ...p.blackjack },
         }
       },
     },

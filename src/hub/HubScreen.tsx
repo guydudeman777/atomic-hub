@@ -167,7 +167,7 @@ function GameDetail({ game, onPlay }: { game: GameInfo; onPlay: () => void }) {
           Play {game.name}
         </button>
       ) : (
-        <p className="term-dim">Coming in a later update. Caravan is open now.</p>
+        <p className="term-dim">Coming in a later update. Caravan and Blackjack are open now.</p>
       )}
     </section>
   )

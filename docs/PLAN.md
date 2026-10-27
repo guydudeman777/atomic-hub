@@ -8,7 +8,7 @@ A desktop-first browser game hub in a retro-futurist wasteland style. Single-pla
 | --- | --- |
 | Platform | Vite + React + TypeScript web app in this repo, deployed to GitHub Pages |
 | Opponents | Computer AI and local hot-seat (pass-the-device screens for hidden hands) |
-| Style | Phosphor terminal hub (green or amber) inside a riveted casing. Each game gets its own table: Caravan is a lamp-lit wooden table |
+| Style | Phosphor terminal hub (green or amber) inside a riveted casing. Each game gets its own table: Caravan is a lamp-lit wooden table, Blackjack a blue felt table on a 1950s casino floor |
 | Layout | Desktop-first. Phones may need to be turned sideways |
 | Economy | Shared caps balance, 500 to start. Refill to 500 when below 50 caps, at most once every 10 minutes |
 | Art and sound | All original and generated in code: SVG cards, Web Audio effects. No Fallout logos or assets |
@@ -18,7 +18,7 @@ A desktop-first browser game hub in a retro-futurist wasteland style. Single-pla
 | Game | Opponents | Default rules | AI | Status |
 | --- | --- | --- | --- | --- |
 | Caravan | AI, hot-seat | Full New Vegas rules, collection and deck builder | Simulates possible hidden hands, 3 levels | **Done (phase 1)** |
-| Blackjack | vs dealer, 1–3 seats | 6-deck shoe, dealer stands on soft 17, 3:2, double after split, split to 4 hands, insurance | Dealer follows fixed rules; strategy coach | Planned |
+| Blackjack | vs dealer: full table with 4 bots, or one on one | 6-deck shoe, dealer stands on soft 17, 3:2, double after split, split to 4 hands, insurance | Dealer follows fixed rules; 7 bots with their own play and betting styles, one a card counter; basic strategy coach | **Done (phase 2)** |
 | Texas Hold’em | 2–6 seats, any mix | No-limit, blinds, side pots, caps buy-in | Simulated win odds + pot odds + personalities | Planned |
 | Five-Card Draw | 2–6 seats | Ante, fixed-limit, draw up to 3 (4 with an Ace) | Hand strength + draw odds | Planned |
 | Video Poker | Solo | Jacks or Better 9/6, 1–5 coins | Optional hold advisor | Planned |
@@ -36,7 +36,7 @@ A desktop-first browser game hub in a retro-futurist wasteland style. Single-pla
 
 0. **Foundation.** Project setup, hub screen, theme, caps/records/settings saving, SVG cards, seeded RNG, CI and Pages deploy. *Done, shipped with phase 1.*
 1. **Caravan.** Rules engine, AI, opponent ladder, collection, deck builder, Trader, hot-seat. *Done.*
-2. **Blackjack, Connect Four, Tic-Tac-Toe.**
+2. **Blackjack, Connect Four, Tic-Tac-Toe.** *Blackjack done.*
 3. **Poker.** Video Poker, then Five-Card Draw, then Hold’em, all sharing one hand evaluator.
 4. **Reversi, Checkers, Battleship.**
 5. **Solitaire, Roulette, Craps, Slots.**
@@ -45,6 +45,6 @@ A desktop-first browser game hub in a retro-futurist wasteland style. Single-pla
 ## Testing approach
 
 - Unit tests for every rules engine. The poker hand evaluator will be checked against all 2,598,960 five-card hands.
-- Casino payback checked by exact math: Video Poker’s return with perfect play, Roulette’s house edge, the Slots paytable.
+- Casino payback checked by exact math: Video Poker’s return with perfect play, Roulette’s house edge, the Slots paytable. Blackjack's basic strategy is checked by self-play against the published house edge.
 - AI strength measured by self-play, with each deal played from both seats.
 - Playwright smoke tests for each game route.

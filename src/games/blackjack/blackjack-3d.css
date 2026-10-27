@@ -1,0 +1,80 @@
+/*
+ * The 3D table, on while Settings → 3D tables is (html[data-table3d='on']).
+ * Plain CSS 3D transforms, as at the Caravan table:
+ *
+ * - The felt is one plane tilted away from you by --tilt, seen from your
+ *   seat through the stage's perspective. The dealer stands at the far edge.
+ * - Cards lie a pixel apart in depth, so they stack the way the flat view's
+ *   z-index does, and lift off the felt as they're dealt.
+ * - Chip stacks rise off the felt, a little over 2 units per chip.
+ */
+
+:root[data-table3d='on'] .bj-stage {
+  perspective: 1500px;
+  perspective-origin: 50% -20%;
+  align-items: end;
+}
+
+:root[data-table3d='on'] .bj-felt {
+  --tilt: 27deg;
+  /* The far edge, the widest part of the table, shrinks into the distance; so does its height. */
+  --u: calc(min(104cqw, 230cqh) / 1000);
+  transform-origin: 50% 100%;
+  transform: rotateX(var(--tilt));
+  transform-style: preserve-3d;
+  margin-bottom: 4px;
+}
+
+:root[data-table3d='on'] .bj-card {
+  transform: translateZ(calc(1px + var(--k) * 0.8px));
+  animation-name: bj-deal-3d;
+  animation-duration: 0.5s;
+}
+
+/* Out of the shoe, up over the felt, and down where it lands. */
+@keyframes bj-deal-3d {
+  from {
+    translate: calc(var(--fx) * var(--u)) calc(var(--fy) * var(--u)) calc(40 * var(--u));
+    rotate: -24deg;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  55% {
+    translate: calc(var(--fx) * var(--u) * 0.3) calc(var(--fy) * var(--u) * 0.3) calc(30 * var(--u));
+  }
+}
+
+:root[data-table3d='on'] .bj-glow {
+  transform: translateZ(0.5px);
+}
+
+:root[data-table3d='on'] .bj-felt-stack {
+  transform-style: preserve-3d;
+  transform: translateZ(1px);
+}
+
+:root[data-table3d='on'] .bj-stack__chip {
+  translate: 0 0 calc(var(--i) * 2.3 * var(--u));
+}
+
+:root[data-table3d='on'] :is(.bj-badge, .bj-plate) {
+  transform: translateZ(2px);
+}
+
+/*
+ * Speech bubbles and your result float just off the felt. (Stood up, they'd
+ * cut through the rail, and half of them would sink into it.)
+ */
+:root[data-table3d='on'] :is(.bj-talk--seat, .bj-burst) {
+  translate: 0 0 6px;
+}
+
+:root[data-table3d='on'] .bj-burst {
+  translate: -50% -50% 6px;
+}
+
+:root[data-table3d='on'] .bj-shoe {
+  transform: translateZ(3px);
+}

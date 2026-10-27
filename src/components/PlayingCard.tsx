@@ -1,6 +1,7 @@
 /**
  * SVG playing cards. Faces share one design; each collectible set gets its
- * own back and an accent color on the face frame.
+ * own back and an accent color on the face frame. Caravan's face cards name
+ * what they do; the casino deck's are plain court cards.
  */
 
 import { type ReactNode, memo, useId } from 'react'
@@ -16,7 +17,11 @@ const SET_ACCENT: Record<string, string> = {
   neon: '#d43d8c',
   atomic: '#2a7a7e',
   gold: '#b48a2a',
+  vegas: '#a3202a',
 }
+
+/** Sets whose court cards don't carry Caravan's effect labels. */
+const PLAIN_FACES = new Set(['vegas'])
 
 const accentOf = (set: string) => SET_ACCENT[set] ?? '#6b7445'
 
@@ -83,9 +88,10 @@ function Pips({ rank, suit }: { rank: NumberRank; suit: Suit }) {
 
 // ---- Face cards and Jokers --------------------------------------------------
 
-/** Each face card shows what it does in Caravan. */
+/** Each face card shows what it does in Caravan; plain sets show a star instead. */
 function FaceEmblem({ card, accent }: { card: Card; accent: string }) {
   const letter = card.rank === 'JK' ? '' : card.rank
+  const plain = PLAIN_FACES.has(card.set)
   return (
     <g>
       <rect x="22" y="24" width="56" height="92" rx="3" fill={accent} fillOpacity="0.14" stroke={accent} strokeWidth="1.5" />
@@ -103,11 +109,11 @@ function FaceEmblem({ card, accent }: { card: Card; accent: string }) {
           <circle cx="50" cy="62" r="3.5" fill="currentColor" />
         </g>
       ) : (
-        <text x="50" y="78" textAnchor="middle" fontFamily="VT323, monospace" fontSize="52" fill="currentColor">
+        <text x="50" y={plain ? 84 : 78} textAnchor="middle" fontFamily="VT323, monospace" fontSize={plain ? 60 : 52} fill="currentColor">
           {letter}
         </text>
       )}
-      <EffectGlyph rank={card.rank} />
+      {plain ? <path d={starburst(50, 40, 7, 2.2, 4)} fill={accent} /> : <EffectGlyph rank={card.rank} />}
     </g>
   )
 }
@@ -119,6 +125,17 @@ function EffectGlyph({ rank }: { rank: Card['rank'] }) {
       {label[rank]}
     </text>
   )
+}
+
+/** A star with `points` long rays, as an SVG path. */
+function starburst(cx: number, cy: number, outer: number, inner: number, points: number): string {
+  const d: string[] = []
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? outer : inner
+    const a = (Math.PI * i) / points - Math.PI / 2
+    d.push(`${i === 0 ? 'M' : 'L'}${(cx + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`)
+  }
+  return `${d.join('')}Z`
 }
 
 // ---- Backs ------------------------------------------------------------------
@@ -198,6 +215,24 @@ function Back({ set, uid }: { set: string; uid: string }) {
           <g stroke="#d6a93c">{frame}</g>
           <path d="M50 48l16 22-16 22-16-22z" fill="#3b2a12" stroke="#d6a93c" strokeWidth="2.5" />
           <path d="M50 58l8 12-8 12-8-12z" fill="#d6a93c" />
+        </>
+      )
+    case 'vegas':
+      // A casino deck: white border, red lattice, a gold starburst in a medallion.
+      return (
+        <>
+          <defs>
+            <pattern id={`${uid}v`} width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width="9" height="9" fill="#8c1b24" />
+              <path d="M0 0H9M0 0V9" stroke="#b9343d" strokeWidth="1.1" />
+            </pattern>
+          </defs>
+          <rect width={W} height={H} rx="7" fill="#f3ead6" />
+          <rect x="6" y="6" width={W - 12} height={H - 12} rx="4" fill={`url(#${uid}v)`} />
+          <rect x="10" y="10" width={W - 20} height={H - 20} rx="3" fill="none" stroke="#f3ead6" strokeWidth="1.2" />
+          <circle cx="50" cy="70" r="17" fill="#6a1219" stroke="#e3c26a" strokeWidth="1.6" />
+          <path d={starburst(50, 70, 13, 4, 8)} fill="#e3c26a" />
+          <circle cx="50" cy="70" r="2.6" fill="#6a1219" />
         </>
       )
     default:

@@ -1,4 +1,4 @@
-import { playSfx } from '../core/sfx'
+import { playSfx } from '../core/audio/sfx'
 import { REFILL_TARGET, REFILL_THRESHOLD, formatCountdown, refillStatus } from '../core/wallet'
 import { useSave } from '../store/save'
 import { useNow } from './useNow'

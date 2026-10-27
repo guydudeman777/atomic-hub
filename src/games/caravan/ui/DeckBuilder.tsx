@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { type Card, parseCardId } from '../../../core/cards'
 import { PlayingCard } from '../../../components/PlayingCard'
-import { playSfx } from '../../../core/sfx'
+import { playSfx } from '../../../core/audio/sfx'
 import { useSave } from '../../../store/save'
 import { CARD_SETS, type SavedDeck, compareCards, isFace } from '../content'
 import { MIN_DECK_SIZE, MIN_NUMBER_CARDS, checkDeck } from '../engine'
@@ -45,7 +45,7 @@ export function DeckBuilder() {
   }
 
   const toggle = (card: Card) => {
-    playSfx('tick')
+    playSfx(inDeck.has(card.id) ? 'draw' : 'pick')
     edit(inDeck.has(card.id) ? draft.cards.filter((id) => id !== card.id) : [...draft.cards, card.id])
   }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PlayingCard } from '../../../components/PlayingCard'
-import { playSfx } from '../../../core/sfx'
+import { playSfx } from '../../../core/audio/sfx'
 import { Link } from '../../../router'
 import { navigate } from '../../../navigation'
 import { useSave } from '../../../store/save'

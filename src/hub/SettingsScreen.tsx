@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { playSfx } from '../core/sfx'
+import { playSfx } from '../core/audio/sfx'
 import { snapshot, useSave } from '../store/save'
 import { Terminal } from './Terminal'
 
@@ -75,23 +75,32 @@ export function SettingsScreen() {
 
         <fieldset className="settings__group">
           <legend>Sound</legend>
-          <label className="settings__row">
-            <span>Sound effects</span>
-            <input type="checkbox" checked={settings.sound} onChange={(e) => update({ sound: e.target.checked })} />
-          </label>
-          <label className="settings__row">
-            <span>Volume</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={settings.volume}
-              disabled={!settings.sound}
-              onChange={(e) => update({ volume: Number(e.target.value) })}
-              onPointerUp={() => playSfx('select')}
-            />
-          </label>
+          <Channel
+            label="Sound effects"
+            on={settings.sound}
+            volume={settings.volume}
+            onToggle={(sound) => update({ sound })}
+            onVolume={(volume) => update({ volume })}
+            onPreview={() => playSfx('card')}
+          />
+          <Channel
+            label="Music"
+            on={settings.music}
+            volume={settings.musicVolume}
+            onToggle={(music) => update({ music })}
+            onVolume={(musicVolume) => update({ musicVolume })}
+          />
+          <Channel
+            label="Table chatter"
+            on={settings.chatter}
+            volume={settings.chatterVolume}
+            onToggle={(chatter) => update({ chatter })}
+            onVolume={(chatterVolume) => update({ chatterVolume })}
+          />
+          <p className="term-dim settings__hint">
+            The radio plays next door while you’re at the terminal. Sit down at a table to hear it properly, along with
+            everyone else.
+          </p>
         </fieldset>
 
         <fieldset className="settings__group">
@@ -139,5 +148,37 @@ export function SettingsScreen() {
         </fieldset>
       </div>
     </Terminal>
+  )
+}
+
+interface ChannelProps {
+  label: string
+  on: boolean
+  volume: number
+  onToggle: (on: boolean) => void
+  onVolume: (volume: number) => void
+  /** Play a sample when the slider is let go. */
+  onPreview?: () => void
+}
+
+function Channel({ label, on, volume, onToggle, onVolume, onPreview }: ChannelProps) {
+  return (
+    <div className="settings__row">
+      <label className="settings__choice settings__channel">
+        <input type="checkbox" checked={on} onChange={(e) => onToggle(e.target.checked)} />
+        {label}
+      </label>
+      <input
+        type="range"
+        aria-label={`${label} volume`}
+        min={0}
+        max={1}
+        step={0.05}
+        value={volume}
+        disabled={!on}
+        onChange={(e) => onVolume(Number(e.target.value))}
+        onPointerUp={onPreview}
+      />
+    </div>
   )
 }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { type Card } from '../../../core/cards'
 import { PlayingCard } from '../../../components/PlayingCard'
 import { createRng, randomSeed } from '../../../core/rng'
-import { playSfx } from '../../../core/sfx'
+import { playSfx } from '../../../core/audio/sfx'
 import { useSave } from '../../../store/save'
 import { CARD_SETS, OPPONENTS, PACK_PRICE, PACK_SIZE, STARTER_SET, drawUnowned, traderSets } from '../content'
 
@@ -29,6 +29,8 @@ export function Trader() {
     addCards(cards.map((c) => c.id))
     setOpened({ set, cards })
     playSfx('coin')
+    // One card turned over for each in the reveal animation (caravan.css).
+    cards.forEach((_, i) => playSfx('deal', { delay: 0.05 + i * 0.08 }))
   }
 
   return (

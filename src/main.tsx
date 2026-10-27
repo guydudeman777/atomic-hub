@@ -7,6 +7,7 @@ import './styles/terminal.css'
 import './hub/hub.css'
 import './styles/transitions.css'
 import App from './App.tsx'
+import { initAudio } from './core/audio/live'
 
 // After a new deploy, an open tab may ask for code files that no longer
 // exist. Reload once to pick up the new version; if that also fails soon
@@ -23,6 +24,8 @@ window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault()
   window.location.reload()
 })
+
+initAudio()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

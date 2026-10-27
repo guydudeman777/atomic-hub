@@ -6,7 +6,8 @@
 import { create } from 'zustand'
 import { type Card, cardLabel } from '../../../core/cards'
 import { createRng, randomSeed } from '../../../core/rng'
-import { playSfx } from '../../../core/sfx'
+import { crowdReaction } from '../../../core/audio/live'
+import { playSfx } from '../../../core/audio/sfx'
 import { useSave } from '../../../store/save'
 import { DUPLICATE_BONUS_CAPS, drawUnowned, opponentById } from '../content'
 import { type GameEvent, type GameState, type Lane, type Move, type PlayerId, applyMove, createGame, other } from '../engine'
@@ -90,6 +91,21 @@ function describe(events: GameEvent[], names: [string, string], mode: MatchConfi
   return entries
 }
 
+/** Each caravan's sounds come from its side of the table. */
+const LANE_PAN: Record<Lane, number> = { 0: -0.35, 1: 0, 2: 0.35 }
+
+function playMoveSounds(events: GameEvent[], drew: boolean) {
+  let removals = 0
+  for (const e of events) {
+    if (e.type === 'played') playSfx('card', { pan: LANE_PAN[e.lane] })
+    else if (e.type === 'discarded') playSfx('discard')
+    else if (e.type === 'disbanded') playSfx('disband', { pan: LANE_PAN[e.lane] })
+    // Jacks and Jokers: the card lands, then the ones it beat get swept off.
+    else if (e.type === 'removed') playSfx('remove', { pan: LANE_PAN[e.lane], delay: 0.15 + 0.08 * removals++ })
+  }
+  if (drew) playSfx('draw', { delay: 0.35 })
+}
+
 function touched(events: GameEvent[]): string[] {
   const ids: string[] = []
   for (const e of events) {
@@ -153,12 +169,15 @@ export const useMatch = create<MatchStore>()((set, get) => ({
     const { state, config, log } = get()
     if (!state || !config || state.winner !== null) return
     const { state: next, events } = applyMove(state, move)
-    const removed = events.some((e) => e.type === 'removed' || e.type === 'disbanded')
-    playSfx(removed ? 'remove' : 'card')
+    const mover = state.current
+    playMoveSounds(events, next.players[mover].deck.length < state.players[mover].deck.length)
     const settlement = next.winner !== null ? settle(config, next) : null
     if (settlement) {
       const humanWon = config.mode === 'hotseat' || settlement.winner === 0
-      window.setTimeout(() => playSfx(humanWon ? 'win' : 'lose'), 250)
+      window.setTimeout(() => {
+        playSfx(humanWon ? 'win' : 'lose')
+        crowdReaction(humanWon ? 'cheer' : 'groan')
+      }, 250)
     }
     set({
       state: next,

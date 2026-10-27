@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { type Card, type Suit, SUIT_NAME, cardName } from '../../../core/cards'
+import { playSfx } from '../../../core/audio/sfx'
 import { createRng, randomSeed } from '../../../core/rng'
 import { PlayingCard, SuitIcon } from '../../../components/PlayingCard'
 import { navigate } from '../../../navigation'
@@ -12,6 +13,7 @@ import {
   type Move,
   type PlayerId,
   LANES,
+  OPENING_HAND_SIZE,
   OPENING_TURNS,
   caravanHeading,
   caravanValue,
@@ -78,13 +80,29 @@ function TableView({ config, state, log, recent, settled }: ViewProps) {
   const [ui, setUi] = useState<{ for: GameState; selected: string | null; disband: Lane | null }>({ for: state, selected: null, disband: null })
   const selected = ui.for === state ? ui.selected : null
   const confirmDisband = ui.for === state ? ui.disband : null
-  const setSelected = (id: string | null) => setUi({ for: state, selected: id, disband: null })
+  const setSelected = (id: string | null) => {
+    if (id && id !== selected) playSfx('pick')
+    setUi({ for: state, selected: id, disband: null })
+  }
   // Hot-seat hides the table at the start of every turn until the next player is ready.
   const [revealedTurn, setRevealedTurn] = useState<number | null>(null)
   // The opening hands are dealt one card at a time when the table first appears.
   const [dealing, setDealing] = useState(true)
   useEffect(() => {
     const t = window.setTimeout(() => setDealing(false), 1800)
+    return () => window.clearTimeout(t)
+  }, [])
+  // A shuffle, then the deal in step with the animation in caravan.css: your
+  // cards from 480 ms and theirs from 535 ms, 110 ms apart. (Deferred so a
+  // StrictMode double mount doesn't deal twice.)
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      playSfx('shuffle')
+      for (let k = 0; k < OPENING_HAND_SIZE; k++) {
+        playSfx('deal', { delay: 0.48 + k * 0.11, pan: 0.1 })
+        playSfx('deal', { delay: 0.535 + k * 0.11, pan: -0.1 })
+      }
+    })
     return () => window.clearTimeout(t)
   }, [])
   const handoff = hotseat && state.winner === null && revealedTurn !== state.turn

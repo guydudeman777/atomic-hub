@@ -10,7 +10,7 @@
 
 import { useSyncExternalStore } from 'react'
 import { flushSync } from 'react-dom'
-import { type Sfx, playSfx } from './core/sfx'
+import { type Sfx, playSfx } from './core/audio/sfx'
 import { type TransitionKind, preloadScreen, transitionKind } from './routes'
 
 function pathFromLocation(): string {
@@ -47,7 +47,8 @@ function transitionsEnabled(): boolean {
 const PHASES: Record<TransitionKind, { out: number; in: number; sfx?: Sfx; sfxAt?: number }> = {
   'enter-game': { out: 560, in: 650, sfx: 'power-off', sfxAt: 0 },
   'exit-game': { out: 380, in: 720, sfx: 'power-on', sfxAt: 520 },
-  sit: { out: 300, in: 560, sfx: 'shuffle', sfxAt: 250 },
+  // The table shuffles and deals its own cards (Table.tsx).
+  sit: { out: 300, in: 560 },
   stand: { out: 300, in: 480 },
 }
 

@@ -92,3 +92,37 @@ test('a game that fails to load offers a way out instead of a blank page', async
   await page.getByRole('button', { name: 'Back to menu' }).click()
   await expect(page.getByRole('heading', { name: 'The Atomic Hub' })).toBeVisible()
 })
+
+test('entering and leaving a game play the screen transitions', async ({ page }) => {
+  const errors = watchErrors(page)
+  // Record every transition phase as it's applied to <html>.
+  await page.addInitScript(() => {
+    const seen: string[] = []
+    ;(window as unknown as { phases: string[] }).phases = seen
+    new MutationObserver(() => {
+      const { leaving, entering } = document.documentElement.dataset
+      const now = leaving ? `leaving:${leaving}` : entering ? `entering:${entering}` : null
+      if (now && seen.at(-1) !== now) seen.push(now)
+    }).observe(document, { attributes: true, subtree: true, attributeFilter: ['data-leaving', 'data-entering'] })
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Play Caravan' }).click()
+  await expect(page.getByRole('button', { name: 'Deal' })).toBeVisible()
+  await page.getByRole('link', { name: 'Back to the hub' }).click()
+  await expect(page.getByRole('heading', { name: 'The Atomic Hub' })).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { phases: string[] }).phases))
+    .toEqual(['leaving:enter-game', 'entering:enter-game', 'leaving:exit-game', 'entering:exit-game'])
+  // Transitions clean up after themselves.
+  await expect(page.locator('html')).not.toHaveAttribute('data-entering')
+  expect(errors).toEqual([])
+})
+
+test('reduced motion swaps screens instantly', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Play Caravan' }).click()
+  await expect(page.getByRole('button', { name: 'Deal' })).toBeVisible()
+  await expect(page.locator('html')).not.toHaveAttribute('data-leaving')
+  await expect(page.locator('html')).not.toHaveAttribute('data-entering')
+})

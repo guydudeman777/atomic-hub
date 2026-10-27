@@ -62,7 +62,15 @@ export function SettingsScreen() {
             <span>Screen flicker</span>
             <input type="checkbox" checked={settings.flicker} onChange={(e) => update({ flicker: e.target.checked })} />
           </label>
-          <p className="term-dim settings__hint">Flicker stays off if your system asks for reduced motion.</p>
+          <label className="settings__row">
+            <span>Screen transitions</span>
+            <input
+              type="checkbox"
+              checked={settings.transitions}
+              onChange={(e) => update({ transitions: e.target.checked })}
+            />
+          </label>
+          <p className="term-dim settings__hint">Flicker and transitions stay off if your system asks for reduced motion.</p>
         </fieldset>
 
         <fieldset className="settings__group">

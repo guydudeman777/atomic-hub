@@ -4,7 +4,7 @@
 
 import { useSave } from '../store/save'
 
-export type Sfx = 'tick' | 'select' | 'card' | 'remove' | 'win' | 'lose' | 'error' | 'coin'
+export type Sfx = 'tick' | 'select' | 'card' | 'remove' | 'win' | 'lose' | 'error' | 'coin' | 'power-off' | 'power-on' | 'shuffle'
 
 let ctx: AudioContext | null = null
 
@@ -78,6 +78,20 @@ export function playSfx(name: Sfx) {
       break
     case 'error':
       tone(ac, 140, t, 0.16, 'square', v * 0.5)
+      break
+    case 'power-off':
+      // The tube collapsing: a falling whine and a thump.
+      tone(ac, 1400, t, 0.42, 'sawtooth', v * 0.3, 70)
+      tone(ac, 90, t + 0.3, 0.2, 'sine', v * 0.8, 40)
+      break
+    case 'power-on':
+      // Degauss thunk, then the rising whine of the tube warming up.
+      tone(ac, 70, t, 0.18, 'sine', v * 0.9, 45)
+      noise(ac, t, 0.06, v * 1.2)
+      tone(ac, 180, t + 0.05, 0.45, 'triangle', v * 0.35, 1800)
+      break
+    case 'shuffle':
+      for (let i = 0; i < 5; i++) noise(ac, t + i * 0.055, 0.045, v * 1.3)
       break
   }
 }

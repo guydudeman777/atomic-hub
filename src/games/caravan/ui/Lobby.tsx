@@ -6,7 +6,7 @@ import { navigate } from '../../../navigation'
 import { useSave } from '../../../store/save'
 import { OPPONENTS, type SavedDeck, deckCards, isUnlocked, setInfo } from '../content'
 import { checkDeck } from '../engine'
-import { useMatch } from './match'
+import { type MatchConfig, useMatch } from './match'
 
 const DIFFICULTY_LABEL = { easy: 'Easy', normal: 'Normal', hard: 'Hard' } as const
 
@@ -79,19 +79,19 @@ function AiSetup() {
   const deckOk = checkDeck(deckCards(deck)).ok
 
   const deal = () => {
-    const ok = start({
+    if (wager > useSave.getState().wallet.caps) {
+      playSfx('error')
+      return
+    }
+    const config: MatchConfig = {
       mode: 'ai',
       opponentId: opponent.id,
       wager,
       names: ['You', opponent.name],
       decks: [deckCards(deck), opponent.deck()],
-    })
-    if (!ok) {
-      playSfx('error')
-      return
     }
     playSfx('select')
-    navigate('/caravan/play')
+    void navigate('/caravan/play', { during: () => start(config) })
   }
 
   return (
@@ -191,9 +191,9 @@ function HotseatSetup() {
 
   const deal = () => {
     const clean = names.map((n, i) => n.trim() || `Player ${i + 1}`) as [string, string]
-    start({ mode: 'hotseat', wager: 0, names: clean, decks: [deckCards(deckA), deckCards(deckB)] })
+    const config: MatchConfig = { mode: 'hotseat', wager: 0, names: clean, decks: [deckCards(deckA), deckCards(deckB)] }
     playSfx('select')
-    navigate('/caravan/play')
+    void navigate('/caravan/play', { during: () => start(config) })
   }
 
   return (

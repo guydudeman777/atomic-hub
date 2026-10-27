@@ -1,0 +1,237 @@
+/*
+ * Screen transitions. navigation.ts plays each change in two phases:
+ *   html[data-leaving=kind]   the outgoing screen animates out (forwards fill)
+ *   html[data-entering=kind]  the new screen animates in (backwards fill)
+ * Phase lengths live in navigation.ts; keep them in step with these.
+ *
+ * enter-game: the terminal tube powers off (collapses to a line, then a dot),
+ *             the casing goes dark, and the game table's lamp flickers on.
+ * exit-game:  the table lamp goes out and the terminal powers back on.
+ * sit/stand:  a lighter push between a game's lobby and its table.
+ */
+
+:root[data-leaving] body,
+:root[data-entering] body {
+  background: #040503;
+}
+
+:root[data-leaving] body {
+  pointer-events: none;
+}
+
+/* ---- Entering a game ------------------------------------------------------ */
+
+:root[data-leaving='enter-game'] .casing > .screen {
+  animation: crt-off 460ms cubic-bezier(0.6, 0, 0.85, 0.25) forwards;
+}
+
+:root[data-leaving='enter-game'] .casing {
+  animation: go-dark 220ms ease-in 340ms forwards;
+}
+
+:root[data-entering='enter-game'] .cv {
+  animation: lamp-on 650ms ease-out backwards;
+}
+
+/* The tube flares to solid phosphor as it collapses, so the line reads as a beam. */
+:root[data-leaving='enter-game'] .casing > .screen::before,
+:root[data-entering='exit-game'] .casing > .screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background: var(--ph-strong);
+  box-shadow: 0 0 24px 6px var(--ph);
+}
+
+:root[data-leaving='enter-game'] .casing > .screen::before {
+  animation: flare-up 460ms ease-in forwards;
+}
+
+:root[data-entering='exit-game'] .casing > .screen::before {
+  animation: flare-down 560ms ease-out 160ms both;
+}
+
+@keyframes flare-up {
+  0% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.3;
+  }
+  55%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes flare-down {
+  0%,
+  28% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.55;
+  }
+  72%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes crt-off {
+  0% {
+    transform: scale(1, 1);
+    filter: brightness(1);
+  }
+  55% {
+    transform: scale(1, 0.006);
+    filter: brightness(1.6);
+  }
+  82% {
+    transform: scale(0.03, 0.006);
+    filter: brightness(2.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes go-dark {
+  to {
+    filter: brightness(0);
+  }
+}
+
+/* A lamp catching: dark, a stutter, then full light. */
+@keyframes lamp-on {
+  0% {
+    opacity: 0;
+    filter: brightness(0.1);
+    transform: scale(1.03);
+  }
+  22% {
+    opacity: 1;
+    filter: brightness(0.6);
+  }
+  32% {
+    filter: brightness(0.25);
+  }
+  46% {
+    filter: brightness(0.85);
+  }
+  54% {
+    filter: brightness(0.6);
+  }
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+}
+
+/* ---- Leaving a game ------------------------------------------------------- */
+
+:root[data-leaving='exit-game'] .cv {
+  animation: lamp-off 380ms ease-in forwards;
+}
+
+:root[data-entering='exit-game'] .casing {
+  animation: light-up 240ms ease-out backwards;
+}
+
+:root[data-entering='exit-game'] .casing > .screen {
+  animation: crt-on 560ms cubic-bezier(0.2, 0.7, 0.3, 1) 160ms backwards;
+}
+
+@keyframes lamp-off {
+  0% {
+    filter: brightness(1);
+  }
+  18% {
+    filter: brightness(0.55);
+  }
+  28% {
+    filter: brightness(0.8);
+  }
+  100% {
+    filter: brightness(0);
+    transform: scale(0.985);
+  }
+}
+
+@keyframes light-up {
+  from {
+    filter: brightness(0);
+  }
+}
+
+@keyframes crt-on {
+  0% {
+    transform: scale(0, 0.005);
+    filter: brightness(2.2);
+  }
+  28% {
+    transform: scale(1, 0.005);
+    filter: brightness(1.6);
+  }
+  62% {
+    transform: scale(1, 1.015);
+    filter: brightness(1.3);
+  }
+  100% {
+    transform: scale(1, 1);
+    filter: brightness(1);
+  }
+}
+
+/* ---- Sitting down at a table and getting up ------------------------------- */
+
+:root[data-leaving='sit'] .cv {
+  animation: sit-out 300ms ease-in forwards;
+}
+
+:root[data-entering='sit'] .cv {
+  animation: sit-in 560ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+}
+
+:root[data-leaving='stand'] .cv {
+  animation: stand-out 300ms ease-in forwards;
+}
+
+:root[data-entering='stand'] .cv {
+  animation: stand-in 480ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+}
+
+@keyframes sit-out {
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(16px);
+    filter: brightness(0.5);
+  }
+}
+
+@keyframes sit-in {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+    filter: brightness(0.45);
+  }
+}
+
+@keyframes stand-out {
+  to {
+    opacity: 0;
+    transform: scale(1.04);
+    filter: brightness(0.45);
+  }
+}
+
+@keyframes stand-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+}

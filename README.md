@@ -24,7 +24,7 @@ npm run dev          # http://localhost:5173
 
 ### Deploying
 
-`.github/workflows/deploy.yml` publishes `main` to GitHub Pages. Turn it on once under **Settings → Pages → Build and deployment → Source: GitHub Actions**. The site uses hash URLs (`#/caravan`), so it works from any Pages path.
+`.github/workflows/deploy.yml` publishes `main` to GitHub Pages. Turn it on once under **Settings → Pages → Build and deployment → Source: GitHub Actions**. Don’t pick *Deploy from a branch*: that publishes the raw source instead of the build, and games open to a blank page. The site uses hash URLs (`#/caravan`), so it works from any Pages path.
 
 ## How it’s built
 

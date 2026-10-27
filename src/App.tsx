@@ -1,9 +1,10 @@
 import { Suspense, lazy, useEffect, useSyncExternalStore } from 'react'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Boot } from './hub/Boot'
 import { HubScreen } from './hub/HubScreen'
 import { RecordsScreen } from './hub/RecordsScreen'
 import { SettingsScreen } from './hub/SettingsScreen'
-import { usePath } from './navigation'
+import { navigate, usePath } from './navigation'
 import { useSave } from './store/save'
 
 const CaravanApp = lazy(() => import('./games/caravan/ui/CaravanApp'))
@@ -54,7 +55,9 @@ export default function App() {
   }, [path])
   return (
     <Boot>
-      <Screen path={path} />
+      <ErrorBoundary key={path} onHome={() => navigate('/')}>
+        <Screen path={path} />
+      </ErrorBoundary>
     </Boot>
   )
 }

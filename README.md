@@ -33,11 +33,13 @@ npm run dev          # http://localhost:5173
 - **Seeded randomness** (`src/core/rng.ts`) so any game can be replayed from its seed.
 - **3D tables** are CSS 3D transforms, not WebGL. Caravan's play area tilts away from you in perspective, and cards land from the player's side and turn over as they're dealt and played (`src/games/caravan/caravan-3d.css`). It's on by default; switch to the flat view in Settings or with *3D view* at the table.
 - **Screen transitions** are CSS animations driven by `src/navigation.ts`. Entering a game powers the terminal off and lights the table's lamp; leaving reverses it. They can be turned off in Settings and are skipped when the system asks for reduced motion.
-- **Everything is drawn in code.** Cards are SVG, sound effects are synthesized with Web Audio, and fonts (VT323, Share Tech Mono) are bundled from Fontsource. There are no third-party image or audio assets.
+- **Everything is drawn in code.** Cards are SVG, all audio is synthesized with Web Audio, and fonts (VT323, Share Tech Mono) are bundled from Fontsource. There are no third-party image or audio assets.
+- **Sound** (`src/core/audio/`): warm card whooshes and landings, a small radio band playing generative swing, waltz and blues tunes (`score.ts` holds the music theory, and is unit tested), and saloon chatter from formant-synthesized voices. The terminal hears the saloon through a wall; at a table you're in the room. Repeated notes and phrases are recorded once and replayed, which keeps the CPU cost low.
 
 ```
 src/
-  core/            cards, seeded RNG, caps rules, sound effects
+  core/            cards, seeded RNG, caps rules
+  core/audio/      mixer, sound effects, radio music, crowd chatter
   store/           the persistent save (caps, settings, records, collection)
   hub/             terminal menu, records, settings, boot screen
   components/      shared UI (SVG playing cards)

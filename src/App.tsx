@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useSyncExternalStore } from 'react'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { setAudioScene } from './core/audio/live'
 import { Boot } from './hub/Boot'
 import { HubScreen } from './hub/HubScreen'
 import { RecordsScreen } from './hub/RecordsScreen'
@@ -56,6 +57,8 @@ export default function App() {
   const path = usePath()
   useEffect(() => {
     window.scrollTo(0, 0)
+    // Games are played in the saloon; the hub's terminal is next door.
+    setAudioScene(screenFor(path) ? 'saloon' : 'hub')
   }, [path])
   return (
     <Boot>

@@ -21,8 +21,15 @@ export interface Settings {
   transitions: boolean
   /** Game tables drawn in perspective, with cards that turn over. */
   table3d: boolean
+  /** Sound effects and their volume. */
   sound: boolean
   volume: number
+  /** The saloon radio. */
+  music: boolean
+  musicVolume: number
+  /** Talk, laughter and glasses at the tables. */
+  chatter: boolean
+  chatterVolume: number
 }
 
 export interface GameStats {
@@ -78,7 +85,19 @@ interface SaveActions {
 export const newSave = (): SaveData => ({
   version: 1,
   wallet: { caps: STARTING_CAPS, lastRefillAt: null },
-  settings: { phosphor: 'green', crt: true, flicker: true, transitions: true, table3d: true, sound: true, volume: 0.5 },
+  settings: {
+    phosphor: 'green',
+    crt: true,
+    flicker: true,
+    transitions: true,
+    table3d: true,
+    sound: true,
+    volume: 0.5,
+    music: true,
+    musicVolume: 0.5,
+    chatter: true,
+    chatterVolume: 0.5,
+  },
   stats: {},
   caravan: {
     collection: fullSet('standard').map((c) => c.id),

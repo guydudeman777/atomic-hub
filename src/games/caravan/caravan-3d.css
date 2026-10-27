@@ -189,7 +189,8 @@
 
 /*
  * The opening deal is the same move, staggered. Only the delay changes, so
- * when the deal ends nothing replays.
+ * when the deal ends nothing replays. The beat matches the flat deal in
+ * caravan.css and the deal sounds in Table.tsx.
  */
 :root[data-table3d='on'] .cv-hand.is-dealing .cv-hand__card {
   animation: from-pile 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) calc(480ms + var(--k) * 110ms) backwards;

@@ -1,5 +1,6 @@
-import { Suspense, useEffect, useSyncExternalStore } from 'react'
+import { Suspense, useEffect } from 'react'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { useMediaQuery } from './components/useMediaQuery'
 import { setAudioScene } from './core/audio/live'
 import { Boot } from './hub/Boot'
 import { HubScreen } from './hub/HubScreen'
@@ -9,23 +10,10 @@ import { navigate, usePath } from './navigation'
 import { screenFor } from './routes'
 import { useSave } from './store/save'
 
-const motionQuery = '(prefers-reduced-motion: reduce)'
-function useReducedMotion(): boolean {
-  return useSyncExternalStore(
-    (cb) => {
-      const mq = window.matchMedia(motionQuery)
-      mq.addEventListener('change', cb)
-      return () => mq.removeEventListener('change', cb)
-    },
-    () => window.matchMedia(motionQuery).matches,
-    () => false,
-  )
-}
-
 /** Mirror display settings onto <html> so plain CSS can react to them. */
 function useDisplaySettings() {
   const { phosphor, crt, flicker, transitions, table3d } = useSave((s) => s.settings)
-  const reduced = useReducedMotion()
+  const reduced = useMediaQuery('(prefers-reduced-motion: reduce)')
   useEffect(() => {
     const root = document.documentElement
     root.dataset.phosphor = phosphor

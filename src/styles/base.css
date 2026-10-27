@@ -45,7 +45,24 @@
   --radius-screen: 18px;
   --focus: 0 0 0 2px var(--screen), 0 0 0 4px var(--ph-strong);
 
+  /*
+   * Phones: the notch, rounded corners and home indicator (index.html opts
+   * into viewport-fit=cover), and the visible height. 100vh on a phone is
+   * the height with the browser's toolbars hidden, so it runs under them.
+   */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --app-height: 100vh;
+
   color-scheme: dark;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-height: 100dvh;
+  }
 }
 
 :root[data-phosphor='amber'] {
@@ -71,8 +88,18 @@ body,
   height: 100%;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Taps act at once instead of waiting to see if they're a double-tap zoom. Pinch zoom still works. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   margin: 0;
+  /* Screen transitions scale a screen up a little; that's no reason to scroll sideways. */
+  overflow-x: clip;
   background: var(--case-lo);
   color: var(--ph);
   font-family: var(--font-body);
@@ -99,6 +126,21 @@ a {
 :focus-visible {
   outline: none;
   box-shadow: var(--focus);
+}
+
+/* Short labels for phones, where the full ones don't fit (a span shows one or the other). */
+.narrow-only {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .wide-only {
+    display: none;
+  }
+
+  .narrow-only {
+    display: inline;
+  }
 }
 
 .visually-hidden {

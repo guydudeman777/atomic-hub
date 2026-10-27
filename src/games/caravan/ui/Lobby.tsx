@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PlayingCard } from '../../../components/PlayingCard'
 import { playSfx } from '../../../core/audio/sfx'
 import { Link } from '../../../router'
@@ -78,6 +78,15 @@ function AiSetup() {
   const deck = useDeck(activeDeckId)
   const deckOk = checkDeck(deckCards(deck)).ok
 
+  // On phones the ladder scrolls sideways; start with the chosen opponent in view.
+  const ladderRef = useRef<HTMLOListElement>(null)
+  useEffect(() => {
+    const ladder = ladderRef.current
+    if (!ladder || ladder.scrollWidth <= ladder.clientWidth) return
+    ladder.querySelector('.is-active')?.scrollIntoView({ block: 'nearest', inline: 'center' })
+    // Only on arrival: after that the player scrolls it.
+  }, [])
+
   const deal = () => {
     if (wager > useSave.getState().wallet.caps) {
       playSfx('error')
@@ -96,7 +105,7 @@ function AiSetup() {
 
   return (
     <div className="cv-setup">
-      <ol className="cv-ladder" aria-label="Opponents">
+      <ol className="cv-ladder" aria-label="Opponents" ref={ladderRef}>
         {OPPONENTS.map((o, i) => {
           const open = isUnlocked(i, beaten)
           const wins = beaten[o.id] ?? 0

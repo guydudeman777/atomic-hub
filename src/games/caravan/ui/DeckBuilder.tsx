@@ -58,7 +58,7 @@ export function DeckBuilder() {
 
   const newDeck = () => {
     setDraft({ id: `deck-${Date.now().toString(36)}`, name: `Deck ${decks.length + 1}`, cards: [] })
-    setNotice('New deck. Click cards on the left to add them, then save.')
+    setNotice('New deck. Pick cards from your collection to add them, then save.')
     setConfirmDelete(false)
   }
 
@@ -119,6 +119,12 @@ export function DeckBuilder() {
       </section>
 
       <section className="cv-builder__collection" aria-label="Your collection">
+        {/* Phones: the summary is above, so a running count stays in view while picking cards. */}
+        <p className="cv-builder__tally" aria-hidden="true">
+          <span className={draft.cards.length >= MIN_DECK_SIZE ? 'is-ok' : ''}>{draft.cards.length}</span> cards,{' '}
+          <span className={check.numberCards >= MIN_NUMBER_CARDS ? 'is-ok' : ''}>{check.numberCards}</span> number.{' '}
+          {check.ok ? 'Ready to play.' : 'Not ready yet.'}
+        </p>
         <div className="cv-builder__filters">
           <label className="cv-field cv-field--inline">
             <span>Set</span>

@@ -6,8 +6,10 @@
 /* ---- Casing ------------------------------------------------------------ */
 
 .casing {
+  --gutter: clamp(10px, 2.2vw, 28px);
   min-height: 100%;
-  padding: clamp(10px, 2.2vw, 28px);
+  padding: max(var(--gutter), var(--safe-top)) max(var(--gutter), var(--safe-right)) max(var(--gutter), var(--safe-bottom))
+    max(var(--gutter), var(--safe-left));
   background:
     radial-gradient(circle at 18px 18px, var(--case-hi) 0 3px, transparent 4px) 0 0 / 100% 100% no-repeat,
     radial-gradient(circle at calc(100% - 18px) 18px, var(--case-hi) 0 3px, transparent 4px) 0 0 / 100% 100% no-repeat,
@@ -145,11 +147,21 @@
   white-space: nowrap;
 }
 
-.term-button:hover:not(:disabled) {
+/* Touch screens get the press but not hover, which sticks after a tap. */
+.term-button:active:not(:disabled) {
   background: var(--ph);
   color: var(--screen-deep);
   border-color: var(--ph);
   text-shadow: none;
+}
+
+@media (hover: hover) {
+  .term-button:hover:not(:disabled) {
+    background: var(--ph);
+    color: var(--screen-deep);
+    border-color: var(--ph);
+    text-shadow: none;
+  }
 }
 
 .term-button--primary {
@@ -159,9 +171,16 @@
   text-shadow: none;
 }
 
-.term-button--primary:hover:not(:disabled) {
+.term-button--primary:active:not(:disabled) {
   background: var(--ph-strong);
   border-color: var(--ph-strong);
+}
+
+@media (hover: hover) {
+  .term-button--primary:hover:not(:disabled) {
+    background: var(--ph-strong);
+    border-color: var(--ph-strong);
+  }
 }
 
 .term-button:disabled {
@@ -200,4 +219,24 @@
 
 @keyframes blink {
   50% { opacity: 0; }
+}
+
+/* Key hints are for keyboards, so touch screens don't show them. */
+@media (hover: none) and (pointer: coarse) {
+  .term-kbd {
+    display: none;
+  }
+}
+
+/* Phones: a slimmer nameplate leaves more of the screen for the screen. */
+@media (max-width: 760px) {
+  .casing {
+    gap: 8px;
+  }
+
+  .casing__plate {
+    gap: 10px;
+    padding: 2px 12px 1px;
+    font-size: var(--step-0);
+  }
 }

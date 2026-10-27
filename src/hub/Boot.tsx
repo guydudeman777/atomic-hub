@@ -19,7 +19,7 @@ function alreadyBooted(): boolean {
   }
 }
 
-/** Once-per-session boot text. Any key or click skips it. */
+/** Once-per-session boot text. Any key, click or tap skips it. */
 export function Boot({ children }: { children: React.ReactNode }) {
   const [done, setDone] = useState(alreadyBooted)
   const [shown, setShown] = useState(0)
@@ -58,7 +58,7 @@ export function Boot({ children }: { children: React.ReactNode }) {
           {LINES.slice(0, shown).join('\n')}
           <span className="cursor-blink" aria-hidden="true" />
         </pre>
-        <p className="boot__skip term-dim">Press any key to skip</p>
+        <p className="boot__skip term-dim">Press any key or tap to skip</p>
       </div>
     </div>
   )

@@ -3,6 +3,7 @@ import { type Card, type Suit, SUIT_NAME, cardName } from '../../../core/cards'
 import { playSfx } from '../../../core/audio/sfx'
 import { createRng, randomSeed } from '../../../core/rng'
 import { PlayingCard, SuitIcon } from '../../../components/PlayingCard'
+import { useMediaQuery } from '../../../components/useMediaQuery'
 import { navigate } from '../../../navigation'
 import { useSave } from '../../../store/save'
 import { chooseMove } from '../ai'
@@ -27,6 +28,13 @@ import {
 } from '../engine'
 import { LANE_NAMES, type MatchConfig, useMatch } from './match'
 import { RulesText } from './Rules'
+
+/**
+ * Phones and small windows get the compact table in caravan.css, whose
+ * media queries match this one: the HUD keeps its move log and table
+ * controls behind a Menu button.
+ */
+const COMPACT_TABLE = '(max-width: 900px), (max-height: 520px)'
 
 const AI_DELAY_MS = 750
 /** The AI waits for the opening deal animation before its first move. */
@@ -160,16 +168,16 @@ function TableView({ config, state, log, recent, lastMover, settled }: ViewProps
 
   return (
     <div className="cv-game">
-      <div className="cv-board" aria-label="Caravan table">
-        <PlayerBar
-          name={names[opponent]}
-          state={state}
-          player={opponent}
-          active={state.current === opponent && state.winner === null}
-          setId={config.decks[opponent][0]?.set ?? 'standard'}
-          dealing={dealing}
-        />
+      <PlayerBar
+        name={names[opponent]}
+        state={state}
+        player={opponent}
+        active={state.current === opponent && state.winner === null}
+        setId={config.decks[opponent][0]?.set ?? 'standard'}
+        dealing={dealing}
+      />
 
+      <div className="cv-board" aria-label="Caravan table">
         <div className="cv-felt">
           <div className="cv-row cv-row--top">
             {LANES.map((lane) => (
@@ -380,7 +388,7 @@ function CaravanColumn({ owner, lane, caravan, recent, playedBy, cardTargets, on
           onClick={disband.onClick}
           aria-label={disband.confirming ? `Confirm disbanding your ${LANE_NAMES[lane]} caravan` : `Disband your ${LANE_NAMES[lane]} caravan`}
         >
-          {disband.confirming ? 'Click again to disband' : 'Disband'}
+          {disband.confirming ? 'Confirm disband' : 'Disband'}
         </button>
       )}
     </div>
@@ -476,11 +484,63 @@ function Hud({ config, status, help, log, canDiscard, hasSelection, onDiscard, o
   const updateSettings = useSave((s) => s.updateSettings)
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [showRules, setShowRules] = useState(false)
+  const compact = useMediaQuery(COMPACT_TABLE)
+  const [menuOpen, setMenuOpen] = useState(false)
+  // The menu belongs to the compact layout. Turning a tablet can leave it, and it stays closed.
+  if (menuOpen && !compact) setMenuOpen(false)
+  const closeMenu = () => {
+    setMenuOpen(false)
+    setConfirmLeave(false)
+  }
   const logRef = useRef<HTMLOListElement>(null)
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight })
-  }, [log])
+  }, [log, menuOpen])
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeMenu()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
   const opponent = opponentById(config.opponentId ?? '')
+
+  const moveLog = (
+    <ol className="cv-hud__log" ref={logRef} aria-label="Move log">
+      {log.map((e) => (
+        <li key={e.id} data-player={e.player}>
+          {e.text}
+        </li>
+      ))}
+    </ol>
+  )
+  const tableControls = (
+    <div className="cv-hud__foot">
+      <button
+        className="term-button"
+        onClick={() => {
+          closeMenu()
+          setShowRules(true)
+        }}
+      >
+        Rules
+      </button>
+      <button className="term-button" aria-pressed={table3d} onClick={() => updateSettings({ table3d: !table3d })}>
+        <span aria-hidden="true">{table3d ? '[x]' : '[ ]'}</span> 3D view
+      </button>
+      {confirmLeave ? (
+        <button
+          className="term-button"
+          onClick={() => void navigate('/caravan', { during: forfeit })}
+        >
+          {config.wager > 0 ? `Forfeit ${config.wager} caps` : 'Leave for real'}
+        </button>
+      ) : (
+        <button className="term-button" onClick={() => setConfirmLeave(true)}>
+          Leave table
+        </button>
+      )}
+    </div>
+  )
 
   return (
     <aside className="cv-hud screen" aria-label="Game status">
@@ -499,34 +559,25 @@ function Hud({ config, status, help, log, canDiscard, hasSelection, onDiscard, o
         <button className="term-button" disabled={!hasSelection} onClick={onCancel}>
           Cancel <span className="term-kbd">Esc</span>
         </button>
-      </div>
-      <ol className="cv-hud__log" ref={logRef} aria-label="Move log">
-        {log.map((e) => (
-          <li key={e.id} data-player={e.player}>
-            {e.text}
-          </li>
-        ))}
-      </ol>
-      <div className="cv-hud__foot">
-        <button className="term-button" onClick={() => setShowRules(true)}>
-          Rules
-        </button>
-        <button className="term-button" aria-pressed={table3d} onClick={() => updateSettings({ table3d: !table3d })}>
-          <span aria-hidden="true">{table3d ? '[x]' : '[ ]'}</span> 3D view
-        </button>
-        {confirmLeave ? (
-          <button
-            className="term-button"
-            onClick={() => void navigate('/caravan', { during: forfeit })}
-          >
-            {config.wager > 0 ? `Forfeit ${config.wager} caps` : 'Leave for real'}
-          </button>
-        ) : (
-          <button className="term-button" onClick={() => setConfirmLeave(true)}>
-            Leave table
+        {compact && (
+          <button className="term-button cv-hud__menu" aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
+            Menu
           </button>
         )}
       </div>
+      {!compact && moveLog}
+      {!compact && tableControls}
+      {menuOpen && (
+        <div className="cv-overlay" role="dialog" aria-modal="true" aria-label="Table menu" onClick={closeMenu}>
+          <div className="cv-menu screen" onClick={(e) => e.stopPropagation()}>
+            {moveLog}
+            {tableControls}
+            <button className="term-button term-button--primary" autoFocus onClick={closeMenu}>
+              Back to the game
+            </button>
+          </div>
+        </div>
+      )}
       {showRules && (
         <div className="cv-overlay" role="dialog" aria-modal="true" aria-label="Caravan rules" onClick={() => setShowRules(false)}>
           <div className="cv-paper cv-rules-modal" onClick={(e) => e.stopPropagation()}>

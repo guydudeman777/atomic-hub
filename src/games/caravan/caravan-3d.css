@@ -18,7 +18,8 @@
 :root[data-table3d='on'] .cv-board {
   --tilt: 26deg;
   perspective: 1600px;
-  perspective-origin: 50% 0%;
+  /* Looking from the top of the table, above the opponent's bar. */
+  perspective-origin: 50% -60px;
 }
 
 /* ---- The mat ------------------------------------------------------------ */
@@ -175,9 +176,9 @@
   gap: 3px;
 }
 
-/* A loose fan around a point well below the cards. */
+/* A loose fan around a point well below the cards (the card's middle, not its strip's, when they overlap). */
 :root[data-table3d='on'] .cv-hand__card {
-  transform-origin: 50% 340%;
+  transform-origin: calc(var(--card-w) / 2) 340%;
   rotate: calc((var(--k) - (var(--n) - 1) / 2) * 2.4deg);
   perspective: 800px;
   animation: from-pile 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
@@ -221,5 +222,44 @@
   }
   35% {
     transform: rotateY(-150deg);
+  }
+}
+
+/* ---- Phones and small windows (the compact table in caravan.css) ------------ */
+
+@media (max-width: 900px), (max-height: 520px) {
+  :root[data-table3d='on'] .cv-board {
+    --tilt: 22deg;
+    perspective: 1100px;
+    perspective-origin: 50% -40px;
+  }
+
+  :root[data-table3d='on'] .cv-felt {
+    margin-top: -12px;
+    padding: 10px 8px 8px;
+    border-radius: 16px;
+    outline-offset: -6px;
+  }
+
+  :root[data-table3d='on'] .cv-hand-row {
+    gap: 22px;
+    margin-top: -8px;
+    padding-inline: 16px;
+  }
+
+  /* A flatter fan, so the cards at the ends stay on screen. */
+  :root[data-table3d='on'] .cv-hand__card {
+    transform-origin: calc(var(--card-w) / 2) 260%;
+    rotate: calc((var(--k) - (var(--n) - 1) / 2) * 1.2deg);
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  :root[data-table3d='on'] .cv-board {
+    perspective-origin: 50% 0%;
+  }
+
+  :root[data-table3d='on'] .cv-hand-row {
+    margin-bottom: calc(var(--card-h) * -0.36);
   }
 }

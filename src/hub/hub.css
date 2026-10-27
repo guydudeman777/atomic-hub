@@ -62,8 +62,10 @@
   top: 2px;
 }
 
-.hub-tab:hover {
-  color: var(--ph);
+@media (hover: hover) {
+  .hub-tab:hover {
+    color: var(--ph);
+  }
 }
 
 .hub-tab[aria-selected='true'] {
@@ -107,6 +109,8 @@
 
 .hub-item::before {
   content: '>';
+  /* Decoration: screen readers shouldn't read "greater than" before every name. */
+  content: '>' / '';
   position: absolute;
   left: 10px;
   opacity: 0;
@@ -130,6 +134,17 @@
   font-family: var(--font-body);
   font-size: var(--step--1);
   opacity: 0.8;
+}
+
+/* On phones the Play button is below the fold, so the chosen game says it opens with another tap. */
+.hub-item__go {
+  display: none;
+  align-self: center;
+  padding: 2px 8px 1px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  font-size: var(--step-0);
+  line-height: 1;
 }
 
 .hub-detail {
@@ -218,8 +233,14 @@
   font-weight: 400;
 }
 
+.records-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .settings__group {
   max-width: 640px;
+  min-width: 0;
   margin: 0;
   padding: 12px 18px 16px;
   border: 2px solid var(--ph-faint);
@@ -236,8 +257,9 @@
 
 .settings__row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 18px;
+  gap: 8px 18px;
 }
 
 .settings__row > span:first-child {
@@ -264,6 +286,7 @@
 .settings input[type='range'] {
   accent-color: var(--ph);
   width: 220px;
+  max-width: 100%;
 }
 
 .settings__hint {
@@ -298,23 +321,115 @@
 }
 
 @media (max-width: 760px) {
-  .hub-body {
-    grid-template-columns: 1fr;
+  .term-header {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 16px;
+    padding: 14px 16px 10px;
   }
 
+  .term-title {
+    font-size: clamp(1.75rem, 8.5vw, var(--step-3));
+    white-space: nowrap;
+  }
+
+  .caps {
+    margin-left: auto;
+  }
+
+  .hub-tabs {
+    padding: 0 16px;
+    gap: 6px 12px;
+  }
+
+  .hub-tab {
+    padding: 6px 10px 8px;
+    white-space: nowrap;
+  }
+
+  .hub-body {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 14px 16px;
+  }
+
+  .hub-item__go {
+    display: block;
+  }
+
+  /* The glyph sits beside the name instead of above it. */
   .hub-detail {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px 14px;
+    max-width: none;
     border-left: 0;
     padding-left: 0;
     border-top: 2px solid var(--ph-faint);
     padding-top: 16px;
   }
 
+  .hub-detail > :not(.hub-detail__icon, .term-heading) {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .hub-detail__icon {
+    margin: 0;
+  }
+
+  .hub-detail__icon svg {
+    width: 64px;
+    height: 64px;
+  }
+
   .hub-footer {
     display: none;
   }
 
-  .term-title {
-    font-size: var(--step-3);
+  .hub-page {
+    padding: 8px 16px 24px;
+  }
+
+  .boot__text {
+    font-size: clamp(14px, 4.4vw, var(--step-2));
+  }
+}
+
+@media (max-width: 520px) {
+  .hub-item {
+    padding: 8px 10px 8px 26px;
+    font-size: var(--step-1);
+  }
+
+  .hub-item::before {
+    left: 9px;
+  }
+
+  .hub-detail__blurb {
+    font-size: var(--step-0);
+  }
+
+  /* Labels on the left, their controls lined up on the right. */
+  .settings__row > span:first-child,
+  .settings__channel {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .settings input[type='range'] {
+    flex: 1 1 120px;
+    width: auto;
+  }
+
+  .settings__group {
+    padding: 10px 14px 14px;
+  }
+
+  .records th,
+  .records td {
+    padding: 6px 10px 6px 0;
   }
 }
 

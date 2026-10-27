@@ -9,10 +9,10 @@ import '../caravan.css'
 import '../caravan-3d.css'
 
 const SECTIONS = [
-  { path: '/caravan', label: 'Tables' },
-  { path: '/caravan/decks', label: 'Deck builder' },
-  { path: '/caravan/trader', label: 'Trader' },
-  { path: '/caravan/rules', label: 'How to play' },
+  { path: '/caravan', label: 'Tables', short: 'Tables' },
+  { path: '/caravan/decks', label: 'Deck builder', short: 'Decks' },
+  { path: '/caravan/trader', label: 'Trader', short: 'Trader' },
+  { path: '/caravan/rules', label: 'How to play', short: 'Rules' },
 ]
 
 export default function CaravanApp({ path }: { path: string }) {
@@ -39,13 +39,15 @@ export default function CaravanApp({ path }: { path: string }) {
     <div className="cv cv-wood cv-page">
       <header className="cv-header">
         <Link to="/" className="cv-back">
-          Back to the hub
+          <span className="wide-only">Back to the hub</span>
+          <span className="narrow-only">‹ Hub</span>
         </Link>
         <h1 className="cv-title">Caravan</h1>
         <nav className="cv-nav" aria-label="Caravan">
           {SECTIONS.map((s) => (
             <Link key={s.path} to={s.path} className="cv-nav__link" aria-current={path === s.path ? 'page' : undefined}>
-              {s.label}
+              <span className="wide-only">{s.label}</span>
+              <span className="narrow-only">{s.short}</span>
             </Link>
           ))}
         </nav>

@@ -1,0 +1,121 @@
+/*
+ * The Atomic Hub: global tokens and base styles.
+ *
+ * Two worlds share these tokens:
+ * - the terminal (hub, menus, in-game HUD): monochrome phosphor on a dark tube
+ * - the tables (each game's felt or wood), defined in that game's stylesheet
+ */
+
+:root {
+  /* Phosphor: green by default, amber via [data-phosphor='amber'] */
+  --ph: #6cf7a0;
+  --ph-strong: #b4ffd0;
+  --ph-dim: #38a26a;
+  --ph-faint: #1d5a3a;
+  --ph-ghost: rgba(108, 247, 160, 0.08);
+  --ph-glow: rgba(108, 247, 160, 0.45);
+  --screen: #04170d;
+  --screen-deep: #010b06;
+
+  /* Hardware casing around the screen */
+  --case: #2b2e22;
+  --case-hi: #474c37;
+  --case-lo: #181a12;
+  --plate: #cfc29a;
+  --plate-ink: #2c281b;
+
+  /* Card stock */
+  --card-face: #f3e9d2;
+  --card-edge: #cdbb92;
+  --card-ink: #1f1b16;
+  --card-red: #a3291f;
+
+  --font-display: 'VT323', ui-monospace, monospace;
+  --font-body: 'Share Tech Mono', ui-monospace, monospace;
+
+  /* Type scale (perfect fourth from 16px) */
+  --step--1: 0.8125rem;
+  --step-0: 1rem;
+  --step-1: 1.333rem;
+  --step-2: 1.777rem;
+  --step-3: 2.369rem;
+  --step-4: 3.157rem;
+  --step-5: 4.209rem;
+
+  --radius-screen: 18px;
+  --focus: 0 0 0 2px var(--screen), 0 0 0 4px var(--ph-strong);
+
+  color-scheme: dark;
+}
+
+:root[data-phosphor='amber'] {
+  --ph: #ffc35a;
+  --ph-strong: #ffe2a8;
+  --ph-dim: #b9822e;
+  --ph-faint: #5e4014;
+  --ph-ghost: rgba(255, 195, 90, 0.08);
+  --ph-glow: rgba(255, 195, 90, 0.42);
+  --screen: #160e03;
+  --screen-deep: #0a0601;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--case-lo);
+  color: var(--ph);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

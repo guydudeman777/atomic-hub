@@ -1,0 +1,203 @@
+/*
+ * The terminal: a CRT screen set into a riveted olive-drab casing.
+ * Used by the hub and by every in-game HUD panel.
+ */
+
+/* ---- Casing ------------------------------------------------------------ */
+
+.casing {
+  min-height: 100%;
+  padding: clamp(10px, 2.2vw, 28px);
+  background:
+    radial-gradient(circle at 18px 18px, var(--case-hi) 0 3px, transparent 4px) 0 0 / 100% 100% no-repeat,
+    radial-gradient(circle at calc(100% - 18px) 18px, var(--case-hi) 0 3px, transparent 4px) 0 0 / 100% 100% no-repeat,
+    radial-gradient(circle at 18px calc(100% - 18px), var(--case-hi) 0 3px, transparent 4px) 0 0 / 100% 100% no-repeat,
+    radial-gradient(circle at calc(100% - 18px) calc(100% - 18px), var(--case-hi) 0 3px, transparent 4px) 0 0 / 100% 100% no-repeat,
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.015) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, var(--case-hi) 0%, var(--case) 8%, var(--case) 92%, var(--case-lo) 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.casing__plate {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 18px 3px;
+  background: linear-gradient(180deg, #ddd1aa, var(--plate) 40%, #b9ad86);
+  color: var(--plate-ink);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 1px 0 rgba(0, 0, 0, 0.6);
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
+  line-height: 1.1;
+}
+
+.casing__plate::before,
+.casing__plate::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #9d9475, #4c4632);
+}
+
+/* ---- Screen ------------------------------------------------------------ */
+
+.screen {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--radius-screen);
+  background: radial-gradient(ellipse at 50% 45%, var(--screen) 0%, var(--screen) 55%, var(--screen-deep) 100%);
+  box-shadow:
+    inset 0 0 0 2px #0a0c07,
+    inset 0 0 40px rgba(0, 0, 0, 0.85),
+    0 0 0 6px var(--case-lo),
+    0 0 0 7px var(--case-hi);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+[data-crt='on'] .screen {
+  text-shadow: 0 0 5px var(--ph-glow);
+}
+
+/* Scanlines and curvature shading sit above content but ignore the pointer. */
+[data-crt='on'] .screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.55) 100%);
+  mix-blend-mode: multiply;
+}
+
+[data-flicker='on'] .screen {
+  animation: flicker 6s infinite steps(1);
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  41% { opacity: 0.985; }
+  42% { opacity: 1; }
+  77% { opacity: 0.975; }
+  78% { opacity: 1; }
+}
+
+/* ---- Terminal primitives ----------------------------------------------- */
+
+.term-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-4);
+  line-height: 0.95;
+  color: var(--ph-strong);
+  letter-spacing: 0.02em;
+}
+
+.term-heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-3);
+  line-height: 1;
+  color: var(--ph-strong);
+}
+
+.term-rule {
+  height: 0;
+  border: 0;
+  border-top: 2px solid var(--ph-faint);
+  margin: 0;
+}
+
+.term-dim {
+  color: var(--ph-dim);
+}
+
+.term-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  padding: 6px 14px;
+  border: 2px solid var(--ph-dim);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ph);
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.term-button:hover:not(:disabled) {
+  background: var(--ph);
+  color: var(--screen-deep);
+  border-color: var(--ph);
+  text-shadow: none;
+}
+
+.term-button--primary {
+  background: var(--ph);
+  color: var(--screen-deep);
+  border-color: var(--ph);
+  text-shadow: none;
+}
+
+.term-button--primary:hover:not(:disabled) {
+  background: var(--ph-strong);
+  border-color: var(--ph-strong);
+}
+
+.term-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.term-kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 4px;
+  border: 1px solid var(--ph-dim);
+  border-radius: 2px;
+  font-size: var(--step--1);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.term-caps {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  line-height: 1;
+  color: var(--ph-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.cursor-blink {
+  display: inline-block;
+  width: 0.6em;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: var(--ph);
+  animation: blink 1.1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}

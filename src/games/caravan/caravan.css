@@ -787,10 +787,67 @@
 }
 
 .cv-player-bar__who {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+/* The opponent's remarks: a paper speech bubble pointing back at their name. */
+.cv-talk {
+  position: absolute;
+  left: calc(100% + 16px);
+  top: 50%;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.cv-talk__bubble {
+  position: relative;
+  width: max-content;
+  max-width: min(420px, 36vw);
+  margin: 0;
+  padding: 7px 12px 8px;
+  translate: 0 -50%;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f6ecd2, var(--paper));
+  color: var(--ink);
+  font-size: var(--step--1);
+  line-height: 1.35;
+  box-shadow:
+    0 1px 0 var(--paper-edge) inset,
+    0 6px 14px rgba(0, 0, 0, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+  transform-origin: 0 50%;
+  animation:
+    talk-in 0.24s cubic-bezier(0.3, 1.5, 0.5, 1) backwards,
+    talk-out 0.3s ease-in var(--hold) forwards;
+}
+
+.cv-talk__bubble::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  margin-top: -6px;
+  border: 6px solid transparent;
+  border-right: 9px solid var(--paper);
+  border-left-width: 0;
+}
+
+@keyframes talk-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@keyframes talk-out {
+  to {
+    opacity: 0;
+    scale: 0.92;
+  }
 }
 
 .cv-player-bar__name {
@@ -1504,6 +1561,29 @@
     margin-right: -8px;
   }
 
+  /* Remarks drop below the name, where a line of talk has room, pointing up at the speaker. */
+  .cv-talk {
+    left: 0;
+    top: calc(100% + 12px);
+  }
+
+  .cv-talk__bubble {
+    max-width: min(420px, calc(100vw - 32px));
+    translate: none;
+    transform-origin: 15px 0;
+  }
+
+  .cv-talk__bubble::before {
+    right: auto;
+    left: 9px;
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    border: 6px solid transparent;
+    border-bottom: 9px solid var(--paper);
+    border-top-width: 0;
+  }
+
   .cv-felt {
     gap: 4px;
   }
@@ -1663,6 +1743,30 @@
 
   .cv-player-bar__deck {
     align-self: center;
+  }
+
+  /* The opponent sits on the right here, so remarks go out over the board, pointing back at them. */
+  .cv-talk {
+    left: auto;
+    right: calc(100% + 14px);
+    top: 50%;
+  }
+
+  .cv-talk__bubble {
+    max-width: min(360px, 40vw);
+    translate: 0 -50%;
+    transform-origin: 100% 50%;
+  }
+
+  .cv-talk__bubble::before {
+    left: 100%;
+    right: auto;
+    top: 50%;
+    bottom: auto;
+    margin-top: -6px;
+    border: 6px solid transparent;
+    border-left: 9px solid var(--paper);
+    border-right-width: 0;
   }
 
   .cv-hud.screen {

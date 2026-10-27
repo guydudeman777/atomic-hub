@@ -22,6 +22,10 @@ async function dealAgainstTheAi(page: Page) {
   await page.goto('/#/caravan')
   await page.getByRole('button', { name: 'Deal' }).tap()
   await expect(page.locator('.cv-hud__status')).toHaveText(/Opening.*\(1 of 3\)/, { timeout: 10_000 })
+  // The opponent's hello is on screen, wherever the layout puts their name.
+  const hello = page.locator('.cv-talk__bubble')
+  await expect(hello).toContainText('Dusty Pete says:')
+  await expectOnScreen(page, hello)
   // Let the opening deal land.
   await expect(page.locator('.cv-hand.is-dealing')).toHaveCount(0)
 }

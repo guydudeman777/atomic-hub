@@ -26,7 +26,7 @@ import {
   legalMoves,
   other,
 } from '../engine'
-import { LANE_NAMES, type MatchConfig, useMatch } from './match'
+import { LANE_NAMES, type MatchConfig, type Remark, useMatch } from './match'
 import { RulesText } from './Rules'
 
 /**
@@ -48,7 +48,7 @@ const FACE_HELP: Record<string, string> = {
 }
 
 export function Table() {
-  const { gameId, config, state, log, recent, lastMover, settlement } = useMatch()
+  const { gameId, config, state, log, recent, lastMover, remark, settlement } = useMatch()
   const play = useMatch((s) => s.play)
 
   // No match? Back to the lobby.
@@ -67,7 +67,7 @@ export function Table() {
   }, [config, state, play])
 
   if (!config || !state) return null
-  return <TableView key={gameId} config={config} state={state} log={log} recent={recent} lastMover={lastMover} settled={!!settlement} />
+  return <TableView key={gameId} config={config} state={state} log={log} recent={recent} lastMover={lastMover} remark={remark} settled={!!settlement} />
 }
 
 interface ViewProps {
@@ -76,10 +76,11 @@ interface ViewProps {
   log: { id: number; player: PlayerId; text: string }[]
   recent: string[]
   lastMover: PlayerId | null
+  remark: Remark | null
   settled: boolean
 }
 
-function TableView({ config, state, log, recent, lastMover, settled }: ViewProps) {
+function TableView({ config, state, log, recent, lastMover, remark, settled }: ViewProps) {
   const play = useMatch((s) => s.play)
   const hotseat = config.mode === 'hotseat'
   // Hot-seat shows the table from the current player's seat; against the AI you're always seat 0.
@@ -175,6 +176,7 @@ function TableView({ config, state, log, recent, lastMover, settled }: ViewProps
         active={state.current === opponent && state.winner === null}
         setId={config.decks[opponent][0]?.set ?? 'standard'}
         dealing={dealing}
+        talk={hotseat ? undefined : <SpeechBubble name={names[opponent]} remark={remark} />}
       />
 
       <div className="cv-board" aria-label="Caravan table">
@@ -293,7 +295,7 @@ function TableView({ config, state, log, recent, lastMover, settled }: ViewProps
 
 // ---------------------------------------------------------------------------
 
-function PlayerBar(props: { name: string; state: GameState; player: PlayerId; active: boolean; setId: string; dealing: boolean }) {
+function PlayerBar(props: { name: string; state: GameState; player: PlayerId; active: boolean; setId: string; dealing: boolean; talk?: React.ReactNode }) {
   const p = props.state.players[props.player]
   return (
     <div className={`cv-player-bar${props.active ? ' is-active' : ''}`}>
@@ -306,6 +308,7 @@ function PlayerBar(props: { name: string; state: GameState; player: PlayerId; ac
             .slice(0, 2)}
         </span>
         <span className="cv-player-bar__name">{props.name}</span>
+        {props.talk}
       </div>
       <div className={`cv-player-bar__hand${props.dealing ? ' is-dealing' : ''}`} aria-label={`${p.hand.length} cards in hand`}>
         {p.hand.map((c, i) => (
@@ -315,6 +318,39 @@ function PlayerBar(props: { name: string; state: GameState; player: PlayerId; ac
         ))}
       </div>
       <span className="cv-player-bar__deck">Deck {p.deck.length}</span>
+    </div>
+  )
+}
+
+/** Long enough to read the line twice at a relaxed pace. */
+const readingTime = (text: string) => Math.min(6000, Math.max(2600, 1600 + text.length * 55))
+
+/**
+ * The opponent's latest remark, beside their name. It pops up once the cards
+ * have landed and fades after a few seconds; a newer remark replaces it.
+ */
+function SpeechBubble({ name, remark }: { name: string; remark: Remark | null }) {
+  const [shown, setShown] = useState<number | null>(null)
+  useEffect(() => {
+    if (!remark) return
+    const hold = readingTime(remark.text)
+    const show = window.setTimeout(() => setShown(remark.id), remark.delay)
+    // The fade-out in caravan.css starts at `hold`; remove the bubble once it's done.
+    const hide = window.setTimeout(() => setShown(null), remark.delay + hold + 300)
+    return () => {
+      window.clearTimeout(show)
+      window.clearTimeout(hide)
+    }
+  }, [remark])
+  const visible = remark !== null && shown === remark.id
+  return (
+    <div className="cv-talk" aria-live="polite">
+      {visible && (
+        <p key={remark.id} className="cv-talk__bubble" style={{ '--hold': `${readingTime(remark.text)}ms` } as React.CSSProperties}>
+          <span className="visually-hidden">{name} says: </span>
+          {remark.text}
+        </p>
+      )}
     </div>
   )
 }

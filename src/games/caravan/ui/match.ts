@@ -9,6 +9,7 @@ import { createRng, randomSeed } from '../../../core/rng'
 import { crowdReaction } from '../../../core/audio/live'
 import { playSfx } from '../../../core/audio/sfx'
 import { useSave } from '../../../store/save'
+import { TableTalk } from '../banter'
 import { DUPLICATE_BONUS_CAPS, drawUnowned, opponentById } from '../content'
 import { type GameEvent, type GameState, type Lane, type Move, type PlayerId, applyMove, createGame, other } from '../engine'
 
@@ -29,6 +30,14 @@ export interface LogEntry {
   text: string
 }
 
+/** Something the AI opponent says, shown in a speech bubble by their portrait. */
+export interface Remark {
+  id: number
+  text: string
+  /** Milliseconds to wait before showing it, so the cards land first. */
+  delay: number
+}
+
 export interface Settlement {
   winner: PlayerId
   reason: GameState['endReason']
@@ -47,6 +56,8 @@ interface MatchStore {
   recent: string[]
   /** Who made the latest move. */
   lastMover: PlayerId | null
+  /** The opponent's latest remark. It stays here after the bubble fades. */
+  remark: Remark | null
   settlement: Settlement | null
   start: (config: MatchConfig) => boolean
   play: (move: Move) => void
@@ -55,6 +66,13 @@ interface MatchStore {
 }
 
 let logId = 0
+let remarkId = 0
+/** The AI opponent's side of the conversation, for the match in progress. */
+let talk: TableTalk | null = null
+
+/** The greeting waits for the opening deal; remarks wait for the card to land. */
+const HELLO_DELAY_MS = 1500
+const REMARK_DELAY_MS = 450
 
 /** Plain-language log lines, written from the table's point of view. */
 function describe(events: GameEvent[], names: [string, string], mode: MatchConfig['mode']): LogEntry[] {
@@ -150,6 +168,7 @@ export const useMatch = create<MatchStore>()((set, get) => ({
   log: [],
   recent: [],
   lastMover: null,
+  remark: null,
   settlement: null,
 
   start: (config) => {
@@ -157,6 +176,9 @@ export const useMatch = create<MatchStore>()((set, get) => ({
     const rng = createRng(randomSeed())
     const firstPlayer: PlayerId = rng() < 0.5 ? 0 : 1
     const state = createGame({ decks: config.decks, rng, firstPlayer })
+    const opponent = config.mode === 'ai' ? opponentById(config.opponentId ?? '') : undefined
+    talk = opponent ? new TableTalk(opponent.banter, createRng(randomSeed())) : null
+    const remark = talk ? { id: ++remarkId, text: talk.hello(), delay: HELLO_DELAY_MS } : null
     set((s) => ({
       gameId: s.gameId + 1,
       config,
@@ -164,13 +186,14 @@ export const useMatch = create<MatchStore>()((set, get) => ({
       settlement: null,
       recent: [],
       lastMover: null,
+      remark,
       log: [{ id: ++logId, player: firstPlayer, text: `New game. ${config.mode === 'ai' && firstPlayer === 0 ? 'You go' : `${config.names[firstPlayer]} goes`} first.` }],
     }))
     return true
   },
 
   play: (move) => {
-    const { state, config, log } = get()
+    const { state, config, log, remark } = get()
     if (!state || !config || state.winner !== null) return
     const { state: next, events } = applyMove(state, move)
     const mover = state.current
@@ -183,11 +206,13 @@ export const useMatch = create<MatchStore>()((set, get) => ({
         crowdReaction(humanWon ? 'cheer' : 'groan')
       }, 250)
     }
+    const said = talk?.react(state, events, next)
     set({
       state: next,
       log: [...log, ...describe(events, config.names, config.mode)].slice(-120),
       recent: touched(events),
       lastMover: state.current,
+      remark: said ? { id: ++remarkId, text: said, delay: REMARK_DELAY_MS } : remark,
       settlement,
     })
   },
@@ -197,8 +222,12 @@ export const useMatch = create<MatchStore>()((set, get) => ({
     if (state && config && state.winner === null && config.mode === 'ai') {
       useSave.getState().recordResult('caravan', 'loss', -config.wager)
     }
-    set({ config: null, state: null, log: [], recent: [], lastMover: null, settlement: null })
+    talk = null
+    set({ config: null, state: null, log: [], recent: [], lastMover: null, remark: null, settlement: null })
   },
 
-  leave: () => set({ config: null, state: null, log: [], recent: [], lastMover: null, settlement: null }),
+  leave: () => {
+    talk = null
+    set({ config: null, state: null, log: [], recent: [], lastMover: null, remark: null, settlement: null })
+  },
 }))

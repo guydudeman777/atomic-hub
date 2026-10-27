@@ -1,18 +1,8 @@
 import { type Page, expect, test } from '@playwright/test'
-
-/** Fail the test on any uncaught error or console error. */
-function watchErrors(page: Page) {
-  const errors: string[] = []
-  page.on('pageerror', (e) => errors.push(e.message))
-  page.on('console', (m) => {
-    if (m.type() === 'error') errors.push(m.text())
-  })
-  return errors
-}
+import { skipBoot, watchErrors } from './helpers.ts'
 
 test.beforeEach(async ({ page }) => {
-  // Skip the once-per-session boot text.
-  await page.addInitScript(() => sessionStorage.setItem('atomic-hub:booted', '1'))
+  await skipBoot(page)
 })
 
 test('hub menu lists the games and navigates by keyboard', async ({ page }) => {

@@ -93,7 +93,8 @@ export function HubScreen() {
                 playSfx('tick')
               }}
             >
-              {c.label}
+              <span className="wide-only">{c.label}</span>
+              <span className="narrow-only">{c.short}</span>
             </button>
           ))}
         </div>
@@ -116,11 +117,17 @@ export function HubScreen() {
               role="option"
               aria-selected={i === index}
               className={`hub-item${i === index ? ' is-active' : ''}${g.ready ? '' : ' is-locked'}`}
-              onMouseEnter={() => i !== index && select(i)}
+              // A mouse selects by pointing. A tap selects, and a second tap opens.
+              onPointerEnter={(e) => e.pointerType === 'mouse' && i !== index && select(i)}
               onClick={() => (i === index ? open(g) : select(i))}
             >
               <span className="hub-item__name">{g.name}</span>
               {!g.ready && <span className="hub-item__tag">In development</span>}
+              {g.ready && i === index && (
+                <span className="hub-item__go" aria-hidden="true">
+                  Play
+                </span>
+              )}
             </li>
           ))}
         </ul>

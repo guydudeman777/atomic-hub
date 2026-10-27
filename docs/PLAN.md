@@ -1,6 +1,6 @@
 # The Atomic Hub: plan
 
-A desktop-first browser game hub in a retro-futurist wasteland style. Single-player against AI plus local hot-seat. No online multiplayer for now.
+A browser game hub for desktops and phones in a retro-futurist wasteland style. Single-player against AI plus local hot-seat. No online multiplayer for now.
 
 ## Decisions
 
@@ -9,7 +9,7 @@ A desktop-first browser game hub in a retro-futurist wasteland style. Single-pla
 | Platform | Vite + React + TypeScript web app in this repo, deployed to GitHub Pages |
 | Opponents | Computer AI and local hot-seat (pass-the-device screens for hidden hands) |
 | Style | Phosphor terminal hub (green or amber) inside a riveted casing. Each game gets its own table: Caravan is a lamp-lit wooden table, Blackjack a blue felt table on a 1950s casino floor |
-| Layout | Desktop-first. Phones may need to be turned sideways |
+| Layout | Desktop and phone. Each game's table has a compact layout for phones, held upright or sideways |
 | Economy | Shared caps balance, 500 to start. Refill to 500 when below 50 caps, at most once every 10 minutes |
 | Art and sound | All original and generated in code: SVG cards, Web Audio effects. No Fallout logos or assets |
 
@@ -40,11 +40,11 @@ A desktop-first browser game hub in a retro-futurist wasteland style. Single-pla
 3. **Poker.** Video Poker, then Five-Card Draw, then Hold’em, all sharing one hand evaluator.
 4. **Reversi, Checkers, Battleship.**
 5. **Solitaire, Roulette, Craps, Slots.**
-6. **Polish.** Animations, achievements, phone layouts, accessibility pass.
+6. **Polish.** Animations, achievements, accessibility pass. (Phone layouts aren't saved for this phase: the hub and Caravan have them, and each new game ships with its own.)
 
 ## Testing approach
 
 - Unit tests for every rules engine. The poker hand evaluator will be checked against all 2,598,960 five-card hands.
 - Casino payback checked by exact math: Video Poker’s return with perfect play, Roulette’s house edge, the Slots paytable. Blackjack's basic strategy is checked by self-play against the published house edge.
 - AI strength measured by self-play, with each deal played from both seats.
-- Playwright smoke tests for each game route.
+- Playwright smoke tests for each game route, on a desktop and on a touch phone.

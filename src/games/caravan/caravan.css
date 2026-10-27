@@ -18,7 +18,7 @@
   --rust-deep: #9c4227;
 
   color: var(--cream);
-  min-height: 100vh;
+  min-height: var(--app-height);
   font-family: var(--font-body);
 }
 
@@ -31,6 +31,13 @@
     repeating-linear-gradient(178.6deg, rgba(0, 0, 0, 0.05) 0 2px, transparent 2px 7px, rgba(255, 230, 190, 0.03) 7px 9px, transparent 9px 17px),
     linear-gradient(90deg, #6a4629, #5d3d23 22%, #6e4a2c 47%, #5a3b22 71%, #684528);
   background-attachment: fixed;
+}
+
+/* Phones don't keep fixed backgrounds still, and repaint them on every scroll. */
+@media (hover: none) {
+  .cv-wood {
+    background-attachment: scroll;
+  }
 }
 
 .cv-ink-dim {
@@ -91,9 +98,16 @@
   text-decoration: none;
 }
 
-.cv-button:hover:not(:disabled) {
+.cv-button:active:not(:disabled) {
   background: var(--ink);
   color: var(--paper);
+}
+
+@media (hover: hover) {
+  .cv-button:hover:not(:disabled) {
+    background: var(--ink);
+    color: var(--paper);
+  }
 }
 
 .cv-button--primary {
@@ -102,9 +116,16 @@
   color: #fbeed3;
 }
 
-.cv-button--primary:hover:not(:disabled) {
+.cv-button--primary:active:not(:disabled) {
   background: #7e3219;
   border-color: #7e3219;
+}
+
+@media (hover: hover) {
+  .cv-button--primary:hover:not(:disabled) {
+    background: #7e3219;
+    border-color: #7e3219;
+  }
 }
 
 .cv-button--small {
@@ -196,11 +217,12 @@
 }
 
 .cv-header {
+  --gutter: clamp(16px, 3vw, 40px);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px 28px;
-  padding: 18px clamp(16px, 3vw, 40px) 14px;
+  padding: max(18px, var(--safe-top)) max(var(--gutter), var(--safe-right)) 14px max(var(--gutter), var(--safe-left));
   border-bottom: 2px solid rgba(0, 0, 0, 0.35);
   box-shadow: 0 1px 0 rgba(255, 220, 170, 0.08);
 }
@@ -237,8 +259,10 @@
   line-height: 1;
 }
 
-.cv-nav__link:hover {
-  background: rgba(0, 0, 0, 0.25);
+@media (hover: hover) {
+  .cv-nav__link:hover {
+    background: rgba(0, 0, 0, 0.25);
+  }
 }
 
 .cv-nav__link[aria-current='page'] {
@@ -256,8 +280,10 @@
 }
 
 .cv-main {
+  --gutter: clamp(16px, 3vw, 40px);
   flex: 1;
-  padding: clamp(16px, 2.4vw, 32px) clamp(16px, 3vw, 40px) 40px;
+  padding: clamp(16px, 2.4vw, 32px) max(var(--gutter), var(--safe-right)) max(40px, var(--safe-bottom))
+    max(var(--gutter), var(--safe-left));
 }
 
 /* Lobby */
@@ -335,8 +361,10 @@
   grid-row: span 2;
 }
 
-.cv-ladder__row:hover {
-  background: rgba(20, 12, 5, 0.6);
+@media (hover: hover) {
+  .cv-ladder__row:hover {
+    background: rgba(20, 12, 5, 0.6);
+  }
 }
 
 .cv-ladder__row.is-active {
@@ -486,9 +514,16 @@
   border-color: rgba(241, 228, 198, 0.6);
 }
 
-.cv-builder__filters .cv-button:hover {
+.cv-builder__filters .cv-button:active {
   background: var(--cream);
   color: var(--ink);
+}
+
+@media (hover: hover) {
+  .cv-builder__filters .cv-button:hover {
+    background: var(--cream);
+    color: var(--ink);
+  }
 }
 
 .cv-seg {
@@ -540,15 +575,22 @@
   box-shadow: 0 0 0 3px var(--sun);
 }
 
-.cv-grid__card:hover {
-  opacity: 1;
-  transform: translateY(-3px);
+@media (hover: hover) {
+  .cv-grid__card:hover {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
 }
 
 .cv-builder__summary {
   grid-area: summary;
   position: sticky;
   top: 16px;
+}
+
+/* The summary's count, kept in view on phones (see below). */
+.cv-builder__tally {
+  display: none;
 }
 
 .cv-builder__count {
@@ -618,7 +660,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -686,20 +728,38 @@
 /* ---- The table ----------------------------------------------------------- */
 
 .cv-game {
+  --gutter: clamp(10px, 1.6vw, 24px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(260px, 22vw, 340px);
-  height: 100vh;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'opp hud'
+    'board hud';
+  height: var(--app-height);
+  /* Clip rather than hide, so nothing (a scroll into view, say) can scroll the table out of place. */
   overflow: hidden;
+  overflow: clip;
+  /* A long press on a card shouldn't select text or pop up a menu. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* No pull-to-refresh or rubber-banding mid-game. */
+:root:has(.cv-game) {
+  overscroll-behavior: none;
 }
 
 .cv-board {
   --card-w: clamp(56px, min(6.2vw, 9.6vh), 98px);
   --card-h: calc(var(--card-w) * 1.4);
+  grid-area: board;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 8px;
   min-height: 0;
-  padding: 10px clamp(10px, 1.6vw, 24px) 12px;
+  padding: 8px var(--gutter) 12px max(var(--gutter), var(--safe-left));
 }
 
 /* The play area: both rows of caravans with the lane plaques between. */
@@ -711,9 +771,11 @@
 }
 
 .cv-player-bar {
+  grid-area: opp;
   display: flex;
   align-items: center;
   gap: 18px;
+  margin: max(10px, var(--safe-top)) var(--gutter) 0 max(var(--gutter), var(--safe-left));
   padding: 4px 10px;
   border-radius: 6px;
   background: rgba(20, 12, 5, 0.35);
@@ -729,6 +791,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 /* The opponent's remarks: a paper speech bubble pointing back at their name. */
@@ -791,10 +854,14 @@
   font-family: var(--font-display);
   font-size: var(--step-2);
   line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cv-player-bar__hand {
   display: flex;
+  flex: none;
 }
 
 .cv-mini-back {
@@ -807,6 +874,7 @@
   margin-left: auto;
   font-size: var(--step--1);
   opacity: 0.85;
+  white-space: nowrap;
 }
 
 .cv-row {
@@ -911,8 +979,10 @@
   box-shadow: 0 0 0 3px var(--sun), 0 0 16px 2px rgba(242, 184, 75, 0.7);
 }
 
-.cv-slot.is-target:hover {
-  translate: 0 -3px;
+@media (hover: hover) {
+  .cv-slot.is-target:hover {
+    translate: 0 -3px;
+  }
 }
 
 .cv-slot.is-recent,
@@ -939,10 +1009,16 @@
   font-size: var(--step--1);
 }
 
-.cv-disband:hover,
 .cv-disband.is-confirming {
   background: var(--rust-deep);
   border-color: var(--rust-deep);
+}
+
+@media (hover: hover) {
+  .cv-disband:hover {
+    background: var(--rust-deep);
+    border-color: var(--rust-deep);
+  }
 }
 
 /* Lane plaques between the two sides */
@@ -1023,28 +1099,51 @@
   padding-top: 14px;
 }
 
+/*
+ * When the hand is wider than the room for it (phones), the cards overlap:
+ * each button shrinks to a strip and its card spills out underneath the
+ * next one, so the strip you can see is the one you tap. The last card
+ * shows whole.
+ */
 .cv-hand {
   display: flex;
   gap: 8px;
+  min-width: 0;
 }
 
 .cv-hand__card {
-  width: var(--card-w);
+  flex: 0 1 var(--card-w);
+  min-width: 0;
   padding: 0;
   border: 0;
   border-radius: 7px;
   background: none;
+  text-align: left;
   transition: transform 0.12s ease-out;
   filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5));
   animation: deal-in 0.22s ease-out;
 }
 
-.cv-hand__card:hover:not(:disabled) {
-  transform: translateY(-6px);
+.cv-hand__card:last-child {
+  flex-shrink: 0;
+}
+
+.cv-hand__card > * {
+  width: var(--card-w);
+  border-radius: 7px;
+}
+
+@media (hover: hover) {
+  .cv-hand__card:hover:not(:disabled) {
+    transform: translateY(-6px);
+  }
 }
 
 .cv-hand__card.is-selected {
   transform: translateY(-14px);
+}
+
+.cv-hand__card.is-selected > * {
   box-shadow: 0 0 0 3px var(--sun), 0 0 18px 2px rgba(242, 184, 75, 0.7);
 }
 
@@ -1076,10 +1175,12 @@
 }
 
 .cv-pile {
+  flex: none;
   display: grid;
   justify-items: center;
   gap: 4px;
   font-size: var(--step--1);
+  white-space: nowrap;
   opacity: 0.9;
 }
 
@@ -1091,7 +1192,8 @@
 /* HUD: the terminal on the table */
 
 .cv-hud.screen {
-  margin: 12px 12px 12px 0;
+  grid-area: hud;
+  margin: max(12px, var(--safe-top)) max(12px, var(--safe-right)) max(12px, var(--safe-bottom)) 0;
   border-radius: 12px;
   padding: 16px 16px 14px;
   gap: 10px;
@@ -1167,10 +1269,16 @@
   inset: 0;
   z-index: 200;
   display: grid;
-  place-items: center;
-  padding: 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(20px, var(--safe-top)) max(20px, var(--safe-right)) max(20px, var(--safe-bottom)) max(20px, var(--safe-left));
   background: rgba(14, 8, 3, 0.74);
   backdrop-filter: blur(2px);
+}
+
+/* Centered, or from the top and scrolling when it's taller than a phone held sideways. */
+.cv-overlay > * {
+  margin: auto;
 }
 
 .cv-overlay--opaque {
@@ -1232,17 +1340,44 @@
 
 .cv-rules-modal {
   max-width: 76ch;
-  max-height: 86vh;
+  max-height: calc(var(--app-height) * 0.86);
   overflow: auto;
   display: grid;
   gap: 12px;
   justify-items: start;
 }
 
-/* ---- Narrow screens: playable, if cramped ------------------------------- */
+/* The table's menu on phones: the move log and table controls. */
+.cv-menu.screen {
+  width: min(100%, 460px);
+  max-height: min(560px, calc(var(--app-height) - 40px));
+  padding: 14px 16px 16px;
+  gap: 12px;
+  border-radius: 12px;
+  color: var(--ph);
+  font-size: var(--step--1);
+}
+
+.cv-menu .cv-hud__log {
+  min-height: 4.5em;
+  margin: 0;
+  padding: 0 0 8px;
+  border-top: 0;
+  border-bottom: 2px solid var(--ph-faint);
+}
+
+.cv-menu .term-button {
+  font-size: var(--step-0);
+  padding: 6px 12px;
+}
+
+.cv-menu > .term-button--primary {
+  align-self: flex-start;
+}
+
+/* ---- Pages on narrow screens --------------------------------------------- */
 
 @media (max-width: 900px) {
-  .cv-setup,
   .cv-builder {
     grid-template-columns: 1fr;
     grid-template-areas: 'bar' 'summary' 'collection';
@@ -1252,21 +1387,402 @@
     position: static;
   }
 
+  .cv-builder__tally {
+    position: sticky;
+    top: max(0px, var(--safe-top));
+    z-index: 1;
+    display: block;
+    margin: 0 0 10px;
+    padding: 8px 14px;
+    border-radius: 4px;
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
+  }
+
+  .cv-builder__tally span {
+    font-family: var(--font-display);
+    font-size: var(--step-1);
+    line-height: 1;
+    color: var(--rust-deep);
+  }
+
+  .cv-builder__tally span.is-ok {
+    color: #3f6b2a;
+  }
+
+  .cv-mini-grid {
+    max-height: 30vh;
+  }
+}
+
+@media (max-width: 760px) {
+  .cv-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    grid-template-areas:
+      'back title caps'
+      'nav nav nav';
+    gap: 10px 12px;
+    padding-top: max(12px, var(--safe-top));
+    padding-bottom: 10px;
+  }
+
+  .cv-back {
+    grid-area: back;
+    justify-self: start;
+  }
+
+  .cv-title {
+    grid-area: title;
+    font-size: var(--step-3);
+  }
+
+  .cv-caps {
+    grid-area: caps;
+    justify-self: end;
+    font-size: var(--step-1);
+  }
+
+  /* One row of sections that scrolls if it has to, rather than wrapping each label. */
+  .cv-nav {
+    grid-area: nav;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .cv-nav__link {
+    flex: none;
+    padding: 8px 12px;
+  }
+
+  .cv-opponent__head {
+    gap: 12px;
+  }
+
+  .cv-opponent__back {
+    width: 42px;
+  }
+
+  .cv-deal {
+    justify-self: stretch;
+  }
+
+  .cv-set__back {
+    width: 60px;
+  }
+
+  .cv-grid {
+    grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+    gap: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .cv-setup {
+    grid-template-columns: 1fr;
+  }
+
   .cv-hotseat__players {
     grid-template-columns: 1fr;
   }
 
+  /* The opponents line up sideways and scroll, so the chosen one's table is on screen. */
+  .cv-ladder {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(150px, 44%);
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    padding-bottom: 6px;
+  }
+
+  .cv-ladder > li {
+    scroll-snap-align: start;
+  }
+
+  .cv-ladder__row {
+    height: 100%;
+    padding: 8px 10px;
+  }
+
+  .cv-ladder__name {
+    font-size: var(--step-1);
+  }
+}
+
+/* ---- The table on phones and small windows ---------------------------------
+ * Keep these queries in step with COMPACT_TABLE in Table.tsx.
+ *
+ * Upright, the opponent, the board and the HUD stack. Cards are sized to fit
+ * three caravans across and leave both rows room to grow above your hand.
+ * Sideways (the next block), the board takes the left and the opponent and
+ * HUD share a column on the right.
+ */
+
+@media (max-width: 900px), (max-height: 520px) {
   .cv-game {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'opp' 'board' 'hud';
+  }
+
+  .cv-board {
+    --card-w: max(
+      40px,
+      min(
+        (100vw - var(--safe-left) - var(--safe-right) - 16px) / 5.1,
+        (var(--app-height) - var(--safe-top) - var(--safe-bottom) - 280px) / 5.3,
+        98px
+      )
+    );
+    gap: 6px;
+    padding: 6px max(8px, var(--safe-right)) 4px max(8px, var(--safe-left));
+  }
+
+  .cv-player-bar {
+    gap: 10px;
+    margin: max(6px, var(--safe-top)) max(8px, var(--safe-right)) 0 max(8px, var(--safe-left));
+    padding: 3px 8px;
+  }
+
+  .cv-player-bar .cv-portrait {
+    width: 30px;
+    height: 30px;
+    font-size: var(--step-0);
+  }
+
+  .cv-player-bar__name {
+    font-size: var(--step-1);
+  }
+
+  .cv-mini-back {
+    width: 20px;
+    margin-right: -8px;
+  }
+
+  /* Remarks drop below the name, where a line of talk has room, pointing up at the speaker. */
+  .cv-talk {
+    left: 0;
+    top: calc(100% + 12px);
+  }
+
+  .cv-talk__bubble {
+    max-width: min(420px, calc(100vw - 32px));
+    translate: none;
+    transform-origin: 15px 0;
+  }
+
+  .cv-talk__bubble::before {
+    right: auto;
+    left: 9px;
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    border: 6px solid transparent;
+    border-bottom: 9px solid var(--paper);
+    border-top-width: 0;
+  }
+
+  .cv-felt {
+    gap: 4px;
+  }
+
+  .cv-disband {
+    padding: 2px 8px;
+    min-height: 22px;
+    font-size: 12px;
+    line-height: 1.1;
+  }
+
+  .cv-hand-row {
+    gap: 10px;
+    padding-top: 12px;
+  }
+
+  .cv-hand {
+    gap: 4px;
+  }
+
+  .cv-pile {
+    font-size: 11px;
+  }
+
+  .cv-pile__card {
+    width: calc(var(--card-w) * 0.6);
+  }
+
+  /* The HUD: status and pot, the hint, then Discard, Cancel and Menu. */
+  .cv-hud.screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'status pot'
+      'help help'
+      'actions actions';
+    align-content: start;
+    gap: 4px 10px;
+    margin: 0 max(8px, var(--safe-right)) max(8px, var(--safe-bottom)) max(8px, var(--safe-left));
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .cv-hud__head {
+    display: contents;
+  }
+
+  .cv-hud__label {
+    display: none;
+  }
+
+  .cv-hud__pot {
+    grid-area: pot;
+  }
+
+  .cv-hud__status {
+    grid-area: status;
+    font-size: var(--step-1);
+  }
+
+  .cv-hud__help {
+    grid-area: help;
+    min-height: 2.8em;
+    line-height: 1.4;
+  }
+
+  .cv-hud__actions {
+    grid-area: actions;
+    margin-top: 2px;
+  }
+
+  .cv-hud .term-button {
+    padding: 6px 12px;
+  }
+
+  .cv-hud__menu {
+    margin-left: auto;
+  }
+}
+
+/*
+ * Once the lanes are phone-narrow, plaques shrink to the two totals. The
+ * lead shows in the border color and a bar under the leader's total.
+ */
+@media (max-width: 760px), (max-height: 520px) {
+  .cv-plaque {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    max-width: 230px;
+    padding: 3px 8px;
+  }
+
+  .cv-plaque__verdict {
+    display: none;
+  }
+
+  .cv-plaque__value {
+    font-size: var(--step-1);
+  }
+
+  .cv-plaque .cv-heading {
+    font-size: 11px;
+  }
+
+  .cv-plaque.is-theirs .cv-plaque__side:first-child {
+    box-shadow: inset 0 -2px 0 var(--rust);
+  }
+
+  .cv-plaque.is-mine .cv-plaque__side:last-child {
+    box-shadow: inset 0 -2px 0 var(--sage);
+  }
+}
+
+@media (max-width: 380px) {
+  .cv-plaque__side,
+  .cv-plaque__side:last-child {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .cv-game {
+    --hud-w: clamp(200px, 30vw, 270px);
+    grid-template-columns: minmax(0, 1fr) var(--hud-w);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      'board opp'
+      'board hud';
+  }
+
+  /* Height is short here, so it sets the card size; your hand hangs off the bottom edge. */
+  .cv-board {
+    --card-w: max(
+      40px,
+      min(
+        (100vw - var(--safe-left) - var(--safe-right) - var(--hud-w) - 24px) / 5.1,
+        (var(--app-height) - var(--safe-top) - 78px) / 4.68,
+        98px
+      )
+    );
+    padding: max(6px, var(--safe-top)) 6px 0 max(8px, var(--safe-left));
+  }
+
+  .cv-player-bar {
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin: max(6px, var(--safe-top)) max(8px, var(--safe-right)) 6px 0;
+  }
+
+  .cv-player-bar__who {
+    flex: 1 1 100%;
+  }
+
+  .cv-player-bar__deck {
+    align-self: center;
+  }
+
+  /* The opponent sits on the right here, so remarks go out over the board, pointing back at them. */
+  .cv-talk {
+    left: auto;
+    right: calc(100% + 14px);
+    top: 50%;
+  }
+
+  .cv-talk__bubble {
+    max-width: min(360px, 40vw);
+    translate: 0 -50%;
+    transform-origin: 100% 50%;
+  }
+
+  .cv-talk__bubble::before {
+    left: 100%;
+    right: auto;
+    top: 50%;
+    bottom: auto;
+    margin-top: -6px;
+    border: 6px solid transparent;
+    border-left: 9px solid var(--paper);
+    border-right-width: 0;
   }
 
   .cv-hud.screen {
-    margin: 0 8px 8px;
-    max-height: 30vh;
+    margin: 0 max(8px, var(--safe-right)) max(8px, var(--safe-bottom)) 0;
   }
 
-  .cv-hud__log {
-    display: none;
+  .cv-hand-row {
+    margin-bottom: calc(var(--card-h) * -0.36);
+    padding-top: 4px;
+  }
+
+  .cv-hand__card.is-selected {
+    transform: translateY(calc(var(--card-h) * -0.22));
+  }
+
+  .cv-pile {
+    align-self: flex-start;
   }
 }

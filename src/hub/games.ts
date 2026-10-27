@@ -16,10 +16,11 @@ export interface GameInfo {
   icon: 'caravan' | 'cards' | 'chip' | 'dice' | 'wheel' | 'reels' | 'grid' | 'discs' | 'ships' | 'xo'
 }
 
-export const CATEGORIES: { id: Category; label: string }[] = [
-  { id: 'cards', label: 'Card tables' },
-  { id: 'casino', label: 'Casino floor' },
-  { id: 'board', label: 'Board games' },
+/** `short` labels the tabs on phones, where the full labels don't fit in a row. */
+export const CATEGORIES: { id: Category; label: string; short: string }[] = [
+  { id: 'cards', label: 'Card tables', short: 'Cards' },
+  { id: 'casino', label: 'Casino floor', short: 'Casino' },
+  { id: 'board', label: 'Board games', short: 'Board' },
 ]
 
 export const GAMES: readonly GameInfo[] = [

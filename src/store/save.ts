@@ -19,6 +19,8 @@ export interface Settings {
   flicker: boolean
   /** Animated changes between the hub and games; off with reduced motion too. */
   transitions: boolean
+  /** Game tables drawn in perspective, with cards that turn over. */
+  table3d: boolean
   /** Sound effects and their volume. */
   sound: boolean
   volume: number
@@ -88,6 +90,7 @@ export const newSave = (): SaveData => ({
     crt: true,
     flicker: true,
     transitions: true,
+    table3d: true,
     sound: true,
     volume: 0.5,
     music: true,

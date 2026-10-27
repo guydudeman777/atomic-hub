@@ -24,7 +24,7 @@ function useReducedMotion(): boolean {
 
 /** Mirror display settings onto <html> so plain CSS can react to them. */
 function useDisplaySettings() {
-  const { phosphor, crt, flicker, transitions } = useSave((s) => s.settings)
+  const { phosphor, crt, flicker, transitions, table3d } = useSave((s) => s.settings)
   const reduced = useReducedMotion()
   useEffect(() => {
     const root = document.documentElement
@@ -32,7 +32,8 @@ function useDisplaySettings() {
     root.dataset.crt = crt ? 'on' : 'off'
     root.dataset.flicker = flicker && !reduced ? 'on' : 'off'
     root.dataset.transitions = transitions && !reduced ? 'on' : 'off'
-  }, [phosphor, crt, flicker, transitions, reduced])
+    root.dataset.table3d = table3d ? 'on' : 'off'
+  }, [phosphor, crt, flicker, transitions, table3d, reduced])
 }
 
 function Screen({ path }: { path: string }) {

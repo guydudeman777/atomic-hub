@@ -51,6 +51,14 @@ describe('save store', () => {
     expect(useSave.getState().wallet.caps).toBe(STARTING_CAPS - 123)
   })
 
+  it('turns 3D tables on for saves made before the setting existed', () => {
+    const old = snapshot(useSave.getState())
+    const { table3d: _, ...oldSettings } = old.settings
+    useSave.getState().updateSettings({ table3d: false })
+    expect(useSave.getState().importSave(JSON.stringify({ ...old, settings: oldSettings }))).toEqual({ ok: true })
+    expect(useSave.getState().settings.table3d).toBe(true)
+  })
+
   it('rejects files that are not saves', () => {
     expect(useSave.getState().importSave('{"hello":1}')).toMatchObject({ ok: false })
     expect(useSave.getState().importSave('not json')).toMatchObject({ ok: false })

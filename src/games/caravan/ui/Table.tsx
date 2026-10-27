@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type HTMLAttributes, useEffect, useMemo, useRef, useState } from 'react'
 import { type Card, type Suit, SUIT_NAME, cardName } from '../../../core/cards'
 import { playSfx } from '../../../core/audio/sfx'
 import { createRng, randomSeed } from '../../../core/rng'
 import { PlayingCard, SuitIcon } from '../../../components/PlayingCard'
 import { navigate } from '../../../navigation'
+import { useSave } from '../../../store/save'
 import { chooseMove } from '../ai'
 import { opponentById } from '../content'
 import {
@@ -39,7 +40,7 @@ const FACE_HELP: Record<string, string> = {
 }
 
 export function Table() {
-  const { gameId, config, state, log, recent, settlement } = useMatch()
+  const { gameId, config, state, log, recent, lastMover, settlement } = useMatch()
   const play = useMatch((s) => s.play)
 
   // No match? Back to the lobby.
@@ -58,7 +59,7 @@ export function Table() {
   }, [config, state, play])
 
   if (!config || !state) return null
-  return <TableView key={gameId} config={config} state={state} log={log} recent={recent} settled={!!settlement} />
+  return <TableView key={gameId} config={config} state={state} log={log} recent={recent} lastMover={lastMover} settled={!!settlement} />
 }
 
 interface ViewProps {
@@ -66,16 +67,19 @@ interface ViewProps {
   state: GameState
   log: { id: number; player: PlayerId; text: string }[]
   recent: string[]
+  lastMover: PlayerId | null
   settled: boolean
 }
 
-function TableView({ config, state, log, recent, settled }: ViewProps) {
+function TableView({ config, state, log, recent, lastMover, settled }: ViewProps) {
   const play = useMatch((s) => s.play)
   const hotseat = config.mode === 'hotseat'
   // Hot-seat shows the table from the current player's seat; against the AI you're always seat 0.
   const viewer: PlayerId = hotseat ? state.current : 0
   const opponent = other(viewer)
   const myTurn = state.winner === null && state.current === viewer
+  // Cards from across the table arrive from the far side and turn over as they land.
+  const playedBy: PlayedBy = lastMover === opponent ? 'them' : 'me'
   // Selection and disband confirmation belong to one game state; any move clears them.
   const [ui, setUi] = useState<{ for: GameState; selected: string | null; disband: Lane | null }>({ for: state, selected: null, disband: null })
   const selected = ui.for === state ? ui.selected : null
@@ -166,52 +170,61 @@ function TableView({ config, state, log, recent, settled }: ViewProps) {
           dealing={dealing}
         />
 
-        <div className="cv-row cv-row--top">
-          {LANES.map((lane) => (
-            <CaravanColumn
-              key={lane}
-              owner={opponent}
-              lane={lane}
-              caravan={state.players[opponent].caravans[lane]}
-              recent={recent}
-              cardTargets={cardTargets}
-              onPlay={doPlay}
-            />
-          ))}
-        </div>
+        <div className="cv-felt">
+          <div className="cv-row cv-row--top">
+            {LANES.map((lane) => (
+              <CaravanColumn
+                key={lane}
+                owner={opponent}
+                lane={lane}
+                caravan={state.players[opponent].caravans[lane]}
+                recent={recent}
+                playedBy={playedBy}
+                cardTargets={cardTargets}
+                onPlay={doPlay}
+              />
+            ))}
+          </div>
 
-        <div className="cv-row cv-plaques">
-          {LANES.map((lane) => (
-            <LanePlaque key={lane} state={state} lane={lane} viewer={viewer} names={names} hotseat={hotseat} />
-          ))}
-        </div>
+          <div className="cv-row cv-plaques">
+            {LANES.map((lane) => (
+              <LanePlaque key={lane} state={state} lane={lane} viewer={viewer} names={names} hotseat={hotseat} />
+            ))}
+          </div>
 
-        <div className="cv-row cv-row--mine">
-          {LANES.map((lane) => (
-            <CaravanColumn
-              key={lane}
-              owner={viewer}
-              lane={lane}
-              caravan={state.players[viewer].caravans[lane]}
-              recent={recent}
-              cardTargets={cardTargets}
-              onPlay={doPlay}
-              droppable={laneTargets.has(lane)}
-              onDrop={() => {
-                const m = selectedMoves.find((mv) => mv.type === 'play' && mv.index === undefined && mv.lane === lane)
-                if (m) doPlay(m)
-              }}
-              disband={
-                myTurn && !opening && state.players[viewer].caravans[lane].length > 0
-                  ? { confirming: confirmDisband === lane, onClick: () => onDisband(lane) }
-                  : undefined
-              }
-            />
-          ))}
+          <div className="cv-row cv-row--mine">
+            {LANES.map((lane) => (
+              <CaravanColumn
+                key={lane}
+                owner={viewer}
+                lane={lane}
+                caravan={state.players[viewer].caravans[lane]}
+                recent={recent}
+                playedBy={playedBy}
+                cardTargets={cardTargets}
+                onPlay={doPlay}
+                droppable={laneTargets.has(lane)}
+                onDrop={() => {
+                  const m = selectedMoves.find((mv) => mv.type === 'play' && mv.index === undefined && mv.lane === lane)
+                  if (m) doPlay(m)
+                }}
+                disband={
+                  myTurn && !opening && state.players[viewer].caravans[lane].length > 0
+                    ? { confirming: confirmDisband === lane, onClick: () => onDisband(lane) }
+                    : undefined
+                }
+              />
+            ))}
+          </div>
         </div>
 
         <div className="cv-hand-row">
-          <div className={`cv-hand${dealing ? ' is-dealing' : ''}`} role="listbox" aria-label="Your hand">
+          <div
+            className={`cv-hand${dealing ? ' is-dealing' : ''}`}
+            role="listbox"
+            aria-label="Your hand"
+            style={{ '--n': hand.length } as React.CSSProperties}
+          >
             {hand.map((card, i) => {
               const usable = playable.has(card.id)
               return (
@@ -225,7 +238,7 @@ function TableView({ config, state, log, recent, settled }: ViewProps) {
                   onClick={() => setSelected(card.id === selected ? null : card.id)}
                   title={`${cardName(card)} (key ${i + 1})${myTurn && !usable ? '. No legal play right now, but you can discard it.' : ''}`}
                 >
-                  <PlayingCard card={card} faceDown={handoff} />
+                  <FlipCard card={card} faceDown={handoff} />
                 </button>
               )
             })}
@@ -303,6 +316,7 @@ interface ColumnProps {
   lane: Lane
   caravan: Caravan
   recent: string[]
+  playedBy: PlayedBy
   cardTargets: Map<string, Move>
   onPlay: (m: Move) => void
   droppable?: boolean
@@ -310,7 +324,7 @@ interface ColumnProps {
   disband?: { confirming: boolean; onClick: () => void }
 }
 
-function CaravanColumn({ owner, lane, caravan, recent, cardTargets, onPlay, droppable, onDrop, disband }: ColumnProps) {
+function CaravanColumn({ owner, lane, caravan, recent, playedBy, cardTargets, onPlay, droppable, onDrop, disband }: ColumnProps) {
   const n = caravan.length
   return (
     <div className="cv-col">
@@ -327,8 +341,10 @@ function CaravanColumn({ owner, lane, caravan, recent, cardTargets, onPlay, drop
         {caravan.map((placed, i) => {
           const target = cardTargets.get(`${owner}-${lane}-${i}`)
           return (
-            <div
+            <TableCard
               key={placed.card.id}
+              card={placed.card}
+              playedBy={playedBy}
               className={`cv-slot${target ? ' is-target' : ''}${recent.includes(placed.card.id) ? ' is-recent' : ''}`}
               style={{ '--i': i } as React.CSSProperties}
               onClick={
@@ -343,20 +359,18 @@ function CaravanColumn({ owner, lane, caravan, recent, cardTargets, onPlay, drop
               tabIndex={target ? 0 : undefined}
               aria-label={target ? `Play on ${cardName(placed.card)}` : undefined}
               onKeyDown={target ? (e) => (e.key === 'Enter' || e.key === ' ') && onPlay(target) : undefined}
-            >
-              <PlayingCard card={placed.card} />
-            </div>
+            />
           )
         })}
         {caravan.map((placed, i) =>
           placed.attached.map((a, j) => (
-            <div
+            <TableCard
               key={a.id}
+              card={a}
+              playedBy={playedBy}
               className={`cv-attached${recent.includes(a.id) ? ' is-recent' : ''}`}
               style={{ '--i': i, '--j': j } as React.CSSProperties}
-            >
-              <PlayingCard card={a} />
-            </div>
+            />
           )),
         )}
       </div>
@@ -369,6 +383,37 @@ function CaravanColumn({ owner, lane, caravan, recent, cardTargets, onPlay, drop
           {disband.confirming ? 'Click again to disband' : 'Disband'}
         </button>
       )}
+    </div>
+  )
+}
+
+type PlayedBy = 'me' | 'them'
+
+/**
+ * A card on the table. Who played it is fixed when it lands, so later moves
+ * (a King on top, say) don't replay its entrance.
+ */
+function TableCard({ card, playedBy, ...rest }: { card: Card; playedBy: PlayedBy } & HTMLAttributes<HTMLDivElement>) {
+  const [by] = useState(playedBy)
+  return (
+    <div {...rest} data-by={by}>
+      <FlipCard card={card} />
+    </div>
+  )
+}
+
+/**
+ * A face-up card with its back behind it, so the 3D view can turn it over as
+ * it appears. The flat view hides the back.
+ */
+function FlipCard({ card, faceDown = false }: { card: Card; faceDown?: boolean }) {
+  if (faceDown) return <PlayingCard card={card} faceDown />
+  return (
+    <div className="cv-flip">
+      <PlayingCard card={card} />
+      <div className="cv-flip__back" aria-hidden="true">
+        <PlayingCard faceDown set={card.set} />
+      </div>
     </div>
   )
 }
@@ -427,6 +472,8 @@ interface HudProps {
 
 function Hud({ config, status, help, log, canDiscard, hasSelection, onDiscard, onCancel, myTurn }: HudProps) {
   const forfeit = useMatch((s) => s.forfeit)
+  const table3d = useSave((s) => s.settings.table3d)
+  const updateSettings = useSave((s) => s.updateSettings)
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [showRules, setShowRules] = useState(false)
   const logRef = useRef<HTMLOListElement>(null)
@@ -463,6 +510,9 @@ function Hud({ config, status, help, log, canDiscard, hasSelection, onDiscard, o
       <div className="cv-hud__foot">
         <button className="term-button" onClick={() => setShowRules(true)}>
           Rules
+        </button>
+        <button className="term-button" aria-pressed={table3d} onClick={() => updateSettings({ table3d: !table3d })}>
+          <span aria-hidden="true">{table3d ? '[x]' : '[ ]'}</span> 3D view
         </button>
         {confirmLeave ? (
           <button

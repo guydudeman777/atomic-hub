@@ -74,6 +74,17 @@ export function SettingsScreen() {
         </fieldset>
 
         <fieldset className="settings__group">
+          <legend>Tables</legend>
+          <label className="settings__row">
+            <span>3D tables</span>
+            <input type="checkbox" checked={settings.table3d} onChange={(e) => update({ table3d: e.target.checked })} />
+          </label>
+          <p className="term-dim settings__hint">
+            Tilts game tables in perspective and turns cards over as they’re dealt and played. You can also switch it at the table.
+          </p>
+        </fieldset>
+
+        <fieldset className="settings__group">
           <legend>Sound</legend>
           <Channel
             label="Sound effects"

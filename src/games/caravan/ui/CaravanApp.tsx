@@ -6,6 +6,7 @@ import { RulesText } from './Rules'
 import { Table } from './Table'
 import { Trader } from './Trader'
 import '../caravan.css'
+import '../caravan-3d.css'
 
 const SECTIONS = [
   { path: '/caravan', label: 'Tables' },

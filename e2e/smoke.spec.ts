@@ -34,26 +34,33 @@ test('hub menu lists the games and navigates by keyboard', async ({ page }) => {
   expect(errors).toEqual([])
 })
 
-test('a Caravan game against the AI gets through the opening', async ({ page }) => {
-  const errors = watchErrors(page)
-  await page.goto('/#/caravan')
-  await page.getByRole('button', { name: 'Deal' }).click()
-  const status = page.locator('.cv-hud__status')
+for (const view of ['3D', 'flat'] as const) {
+  test(`a Caravan game against the AI gets through the opening (${view} view)`, async ({ page }) => {
+    const errors = watchErrors(page)
+    if (view === 'flat') {
+      await page.goto('/#/settings')
+      await page.getByLabel('3D tables').uncheck()
+    }
+    await page.goto('/#/caravan')
+    await expect(page.locator('html')).toHaveAttribute('data-table3d', view === '3D' ? 'on' : 'off')
+    await page.getByRole('button', { name: 'Deal' }).click()
+    const status = page.locator('.cv-hud__status')
 
-  for (let turn = 1; turn <= 3; turn++) {
-    await expect(status).toHaveText(new RegExp(`Opening.*\\(${turn} of 3\\)`), { timeout: 10_000 })
-    await page.locator('.cv-hand__card:not(.is-dim)').first().click()
-    await page.locator('.cv-caravan.is-drop').first().click()
-  }
+    for (let turn = 1; turn <= 3; turn++) {
+      await expect(status).toHaveText(new RegExp(`Opening.*\\(${turn} of 3\\)`), { timeout: 10_000 })
+      await page.locator('.cv-hand__card:not(.is-dim)').first().click()
+      await page.locator('.cv-caravan.is-drop').first().click()
+    }
 
-  // The opening is over: the AI answers and normal turns begin. (Exact card
-  // counts vary, since the AI may already have played a Jack on you.)
-  await expect(status).toHaveText('Your turn', { timeout: 10_000 })
-  const log = page.getByRole('list', { name: 'Move log' })
-  await expect(log.getByText(/^You played/)).toHaveCount(3)
-  await expect.poll(() => log.getByText(/^Dusty Pete played/).count()).toBeGreaterThanOrEqual(3)
-  expect(errors).toEqual([])
-})
+    // The opening is over: the AI answers and normal turns begin. (Exact card
+    // counts vary, since the AI may already have played a Jack on you.)
+    await expect(status).toHaveText('Your turn', { timeout: 10_000 })
+    const log = page.getByRole('list', { name: 'Move log' })
+    await expect(log.getByText(/^You played/)).toHaveCount(3)
+    await expect.poll(() => log.getByText(/^Dusty Pete played/).count()).toBeGreaterThanOrEqual(3)
+    expect(errors).toEqual([])
+  })
+}
 
 test('hot-seat hides the table between turns', async ({ page }) => {
   const errors = watchErrors(page)
@@ -72,6 +79,22 @@ test('hot-seat hides the table between turns', async ({ page }) => {
   await expect(handoff).toContainText(`Pass the device to ${next}`)
   // While the dialog is up, the hand underneath is face down.
   await expect(page.getByRole('img', { name: 'Face-down card' }).first()).toBeAttached()
+  expect(errors).toEqual([])
+})
+
+test('the 3D view can be switched off at the table and stays off', async ({ page }) => {
+  const errors = watchErrors(page)
+  await page.goto('/#/caravan')
+  await page.getByRole('button', { name: 'Deal' }).click()
+  const toggle = page.getByRole('button', { name: '3D view' })
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('html')).toHaveAttribute('data-table3d', 'on')
+
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.locator('html')).toHaveAttribute('data-table3d', 'off')
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-table3d', 'off')
   expect(errors).toEqual([])
 })
 

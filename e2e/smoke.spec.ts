@@ -45,6 +45,8 @@ for (const view of ['3D', 'flat'] as const) {
     await expect(page.locator('html')).toHaveAttribute('data-table3d', view === '3D' ? 'on' : 'off')
     await page.getByRole('button', { name: 'Deal' }).click()
     const status = page.locator('.cv-hud__status')
+    // The opponent says hello as the cards are dealt.
+    await expect(page.locator('.cv-talk__bubble')).toContainText('Dusty Pete says:')
 
     for (let turn = 1; turn <= 3; turn++) {
       await expect(status).toHaveText(new RegExp(`Opening.*\\(${turn} of 3\\)`), { timeout: 10_000 })

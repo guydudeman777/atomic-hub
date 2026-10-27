@@ -43,7 +43,7 @@ src/
   store/           the persistent save (caps, settings, records, collection)
   hub/             terminal menu, records, settings, boot screen
   components/      shared UI (SVG playing cards)
-  games/caravan/   engine.ts, ai.ts, content.ts (sets, opponents), ui/
+  games/caravan/   engine.ts, ai.ts, banter.ts, content.ts (sets, opponents), ui/
 e2e/               Playwright smoke tests
 ```
 
@@ -59,6 +59,7 @@ Every gambling game shares one caps balance. You start with 500. If you drop bel
 - **AI:** the AI never peeks at your hand. It re-deals the cards it can’t see into a set of possible hands and scores its moves across all of them. Hard also looks ahead to your best reply. Self-play results (each deal played from both seats):
   - Normal beats Easy about 80% of the time.
   - Hard beats Normal about 63% of the time. Caravan is luck-heavy, so that's a real edge.
+- **Table talk:** each opponent greets you and now and then remarks on your plays and their own, in a speech bubble by their name. Big moments, like a Jack on someone's caravan or a lane pushed over 26, usually get a line; ordinary plays rarely do. Nobody talks two turns running. `banter.ts` decides when they speak; their lines are in `content.ts`.
 - **Collection:**
   - You start with the 54-card Wasteland Standard set.
   - Beating each of the five opponents wins cards from their set and unlocks the next opponent.

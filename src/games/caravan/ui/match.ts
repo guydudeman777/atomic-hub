@@ -44,6 +44,8 @@ interface MatchStore {
   log: LogEntry[]
   /** Card ids touched by the latest move, for highlighting. */
   recent: string[]
+  /** Who made the latest move. */
+  lastMover: PlayerId | null
   settlement: Settlement | null
   start: (config: MatchConfig) => boolean
   play: (move: Move) => void
@@ -131,6 +133,7 @@ export const useMatch = create<MatchStore>()((set, get) => ({
   state: null,
   log: [],
   recent: [],
+  lastMover: null,
   settlement: null,
 
   start: (config) => {
@@ -144,6 +147,7 @@ export const useMatch = create<MatchStore>()((set, get) => ({
       state,
       settlement: null,
       recent: [],
+      lastMover: null,
       log: [{ id: ++logId, player: firstPlayer, text: `New game. ${config.mode === 'ai' && firstPlayer === 0 ? 'You go' : `${config.names[firstPlayer]} goes`} first.` }],
     }))
     return true
@@ -164,6 +168,7 @@ export const useMatch = create<MatchStore>()((set, get) => ({
       state: next,
       log: [...log, ...describe(events, config.names, config.mode)].slice(-120),
       recent: touched(events),
+      lastMover: state.current,
       settlement,
     })
   },
@@ -173,8 +178,8 @@ export const useMatch = create<MatchStore>()((set, get) => ({
     if (state && config && state.winner === null && config.mode === 'ai') {
       useSave.getState().recordResult('caravan', 'loss', -config.wager)
     }
-    set({ config: null, state: null, log: [], recent: [], settlement: null })
+    set({ config: null, state: null, log: [], recent: [], lastMover: null, settlement: null })
   },
 
-  leave: () => set({ config: null, state: null, log: [], recent: [], settlement: null }),
+  leave: () => set({ config: null, state: null, log: [], recent: [], lastMover: null, settlement: null }),
 }))

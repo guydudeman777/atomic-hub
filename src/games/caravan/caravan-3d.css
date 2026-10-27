@@ -1,0 +1,224 @@
+/*
+ * The 3D table, on while Settings → 3D tables is (html[data-table3d='on']).
+ * Plain CSS 3D transforms, no WebGL:
+ *
+ * - The mat holding both rows of caravans is one plane tilted away from you
+ *   by --tilt and seen through the board's perspective. Cards on it sit a
+ *   pixel apart in depth, so they stack the way the flat view's z-index does.
+ * - The lane plaques stand up off the mat to face you.
+ * - Cards land from above, yours from your side and your opponent's from
+ *   theirs, turning over as they come down. Your hand is held upright in a
+ *   fan, and its cards turn over as they're dealt and drawn.
+ *
+ * filter, opacity below 1 and overflow flatten 3D for everything inside, so
+ * keep them off the chain from the mat down to the cards. The cards
+ * themselves can have them.
+ */
+
+:root[data-table3d='on'] .cv-board {
+  --tilt: 26deg;
+  perspective: 1600px;
+  perspective-origin: 50% 0%;
+}
+
+/* ---- The mat ------------------------------------------------------------ */
+
+:root[data-table3d='on'] .cv-felt {
+  transform-origin: 50% 100%;
+  transform: rotateX(var(--tilt));
+  transform-style: preserve-3d;
+  margin: -26px 0 0;
+  padding: 18px 22px 14px;
+  border-radius: 22px;
+  /* An old army blanket: olive wool, a lamp pool in the middle, stitched hem. */
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 58%, rgba(255, 222, 160, 0.17), transparent 75%),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.07) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, rgba(255, 240, 200, 0.035) 0 1px, transparent 1px 3px),
+    #4c5434;
+  outline: 2px dashed rgba(236, 224, 188, 0.32);
+  outline-offset: -10px;
+  box-shadow:
+    0 0 0 3px #343a22,
+    inset 0 0 60px rgba(0, 0, 0, 0.4),
+    0 40px 50px rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * Each layer between the mat and the cards sits half a pixel above the one
+ * below it. Browsers can't order hits between elements in the same plane,
+ * so without this, clicks on an empty caravan or a Disband button land on
+ * the mat.
+ */
+:root[data-table3d='on'] .cv-felt :is(.cv-row, .cv-col, .cv-caravan) {
+  transform-style: preserve-3d;
+  transform: translateZ(0.5px);
+}
+
+:root[data-table3d='on'] .cv-felt .cv-col {
+  border-left-color: rgba(236, 224, 188, 0.22);
+}
+
+/* Plaques stand on their bottom edge, square to you, with a thick base. */
+:root[data-table3d='on'] .cv-plaque {
+  transform-origin: 50% 100%;
+  transform: translateZ(1px) rotateX(calc(-1 * var(--tilt)));
+  box-shadow:
+    0 4px 0 #17120b,
+    0 12px 14px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* ---- Cards on the mat --------------------------------------------------- */
+
+:root[data-table3d='on'] .cv-slot {
+  transform: translateZ(calc(1px + var(--i) * 1px));
+  perspective: 700px;
+  animation: land-mine 0.5s cubic-bezier(0.25, 0.7, 0.35, 1);
+}
+
+/* Face cards lie on top of the whole caravan. */
+:root[data-table3d='on'] .cv-attached {
+  transform: translateZ(calc(16px + var(--i) * 1px + var(--j) * 0.5px)) rotate(4deg);
+  perspective: 700px;
+  animation: land-mine 0.5s cubic-bezier(0.25, 0.7, 0.35, 1);
+}
+
+:root[data-table3d='on'] .cv-slot.is-target:hover {
+  translate: 0 0 14px;
+}
+
+/*
+ * Keep the landing first in the list so turning the glow on later doesn't
+ * replay it. The glow waits until the card is down.
+ */
+:root[data-table3d='on'] :is(.cv-slot, .cv-attached).is-recent {
+  animation:
+    land-mine 0.5s cubic-bezier(0.25, 0.7, 0.35, 1),
+    recent-glow 1.6s ease-out 0.4s;
+}
+
+:root[data-table3d='on'] :is(.cv-slot, .cv-attached)[data-by='them'] {
+  animation-name: land-theirs;
+  animation-duration: 0.6s;
+}
+
+:root[data-table3d='on'] :is(.cv-slot, .cv-attached).is-recent[data-by='them'] {
+  animation-name: land-theirs, recent-glow;
+  animation-duration: 0.6s, 1.6s;
+  animation-delay: 0s, 0.5s;
+}
+
+/* The opponent's cards come over face down and turn toward you. */
+:root[data-table3d='on'] [data-by='them'] > .cv-flip {
+  animation: turn-toward 0.6s cubic-bezier(0.3, 0.6, 0.35, 1);
+}
+
+/* From your hand: up off the bottom edge, then down onto the mat. */
+@keyframes land-mine {
+  from {
+    opacity: 0;
+    translate: 0 90% 180px;
+    filter: drop-shadow(0 60px 22px rgba(0, 0, 0, 0.2));
+  }
+  25% {
+    opacity: 1;
+  }
+}
+
+/* From across the table: in over the far edge. */
+@keyframes land-theirs {
+  from {
+    opacity: 0;
+    translate: 0 -120% 220px;
+    filter: drop-shadow(0 70px 26px rgba(0, 0, 0, 0.18));
+  }
+  20% {
+    opacity: 1;
+  }
+}
+
+@keyframes turn-toward {
+  from {
+    transform: rotateX(-180deg);
+  }
+}
+
+/* ---- Turning cards over ---------------------------------------------------- */
+
+:root[data-table3d='on'] .cv-flip {
+  transform-style: preserve-3d;
+}
+
+:root[data-table3d='on'] .cv-flip > svg,
+:root[data-table3d='on'] .cv-flip__back {
+  backface-visibility: hidden;
+}
+
+:root[data-table3d='on'] .cv-flip__back {
+  display: block;
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
+
+/* ---- Your hand -------------------------------------------------------------- */
+
+:root[data-table3d='on'] .cv-hand-row {
+  position: relative;
+  z-index: 1;
+  gap: 44px;
+  margin-top: -18px;
+}
+
+:root[data-table3d='on'] .cv-hand {
+  gap: 3px;
+}
+
+/* A loose fan around a point well below the cards. */
+:root[data-table3d='on'] .cv-hand__card {
+  transform-origin: 50% 340%;
+  rotate: calc((var(--k) - (var(--n) - 1) / 2) * 2.4deg);
+  perspective: 800px;
+  animation: from-pile 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+:root[data-table3d='on'] .cv-hand__card > .cv-flip {
+  animation: turn-up 0.45s cubic-bezier(0.3, 0.6, 0.35, 1);
+}
+
+/*
+ * The opening deal is the same move, staggered. Only the delay changes, so
+ * when the deal ends nothing replays.
+ */
+:root[data-table3d='on'] .cv-hand.is-dealing .cv-hand__card {
+  animation: from-pile 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) calc(480ms + var(--k) * 110ms) backwards;
+}
+
+:root[data-table3d='on'] .cv-hand.is-dealing .cv-hand__card > .cv-flip {
+  animation: turn-up 0.45s cubic-bezier(0.3, 0.6, 0.35, 1) calc(480ms + var(--k) * 110ms) backwards;
+}
+
+/*
+ * Off the top of your deck, which sits just right of the hand. (No scale:
+ * it would work around the fan's pivot, far below the card.)
+ */
+@keyframes from-pile {
+  from {
+    opacity: 0;
+    translate: calc((var(--n) - var(--k)) * (var(--card-w) + 3px) + 30px) 0;
+    rotate: 0deg;
+  }
+  15% {
+    opacity: 1;
+  }
+}
+
+@keyframes turn-up {
+  from {
+    transform: rotateY(-180deg);
+  }
+  35% {
+    transform: rotateY(-150deg);
+  }
+}

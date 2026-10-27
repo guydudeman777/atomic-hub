@@ -31,6 +31,7 @@ npm run dev          # http://localhost:5173
 - **Vite + React + TypeScript**, Zustand for the saved state, a tiny hash router, Vitest and Playwright.
 - **Rules are plain TypeScript.** Each game’s engine (`engine.ts`) has no React in it: create a game, list legal moves, apply a move. The UI and the AI both drive games through that interface, which is what makes the rules testable.
 - **Seeded randomness** (`src/core/rng.ts`) so any game can be replayed from its seed.
+- **3D tables** are CSS 3D transforms, not WebGL. Caravan's play area tilts away from you in perspective, and cards land from the player's side and turn over as they're dealt and played (`src/games/caravan/caravan-3d.css`). It's on by default; switch to the flat view in Settings or with *3D view* at the table.
 - **Screen transitions** are CSS animations driven by `src/navigation.ts`. Entering a game powers the terminal off and lights the table's lamp; leaving reverses it. They can be turned off in Settings and are skipped when the system asks for reduced motion.
 - **Everything is drawn in code.** Cards are SVG, sound effects are synthesized with Web Audio, and fonts (VT323, Share Tech Mono) are bundled from Fontsource. There are no third-party image or audio assets.
 

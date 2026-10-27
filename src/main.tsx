@@ -5,6 +5,7 @@ import '@fontsource/share-tech-mono/latin-400.css'
 import './styles/base.css'
 import './styles/terminal.css'
 import './hub/hub.css'
+import './styles/transitions.css'
 import App from './App.tsx'
 
 // After a new deploy, an open tab may ask for code files that no longer

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { playSfx } from '../core/sfx'
 import { Link } from '../router'
 import { navigate } from '../navigation'
+import { preloadScreen } from '../routes'
 import { emptyStats, useSave } from '../store/save'
 import { CATEGORIES, type Category, GAMES, type GameInfo } from './games'
 import { GameIcon } from './Icons'
@@ -28,6 +29,11 @@ export function HubScreen() {
   const index = Math.min(selected[tab], games.length - 1)
   const game = games[index]
 
+  // Fetch playable games' code in the background so entering one is instant.
+  useEffect(() => {
+    for (const g of GAMES) if (g.ready) void preloadScreen(g.path)
+  }, [])
+
   useEffect(() => {
     try {
       sessionStorage.setItem(TAB_KEY, tab)
@@ -52,8 +58,7 @@ export function HubScreen() {
       playSfx('error')
       return
     }
-    playSfx('select')
-    navigate(g.path)
+    void navigate(g.path)
   }
 
   // Arrow keys drive the menu like a terminal; Enter opens.

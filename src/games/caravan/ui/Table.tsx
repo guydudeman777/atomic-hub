@@ -26,6 +26,8 @@ import { LANE_NAMES, type MatchConfig, useMatch } from './match'
 import { RulesText } from './Rules'
 
 const AI_DELAY_MS = 750
+/** The AI waits for the opening deal animation before its first move. */
+const AI_FIRST_MOVE_DELAY_MS = 1800
 
 const FACE_HELP: Record<string, string> = {
   J: 'Jacks remove a card and everything attached to it.',
@@ -35,7 +37,7 @@ const FACE_HELP: Record<string, string> = {
 }
 
 export function Table() {
-  const { config, state, log, recent, settlement } = useMatch()
+  const { gameId, config, state, log, recent, settlement } = useMatch()
   const play = useMatch((s) => s.play)
 
   // No match? Back to the lobby.
@@ -48,12 +50,13 @@ export function Table() {
   useEffect(() => {
     if (!config || !state || config.mode !== 'ai' || state.winner !== null || state.current !== 1) return
     const profile = opponentById(config.opponentId ?? '')?.profile ?? { difficulty: 'normal', aggression: 1 }
-    const t = window.setTimeout(() => play(chooseMove(state, profile, aiRng.current)), AI_DELAY_MS)
+    const delay = state.turn === 0 ? AI_FIRST_MOVE_DELAY_MS : AI_DELAY_MS
+    const t = window.setTimeout(() => play(chooseMove(state, profile, aiRng.current)), delay)
     return () => window.clearTimeout(t)
   }, [config, state, play])
 
   if (!config || !state) return null
-  return <TableView config={config} state={state} log={log} recent={recent} settled={!!settlement} />
+  return <TableView key={gameId} config={config} state={state} log={log} recent={recent} settled={!!settlement} />
 }
 
 interface ViewProps {
@@ -78,6 +81,12 @@ function TableView({ config, state, log, recent, settled }: ViewProps) {
   const setSelected = (id: string | null) => setUi({ for: state, selected: id, disband: null })
   // Hot-seat hides the table at the start of every turn until the next player is ready.
   const [revealedTurn, setRevealedTurn] = useState<number | null>(null)
+  // The opening hands are dealt one card at a time when the table first appears.
+  const [dealing, setDealing] = useState(true)
+  useEffect(() => {
+    const t = window.setTimeout(() => setDealing(false), 1800)
+    return () => window.clearTimeout(t)
+  }, [])
   const handoff = hotseat && state.winner === null && revealedTurn !== state.turn
 
   const moves = useMemo(() => (myTurn ? legalMoves(state) : []), [state, myTurn])
@@ -136,6 +145,7 @@ function TableView({ config, state, log, recent, settled }: ViewProps) {
           player={opponent}
           active={state.current === opponent && state.winner === null}
           setId={config.decks[opponent][0]?.set ?? 'standard'}
+          dealing={dealing}
         />
 
         <div className="cv-row cv-row--top">
@@ -183,7 +193,7 @@ function TableView({ config, state, log, recent, settled }: ViewProps) {
         </div>
 
         <div className="cv-hand-row">
-          <div className="cv-hand" role="listbox" aria-label="Your hand">
+          <div className={`cv-hand${dealing ? ' is-dealing' : ''}`} role="listbox" aria-label="Your hand">
             {hand.map((card, i) => {
               const usable = playable.has(card.id)
               return (
@@ -192,6 +202,7 @@ function TableView({ config, state, log, recent, settled }: ViewProps) {
                   role="option"
                   aria-selected={card.id === selected}
                   className={`cv-hand__card${card.id === selected ? ' is-selected' : ''}${myTurn && !usable ? ' is-dim' : ''}`}
+                  style={{ '--k': i } as React.CSSProperties}
                   disabled={!myTurn}
                   onClick={() => setSelected(card.id === selected ? null : card.id)}
                   title={`${cardName(card)} (key ${i + 1})${myTurn && !usable ? '. No legal play right now, but you can discard it.' : ''}`}
@@ -243,7 +254,7 @@ function TableView({ config, state, log, recent, settled }: ViewProps) {
 
 // ---------------------------------------------------------------------------
 
-function PlayerBar(props: { name: string; state: GameState; player: PlayerId; active: boolean; setId: string }) {
+function PlayerBar(props: { name: string; state: GameState; player: PlayerId; active: boolean; setId: string; dealing: boolean }) {
   const p = props.state.players[props.player]
   return (
     <div className={`cv-player-bar${props.active ? ' is-active' : ''}`}>
@@ -257,9 +268,9 @@ function PlayerBar(props: { name: string; state: GameState; player: PlayerId; ac
         </span>
         <span className="cv-player-bar__name">{props.name}</span>
       </div>
-      <div className="cv-player-bar__hand" aria-label={`${p.hand.length} cards in hand`}>
-        {p.hand.map((c) => (
-          <div key={c.id} className="cv-mini-back">
+      <div className={`cv-player-bar__hand${props.dealing ? ' is-dealing' : ''}`} aria-label={`${p.hand.length} cards in hand`}>
+        {p.hand.map((c, i) => (
+          <div key={c.id} className="cv-mini-back" style={{ '--k': i } as React.CSSProperties}>
             <PlayingCard faceDown set={props.setId} />
           </div>
         ))}
@@ -438,10 +449,7 @@ function Hud({ config, status, help, log, canDiscard, hasSelection, onDiscard, o
         {confirmLeave ? (
           <button
             className="term-button"
-            onClick={() => {
-              forfeit()
-              navigate('/caravan')
-            }}
+            onClick={() => void navigate('/caravan', { during: forfeit })}
           >
             {config.wager > 0 ? `Forfeit ${config.wager} caps` : 'Leave for real'}
           </button>
@@ -509,10 +517,7 @@ function GameOver() {
           </button>
           <button
             className="cv-button"
-            onClick={() => {
-              leave()
-              navigate('/caravan')
-            }}
+            onClick={() => void navigate('/caravan', { during: leave })}
           >
             Back to the lobby
           </button>

@@ -37,6 +37,8 @@ export interface Settlement {
 }
 
 interface MatchStore {
+  /** Increments with every new deal, so the table remounts and re-deals. */
+  gameId: number
   config: MatchConfig | null
   state: GameState | null
   log: LogEntry[]
@@ -124,6 +126,7 @@ function settle(config: MatchConfig, state: GameState): Settlement {
 }
 
 export const useMatch = create<MatchStore>()((set, get) => ({
+  gameId: 0,
   config: null,
   state: null,
   log: [],
@@ -135,13 +138,14 @@ export const useMatch = create<MatchStore>()((set, get) => ({
     const rng = createRng(randomSeed())
     const firstPlayer: PlayerId = rng() < 0.5 ? 0 : 1
     const state = createGame({ decks: config.decks, rng, firstPlayer })
-    set({
+    set((s) => ({
+      gameId: s.gameId + 1,
       config,
       state,
       settlement: null,
       recent: [],
       log: [{ id: ++logId, player: firstPlayer, text: `New game. ${config.mode === 'ai' && firstPlayer === 0 ? 'You go' : `${config.names[firstPlayer]} goes`} first.` }],
-    })
+    }))
     return true
   },
 

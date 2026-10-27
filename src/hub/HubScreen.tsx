@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { playSfx } from '../core/sfx'
+import { playSfx } from '../core/audio/sfx'
 import { Link } from '../router'
 import { navigate } from '../navigation'
 import { preloadScreen } from '../routes'

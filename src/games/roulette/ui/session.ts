@@ -228,11 +228,18 @@ let quiet = false
 let send: ((input: Input) => void) | null = null
 /** Online, the host: the spin already asked for, so it's asked for once. */
 let spinAsked = -1
+/**
+ * Online: caps in bets you've sent that the table hasn't played yet. They
+ * leave your wallet only when played, so a second bet sent meanwhile can't
+ * count on them.
+ */
+let pending = 0
 
 /** Online: send your bets and spins through this. Null plays them at once. */
 export function sendThrough(fn: ((input: Input) => void) | null) {
   send = fn
   spinAsked = -1
+  pending = 0
 }
 
 let talk: WheelTalk | null = null
@@ -240,6 +247,8 @@ let talk: WheelTalk | null = null
 const broke = new Set<string>()
 
 const caps = () => useSave.getState().wallet.caps
+/** What you can still put down: your caps, less any bets on their way to the table. */
+const spendable = () => Math.max(0, caps() - pending)
 
 const UNIT_WORD: Record<number, string> = { 2: 'twos' }
 
@@ -328,7 +337,10 @@ export const useSession = create<SessionStore>()((set, get) => {
   /** Your bet or take-down: onto the layout at once, or online, to the table to be played in turn. */
   const place = (state: TableState, action: { type: 'bet'; spot: Spot; amount: number } | { type: 'down'; spot: Spot }): TableState => {
     if (!send) return change(state, action)
-    send(action.type === 'bet' ? { ...action, n: state.spins, available: caps() } : { ...action, n: state.spins })
+    if (action.type === 'bet') {
+      send({ ...action, n: state.spins, available: spendable() })
+      pending += action.amount
+    } else send({ ...action, n: state.spins })
     return state
   }
 
@@ -513,6 +525,8 @@ export const useSession = create<SessionStore>()((set, get) => {
       return
     }
     const input = entry.input as Input
+    // One of your bets back from the table, standing or dropped: its caps are no longer on their way.
+    if (seat === online.me && input.type === 'bet') pending = Math.max(0, pending - input.amount)
     if (input.n !== state.spins) return
     switch (input.type) {
       case 'bet':
@@ -629,7 +643,7 @@ export const useSession = create<SessionStore>()((set, get) => {
         return
       }
       set({ focus: spot })
-      const available = caps()
+      const available = spendable()
       const amount = fitBet(state, spot, chip, available)
       if (amount === null) {
         notify(refusal(state, spot, available))
@@ -678,7 +692,7 @@ export const useSession = create<SessionStore>()((set, get) => {
         return
       }
       let placed = 0
-      let available = caps()
+      let available = spendable()
       for (const { spot, amount } of lost) {
         const add = amount - betOn(state, spot)
         if (add <= 0 || !isLegal(state, { type: 'bet', spot, amount: add }, available)) continue

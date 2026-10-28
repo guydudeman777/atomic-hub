@@ -5,8 +5,11 @@ A retro-futurist game hub for the browser: a phosphor-green terminal menu leadin
 **Playable now:**
 - Caravan, the card game from Fallout: New Vegas, against five AI opponents or a friend in hot-seat mode, with a card collection and deck builder.
 - Blackjack at a blue-felt Vegas table, with a full table of regulars or one on one with the dealer, and a basic strategy coach.
+- Five-Card Draw in a saloon’s back room, fixed limit, heads up or against up to five regulars who bluff.
+- Craps on a green felt Vegas layout, with the dice in your hand, every standard bet, and regulars betting along at the rail.
+- Reversi on a walnut board in an atomic-age den, against a ladder of four opponents or a friend in hot-seat mode.
 
-**On the way:** Texas Hold’em, Five-Card Draw, Solitaire, Video Poker, Roulette, Craps, Slots, Connect Four, Checkers, Reversi, Battleship and Tic-Tac-Toe. See [docs/PLAN.md](docs/PLAN.md).
+**On the way:** Texas Hold’em, Solitaire, Video Poker, Roulette, Slots, Connect Four, Checkers, Battleship and Tic-Tac-Toe. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Running it
 
@@ -33,28 +36,32 @@ npm run dev          # http://localhost:5173
 - **Vite + React + TypeScript**, Zustand for the saved state, a tiny hash router, Vitest and Playwright.
 - **Rules are plain TypeScript.** Each game’s engine (`engine.ts`) has no React in it: create a game, list legal moves, apply a move. The UI and the AI both drive games through that interface, which is what makes the rules testable.
 - **Seeded randomness** (`src/core/rng.ts`) so any game can be replayed from its seed.
-- **3D tables** are CSS 3D transforms, not WebGL. Caravan's play area tilts away from you in perspective, and cards land from the player's side and turn over as they're dealt and played (`src/games/caravan/caravan-3d.css`). The Blackjack felt tilts the same way, with chip stacks that rise off it (`src/games/blackjack/blackjack-3d.css`). It's on by default; switch to the flat view in Settings or with *3D view* at the table.
+- **3D tables** are CSS 3D transforms, not WebGL. Caravan's play area tilts away from you in perspective, and cards land from the player's side and turn over as they're dealt and played (`src/games/caravan/caravan-3d.css`). The Blackjack and Five-Card Draw felts tilt the same way, with chip stacks that rise off them (`blackjack-3d.css`, `draw-3d.css`). The Craps dice are 3D cubes thrown from your rail: they hit the rubber-pyramid wall in time with their sound and tumble onto the seeded result (`craps.css`, `craps-3d.css`). Reversi's discs drop onto the felt, and the ones they flank roll over in 3D, ring by ring outward from the move, lifting as they turn; in the flat view they flip in place (`reversi.css`). It's on by default; switch to the flat view in Settings or with *3D view* at the table.
 - **Phones** get their own layouts rather than a shrunken desktop. Each table has a compact layout for phones and small windows (in Caravan's, `caravan.css`, under *The table on phones and small windows*):
   - Held upright, the opponent, board and HUD stack. Held sideways, the board fills the left and the opponent and HUD share a column on the right, with your hand hanging off the bottom edge.
   - Cards are sized from the screen so three caravans fit across and both rows have room to grow. When your hand doesn't fit, its cards overlap and you tap the strip you can see.
   - The move log, rules, 3D switch and *Leave table* sit behind a *Menu* button.
   - Held upright, the Blackjack table becomes a deep half ellipse that fills the screen, with the spots down its sides and cards about 1.7 times the size. Its depth fits the phone (`tallShape` in `src/games/blackjack/ui/layout.ts`). Held sideways, it's the usual half circle with its cards and chips grown against the felt, and the HUD takes a column on the right. The log and table controls go behind *Menu* there too (`blackjack.css`, under *The table on phones and small windows*).
+  - The Five-Card Draw felt becomes a tall oval held upright (`tallShape` in `src/games/draw/ui/layout.ts`), and the wide Craps layout re-lays into a tall column with bets big enough to tap (`tallShape` in `src/games/craps/ui/layout.ts`). The Reversi board stays square and as big as fits, either way up.
   - The hub menu opens a game with a second tap. Hover effects only apply where there's a mouse, so nothing sticks after a tap, and layouts keep clear of notches and the home indicator.
   - Added to a home screen, the hub opens full screen (`public/manifest.webmanifest`).
 - **Screen transitions** are CSS animations driven by `src/navigation.ts`. Entering a game powers the terminal off and lights the table's lamp; leaving reverses it. They can be turned off in Settings and are skipped when the system asks for reduced motion.
-- **Everything is drawn in code.** Cards, chips and the Blackjack felt are SVG, all audio is synthesized with Web Audio, and fonts (VT323, Share Tech Mono, and Limelight for the casino) are bundled from Fontsource. There are no third-party image or audio assets. The PNG app icons in `public/` are rendered from `favicon.svg` by `scripts/render-icons.mjs`.
-- **Sound** (`src/core/audio/`): warm card whooshes and landings, clay chips clacking, a small radio band playing generative swing, waltz and blues tunes (`score.ts` holds the music theory, and is unit tested), and saloon chatter from formant-synthesized voices. The terminal hears the saloon through a wall; at a table you're in the room. Repeated notes and phrases are recorded once and replayed, which keeps the CPU cost low.
+- **Everything is drawn in code.** Cards, chips and the Blackjack felt are SVG, all audio is synthesized with Web Audio, and fonts (VT323 and Share Tech Mono for the terminal; Limelight for the casino, Monoton for its craps marquee, Rye for the saloon and Righteous for the den) are bundled from Fontsource. There are no third-party image or audio assets. The PNG app icons in `public/` are rendered from `favicon.svg` by `scripts/render-icons.mjs`.
+- **Sound** (`src/core/audio/`): warm card whooshes and landings, clay chips clacking, dice skipping down the felt and cracking off the wall, board discs set down and turned over, a small radio band playing generative swing, waltz and blues tunes (`score.ts` holds the music theory, and is unit tested), and saloon chatter from formant-synthesized voices. The terminal hears the saloon through a wall; at a table you're in the room. Repeated notes and phrases are recorded once and replayed, which keeps the CPU cost low.
 
 ```
 src/
-  core/            cards, seeded RNG, caps rules
+  core/            cards, seeded RNG, caps rules, poker hand evaluator (poker.ts)
   core/audio/      mixer, sound effects, radio music, crowd chatter
   store/           the persistent save (caps, settings, records, collection)
   hub/             terminal menu, records, settings, boot screen
   components/      shared UI (SVG playing cards)
   games/caravan/   engine.ts, ai.ts, banter.ts, content.ts (sets, opponents), ui/
   games/blackjack/ engine.ts, strategy.ts, bots.ts, banter.ts, content.ts (tables, regulars), ui/
-e2e/               Playwright smoke tests (smoke.spec.ts on a desktop, phone.spec.ts on a phone)
+  games/draw/      engine.ts, strategy.ts, ai.ts, banter.ts, content.ts (tables, regulars), ui/
+  games/craps/     engine.ts, odds.ts (exact house edges), calls.ts (the stickman), rail.ts (the regulars), content.ts (tables, bet guide), ui/
+  games/reversi/   bits.ts, engine.ts, ai.ts, banter.ts, content.ts (opponents), ui/
+e2e/               Playwright smoke tests: smoke.spec.ts and <game>.spec.ts on a desktop, phone.spec.ts and <game>.phone.spec.ts on a phone
 scripts/           render-icons.mjs: the PNG app icons from favicon.svg
 ```
 
@@ -88,6 +95,44 @@ Every gambling game shares one caps balance. You start with 500. If you drop bel
 - **Coach and count:** the coach lights the basic strategy play for your hand and notes in the log when you play something else. *Count* shows the Hi-Lo running and true counts. The full chart is on the *Strategy chart* page, drawn from the same data the coach uses (`strategy.ts`).
 - **Table talk:** the regulars say hello, cheer a dealer bust, groan at a dealer blackjack, and have opinions about you splitting tens or taking the dealer's bust card. `banter.ts` decides who speaks and when; the dealer calls insurance, the peek and their total.
 - **Tempers** (`tilt.ts`): every loss stings, more for a lost double or split, a dealer blackjack or a run of losses. Depending on their temper, a regular may swear about it (uncensored), slam the table so it shakes and the chips jump, or storm off. Slam it too often and security walks them out; bet like a card counter and the pit boss has a word. At most one scene a round, the most dramatic. An emptied seat stays open for one to three rounds before someone new sits down. In self-play, Big Sal, the worst of them, slams the table about 5 times in 100 rounds; Granny Pearl only ever swears.
+
+### Five-Card Draw
+
+- **Rules:** one deck, shuffled fresh every hand. Everyone antes and gets five cards from the button’s left. A betting round at the small bet, then one draw: up to three cards, or four keeping an Ace. Then a round at the big bet (twice the small) and the showdown. Fixed limit, a bet and three raises a round. No openers: anyone may bet, and if everyone checks the hand still goes to the draw. All-ins and side pots are handled; an all-in short of a full raise doesn’t reopen the betting, and an odd cap in a split pot goes to the first winner left of the button. The full text is under *How to play*, and in the header of `src/games/draw/engine.ts`.
+- **Hands:** `src/core/poker.ts` ranks any five cards and names them (“Two pair, Kings and Sevens”). Video Poker and Hold’em will share it. It’s checked against all 2,598,960 five-card hands, category by category.
+- **Tables:** heads up, or with up to five regulars. Pick penny ante (ante 1, bets 2 and 4), the back room (5, 10 and 20; needs 100 caps) or the cattlemen’s game (25, 50 and 100; needs 500). Your caps are your stack: antes and bets leave your wallet as you make them, so getting up mid-hand forfeits only what’s in the pot. Each hand you play goes on the record.
+- **The regulars:** seven of them (`content.ts`), each with a style in `ai.ts`: tightness, aggression, bluffing, sandbagging and draw habits. Widow Mae plays tight and aggressive and Preacher Eli is a rock. Dutch Hendry is a maniac, and Rosie Two-Guns calls everything and chases inside straights. Silas Pike sandbags, Kid Larkin keeps a kicker and stands pat on air, and the Colonel plays steady. Nobody sees a hidden card: they judge a hand from how finished hands usually come out by how many cards each player drew, and read every bet and raise as strength. When one goes broke, someone else sits down after a hand or three. Self-play:
+  - Heads up, each deal from both seats, 100,000 hands each: a steady by-the-book player beats Dutch by 8.4 big bets per 100 hands, Rosie by 5.6, Kid Larkin by 2.5 and the Colonel by 1.5. It breaks even with Silas (+0.4) and loses narrowly to Widow Mae (−1.0) and Preacher Eli (−1.8), who only put caps in with the goods.
+  - Six-handed, 60,000 hands with everyone rotated through every seat: Widow Mae +2.8, the steady player +2.2, Silas +1.8, Eli −1.2, Rosie −2.2, Dutch −3.3.
+- **Hints:** before your draw the book’s keepers are marked on your cards, with the reason in the terminal, and the log notes it when you draw differently (`strategy.ts`). The book stands pat on a straight or better and keeps trips or two pair; then four to a straight flush, a pair of Jacks or better, four to a flush, a small pair, then an open-ended straight draw. Otherwise it keeps an Ace and draws four, or the two highest and draws three.
+- **Table talk:** the regulars say hello and goodbye, groan at a bad beat with two pair or better, own up when a bluff gets called, crow over big pots, and needle you for standing pat or drawing four. They never give away a hand they didn’t show. The dealer calls the draw, the cap and who takes the pot (`banter.ts`).
+
+### Craps
+
+- **Rules:** one end of a Las Vegas table, and you’re the shooter. On the come-out, 7 or 11 wins the pass line and 2, 3 or 12 loses. Any other number is the point, which has to roll again before a 7. As in Vegas, the shooter needs a pass line or don’t pass bet to come out. The full text is under *How to play*, and in the header of `src/games/craps/engine.ts`.
+- **Bets:**
+  - Pass and Don’t Pass (bar 12), Come and Don’t Come, with odds behind any of them at 3-4-5×, or laid up to 6×.
+  - The Field: 2 pays double, 12 pays triple.
+  - Place 4 to 10, paying 9 to 5, 7 to 5 and 7 to 6, off on the come-out.
+  - Hardways at 7 or 9 to 1, and the one-roll bets: any seven 4 to 1, any craps 7 to 1, yo 15 to 1, aces and boxcars 30 to 1.
+  - Bets go down in the units a dealer asks for, so every payout is whole caps: the 6 and 8 are placed in sixes, for example. A chip that doesn’t fit is rounded up, and the dealer says so.
+  - Pass line bets with a point and come bets on their numbers can’t come down; everything else can.
+- **House edges:** worked out exactly in `odds.ts` by playing each bet through the engine against all 36 rolls until it’s decided, and tested against the published figures. Pass and come 1.41%, don’t pass and don’t come 1.36%, the field 2.78%, place 6 and 8 1.52%, 5 and 9 4.00%, 4 and 10 6.67%, odds nothing at all. Hard 6 and 8 9.09%, hard 4 and 10 11.11%, any seven 16.67%, any craps and yo 11.11%, aces and boxcars 13.89%. The *Bets and odds* page shows the same numbers.
+- **Tables:** low limit (5 to 200 caps, propositions from 1), the main pit (25 to 1,000, propositions from 5) or high limit (100 to 3,000, propositions from 25). Caps go on the layout when you bet. Getting up hands back every bet that can come down and forfeits the rest. Every roll that decides one of your bets goes on the record, with that roll’s net caps.
+- **Guide:** says what any bet pays and its house edge as you point at or tap it, and lights up the pass line, then full odds behind it.
+- **The stickman and the rail:** the stickman calls every roll (“Yo-leven!”, “Six the hard way”, “Seven out, line away”). Three of five regulars play beside you (`rail.ts`), each betting their own caps on your dice through the same engine: Doc takes full odds, Lou bets the don’t, Rosa places the 6 and 8, Spike plays the hardways and Bea plays the field. They talk about points made, seven-outs, long hands and hardways, and when one goes broke someone else steps up. The crowd cheers a point made and groans at a seven-out.
+
+### Reversi
+
+- **Rules:** tournament rules on an 8×8 board. White starts on d4 and e5, Black on d5 and e4, and Black moves first. A move must flank at least one line, and every flanked line turns, in all eight directions. You pass only when you have no move. The game ends when neither side can move, and any empty squares go to the winner. The full text is under *How to play*, and in the header of `src/games/reversi/engine.ts`.
+- **The engine:** bitboards held as two 32-bit halves (`bits.ts`), checked against a plain square-by-square version over hundreds of random games.
+- **Opponents:** four of them, each unlocked by beating the one before. Buddy Novak counts discs and nothing else. Aunt Marge plays by a table of square values. Mr. Fairbanks and Dr. Ida Lund weigh corners, stable edges, mobility, frontier, and the X- and C-squares next to empty corners, with weights tuned by self-play. Their search is alpha-beta, deepening until its time is up (a quarter of a second at most); Fairbanks solves the last 8 squares exactly and Lund the last 14. Self-play, 50 openings each played from both colors:
+  - Aunt Marge beats Buddy 94.5% of the time.
+  - Mr. Fairbanks beats Aunt Marge 86.5% of the time.
+  - Dr. Lund beat Mr. Fairbanks in all 100 games. She’s the last rung.
+- **Hot-seat:** two named players at one board. Nothing in Reversi is hidden, so there’s no handoff screen. Against the AI you choose your color, and the game goes on your record; leaving early counts as a loss. Hot-seat games don’t.
+- **On the board:** *Show moves* marks the squares you can play, and the last disc played wears an orange pip. A pass is announced over the board, and the AI waits until you’ve read it. Arrow keys and Enter play, or type a square’s name, such as D then 3.
+- **Table talk:** each opponent has lines for a corner taken, a pass, a sweep of six or more discs, and now and then an ordinary move. Nobody talks two moves running. `banter.ts` decides when they speak; their lines are in `content.ts`.
 
 ## Credits
 

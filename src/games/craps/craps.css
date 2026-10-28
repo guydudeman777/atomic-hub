@@ -1453,6 +1453,14 @@
   list-style: none;
 }
 
+/* A label for the eye; screen readers get the list's own name. */
+.cr-hud__rolls::before {
+  content: 'Rolls';
+  align-self: center;
+  margin-right: 4px;
+  color: var(--ph-dim);
+}
+
 .cr-hud__rolls li {
   min-width: 2.1em;
   padding: 1px 4px;

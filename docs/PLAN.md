@@ -9,7 +9,7 @@ A browser game hub for desktops and phones in a retro-futurist wasteland style. 
 | Platform | Vite + React + TypeScript web app in this repo, deployed to GitHub Pages |
 | Opponents | Computer AI, local hot-seat (pass-the-device screens for hidden hands), and online with friends |
 | Online | Peer to peer, still with no server: Trystero over public Nostr relays to introduce browsers, WebRTC between them. The host numbers every input and each browser replays them through the same seeded engine. Not cheat-proof: every browser holds the whole game |
-| Style | Phosphor terminal hub (green or amber) inside a riveted casing. Each game gets its own table: Caravan is a lamp-lit wooden table, Blackjack a blue felt table on a 1950s casino floor, Five-Card Draw a green baize table in a saloon’s back room, Craps a green felt pit under marquee lights, Reversi a walnut board in an atomic-age den, Connect Four a big blue rack in a booth on a boardwalk midway, Tic-Tac-Toe grease pencil on a placemat at a roadside diner |
+| Style | Phosphor terminal hub (green or amber) inside a riveted casing. Each game gets its own table: Caravan is a lamp-lit wooden table, Blackjack a blue felt table on a 1950s casino floor, Five-Card Draw a green baize table in a saloon’s back room, Craps a green felt pit under marquee lights, Roulette a gilded art-deco salon on the Riviera, Reversi a walnut board in an atomic-age den, Connect Four a big blue rack in a booth on a boardwalk midway, Tic-Tac-Toe grease pencil on a placemat at a roadside diner |
 | Layout | Desktop and phone. Each game's table has a compact layout for phones, held upright or sideways |
 | Economy | Shared caps balance, 500 to start. Refill to 500 when below 50 caps, at most once every 10 minutes |
 | Art and sound | All original and generated in code: SVG cards, Web Audio effects. No Fallout logos or assets |
@@ -29,7 +29,7 @@ A browser game hub for desktops and phones in a retro-futurist wasteland style. 
 | Reversi | AI ladder of 4, hot-seat | 8×8, tournament rules, empties to the winner | Alpha-beta on bitboards weighing corners, stability, mobility, frontier and X/C-squares; exact endgame solve (8–14 empties) | **Done (phase 4)** |
 | Battleship | AI, hot-seat | 10×10, ships of 5-4-3-3-2 | Hunt/target guided by where ships can fit | Planned |
 | Tic-Tac-Toe | AI ladder of 4, hot-seat | Classic 3×3 and Ultimate 9×9 | Classic solved exactly, with trap-setting among drawing moves; Ultimate by Monte Carlo tree search, 150 to 30,000 playouts | **Done (phase 2)** |
-| Roulette | vs house | European by default, American toggle | — | Planned |
+| Roulette | vs house, 3 regulars at the wheel | European, French (la partage) or American; every inside and outside bet | House edges worked out exactly through the engine; 6 regulars with betting systems | **Done (phase 5)** |
 | Craps | vs house, 3 regulars at the rail | Pass/Don’t Pass, Come/Don’t Come, 3-4-5× odds, Field (2× and 3×), Place, Hardways, one-roll bets; dealer units so every payout is whole caps | House edges worked out exactly through the engine; 5 regulars with their own betting styles | **Done (phase 5)** |
 | Slots | Solo | 3 reels, published paytable, ~95% payback checked by a test | — | Planned |
 
@@ -40,12 +40,12 @@ A browser game hub for desktops and phones in a retro-futurist wasteland style. 
 2. **Blackjack, Connect Four, Tic-Tac-Toe.** *Done.*
 3. **Poker.** Video Poker, Five-Card Draw and Hold’em, all sharing one hand evaluator (`src/core/poker.ts`). *Five-Card Draw and the evaluator done.*
 4. **Reversi, Checkers, Battleship.** *Reversi done.*
-5. **Solitaire, Roulette, Craps, Slots.** *Craps done.*
+5. **Solitaire, Roulette, Craps, Slots.** *Craps and Roulette done.*
 6. **Polish.** Animations, achievements, accessibility pass. (Phone layouts aren't saved for this phase: the hub and Caravan have them, and each new game ships with its own.)
 
 ## Testing approach
 
 - Unit tests for every rules engine. The poker hand evaluator is checked against all 2,598,960 five-card hands.
-- Casino payback checked by exact math: Video Poker’s return with perfect play, Roulette’s house edge, the Slots paytable, and every Craps bet’s house edge (played through the engine against all 36 rolls). Blackjack's basic strategy is checked by self-play against the published house edge.
+- Casino payback checked by exact math: Video Poker’s return with perfect play, every Roulette bet’s house edge on each wheel (played through the engine against every pocket), the Slots paytable, and every Craps bet’s house edge (played through the engine against all 36 rolls). Blackjack's basic strategy is checked by self-play against the published house edge.
 - AI strength measured by self-play, with each deal played from both seats.
 - Playwright smoke tests for each game route, on a desktop and on a touch phone.

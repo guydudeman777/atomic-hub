@@ -26,7 +26,10 @@ for (const view of ['3D', 'flat'] as const) {
     }
     await page.goto('/')
     await page.getByRole('tab', { name: 'Board games' }).click()
-    await page.getByRole('option', { name: /Tic-Tac-Toe/ }).click()
+    // Pointing selects it; Play opens it. (Clicking a game the mouse has just selected opens it, so a click could race the Play button.)
+    const game = page.getByRole('option', { name: /Tic-Tac-Toe/ })
+    await game.hover()
+    await expect(game).toHaveAttribute('aria-selected', 'true')
     await page.getByRole('button', { name: 'Play Tic-Tac-Toe' }).click()
     await expect(page.getByRole('button', { name: /^Skip Dawson/ })).toHaveAttribute('aria-pressed', 'true')
     await page.getByRole('button', { name: 'Slide into the booth' }).click()

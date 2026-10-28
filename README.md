@@ -1,6 +1,6 @@
 # The Atomic Hub
 
-A retro-futurist game hub for the browser: a phosphor-green terminal menu leading to card tables, a casino floor and board games. Plays on desktops and phones, with no server and no accounts. Your caps, records and cards live in your browser and can be exported as a save file.
+A retro-futurist game hub for the browser: a phosphor-green terminal menu leading to card tables, a casino floor and board games. Plays on desktops and phones, with no server and no accounts. Your caps, records and cards live in your browser and can be exported as a save file. Every game can also be played online with friends: one of you hosts a table and sends the others its code.
 
 **Playable now:**
 - Caravan, the card game from Fallout: New Vegas, against five AI opponents or a friend in hot-seat mode, with a card collection and deck builder.
@@ -31,6 +31,27 @@ npm run dev          # http://localhost:5173
 
 `.github/workflows/deploy.yml` publishes `main` to GitHub Pages. Turn it on once under **Settings → Pages → Build and deployment → Source: GitHub Actions**. Don’t pick *Deploy from a branch*: that publishes the raw source instead of the build, and games open to a blank page. The site uses hash URLs (`#/caravan`), so it works from any Pages path.
 
+## Playing online
+
+Every game has an **Online** tab in its lobby. One player hosts a table and gets a six-character code (K7Q-X2M) and an invite link (`#/reversi/join/K7QX2M`); the others type the code in or follow the link. Your name at the table is set there too, and saved.
+
+- **Reversi and Caravan:** two players. Reversi's host picks the colors, which swap every game; in Caravan each of you brings your own active deck. Getting up mid-game resigns. If a player's connection drops, the game waits for them to come back to their seat. These don't use caps or go on your record.
+- **Blackjack:** up to five players, each in their own spot, with regulars in the empty ones if the host wants. The deal goes out once everyone has bet (or sat out), or when the host deals without the stragglers.
+- **Five-Card Draw:** up to six, plus as many regulars as the host picks. Everyone sees the table from their own chair, with only their own cards face up. A hand is dealt once everyone has asked in.
+- **Craps:** up to four at the rail, betting on the same dice. The shooter keeps the dice until they seven out, then they go round the table.
+
+At the card tables and in Craps everyone plays their own caps, and the hands go on their own record. Friends can join between rounds and leave at any time.
+
+**How it works** (`src/net/`):
+
+- **No server.** Browsers find each other through public Nostr relays ([Trystero](https://github.com/dmotz/trystero)), and the game itself runs over WebRTC data channels straight between them. The code is the room's password, so the relays only see encrypted handshakes. Trystero is only loaded when someone goes online.
+- **The table link** (`link.ts`): the host numbers every input (a move, a bet, a throw, someone joining or leaving) and passes it to everyone. Every game is seeded, so each browser plays the same inputs through the same engine and ends up at the same table. The host sends only the setup (seed, stakes, seats) and the inputs, never the state.
+- **Each game's `ui/online.ts`** turns the setup into a sitting and its inputs into moves. The card tables queue inputs until their table is ready for them: a decision waits for that hand's turn, a bet for the round to finish. Each input says when it was made, so a repeated click whose moment has passed is dropped the same way everywhere.
+- **Catching up:** anyone joining late, or coming back after a reload, gets the setup and every input so far, and plays them through quietly, without touching their caps.
+- **Checksums:** guests send the host a checksum of their table after each input, and a guest whose table has drifted is told to rejoin.
+- **Limits:** every browser holds the whole seeded game, so someone poking around in devtools could see hidden cards. That's fine among friends, but it isn't cheat-proof. A few strict networks (some offices and mobile carriers) can't connect two browsers directly without a TURN relay, which the hub doesn't run.
+- **Testing:** `?net=local` in the address swaps the relays for a BroadcastChannel between tabs of one browser. The end-to-end tests use it to seat two or three tabs at one table (`e2e/online.spec.ts`), and it's handy for trying a table out alone.
+
 ## How it’s built
 
 - **Vite + React + TypeScript**, Zustand for the saved state, a tiny hash router, Vitest and Playwright.
@@ -52,6 +73,7 @@ npm run dev          # http://localhost:5173
 ```
 src/
   core/            cards, seeded RNG, caps rules, poker hand evaluator (poker.ts)
+  net/             online tables: transports (Nostr, local), the table link, the Online tab
   core/audio/      mixer, sound effects, radio music, crowd chatter
   store/           the persistent save (caps, settings, records, collection)
   hub/             terminal menu, records, settings, boot screen

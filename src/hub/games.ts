@@ -28,12 +28,12 @@ export const CATEGORIES: { id: Category; label: string; short: string }[] = [
 export const GAMES: readonly GameInfo[] = [
   {
     id: 'caravan', name: 'Caravan', category: 'cards', ready: true, path: '/caravan', icon: 'caravan',
-    modes: 'Against the AI or hot-seat',
+    modes: 'Against the AI, hot-seat, or online',
     blurb: 'Build three caravans worth 21 to 26 and outbid your rival on at least two. Win cards from five opponents and build your own deck.',
   },
   {
     id: 'blackjack', name: 'Blackjack', category: 'cards', ready: true, path: '/blackjack', icon: 'blackjack',
-    modes: 'A full table of regulars, or one on one with the dealer',
+    modes: 'A full table of regulars, one on one with the dealer, or online with friends',
     blurb: 'Blue felt, a six-deck shoe and caps on the line. Dealer stands on soft 17, blackjack pays 3 to 2, and a coach knows the book.',
   },
   {
@@ -43,7 +43,7 @@ export const GAMES: readonly GameInfo[] = [
   },
   {
     id: 'draw', name: 'Five-Card Draw', category: 'cards', ready: true, path: '/draw', icon: 'draw',
-    modes: 'Heads up, or up to five saloon regulars',
+    modes: 'Heads up, up to five saloon regulars, or online with friends',
     blurb: 'Ante up, draw up to three, and bet it all on what you kept. Fixed limit, in a back room where the regulars bluff.',
   },
   {
@@ -63,7 +63,7 @@ export const GAMES: readonly GameInfo[] = [
   },
   {
     id: 'craps', name: 'Craps', category: 'casino', ready: true, path: '/craps', icon: 'dice',
-    modes: 'Against the house, with the dice in your hand and three regulars at the rail',
+    modes: 'Against the house, with the dice in your hand and three regulars at the rail, or online with friends',
     blurb: 'Pass line, come bets, full odds, place bets, the field and the hardways, on a green felt layout under the marquee lights.',
   },
   {
@@ -83,7 +83,7 @@ export const GAMES: readonly GameInfo[] = [
   },
   {
     id: 'reversi', name: 'Reversi', category: 'board', ready: true, path: '/reversi', icon: 'reversi',
-    modes: 'Four opponents on a ladder, or hot-seat',
+    modes: 'Four opponents on a ladder, hot-seat, or online',
     blurb: 'Flank and flip. Corners win games. On a walnut board in an atomic-age den.',
   },
   {

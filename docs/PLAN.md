@@ -1,13 +1,14 @@
 # The Atomic Hub: plan
 
-A browser game hub for desktops and phones in a retro-futurist wasteland style. Single-player against AI plus local hot-seat. No online multiplayer for now.
+A browser game hub for desktops and phones in a retro-futurist wasteland style. Single-player against AI, local hot-seat, and online tables with friends.
 
 ## Decisions
 
 | Topic | Decision |
 | --- | --- |
 | Platform | Vite + React + TypeScript web app in this repo, deployed to GitHub Pages |
-| Opponents | Computer AI and local hot-seat (pass-the-device screens for hidden hands) |
+| Opponents | Computer AI, local hot-seat (pass-the-device screens for hidden hands), and online with friends |
+| Online | Peer to peer, still with no server: Trystero over public Nostr relays to introduce browsers, WebRTC between them. The host numbers every input and each browser replays them through the same seeded engine. Not cheat-proof: every browser holds the whole game |
 | Style | Phosphor terminal hub (green or amber) inside a riveted casing. Each game gets its own table: Caravan is a lamp-lit wooden table, Blackjack a blue felt table on a 1950s casino floor, Five-Card Draw a green baize table in a saloon’s back room, Craps a green felt pit under marquee lights, Reversi a walnut board in an atomic-age den |
 | Layout | Desktop and phone. Each game's table has a compact layout for phones, held upright or sideways |
 | Economy | Shared caps balance, 500 to start. Refill to 500 when below 50 caps, at most once every 10 minutes |

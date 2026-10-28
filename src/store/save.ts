@@ -76,6 +76,8 @@ export interface CrapsSave {
 export interface ReversiSave {
   /** Mark the squares you can play. */
   showMoves: boolean
+  /** Wins against each opponent id, which opens the next one on the ladder. */
+  beaten: Record<string, number>
 }
 
 export interface SaveData {
@@ -139,7 +141,7 @@ export const newSave = (): SaveData => ({
   blackjack: { coach: true, count: false },
   draw: { hints: true },
   craps: { guide: true },
-  reversi: { showMoves: true },
+  reversi: { showMoves: true, beaten: {} },
 })
 
 /** Just the data fields, for export. */

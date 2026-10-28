@@ -1,0 +1,134 @@
+/*
+ * The 3D layout, on while Settings → 3D tables is (html[data-table3d='on']).
+ * Plain CSS 3D transforms, as at the Blackjack table:
+ *
+ * - The felt is one plane tilted away from you by --tilt, seen from your
+ *   place at the rail through the stage's perspective. The wall is the far
+ *   edge.
+ * - Chip stacks rise off the felt, and the puck sits on it.
+ * - The dice fly: thrown from above your rail, they come down onto the
+ *   felt by the wall, hop back off it, and land. Their cubes share the
+ *   stage's perspective instead of their own.
+ */
+
+/* Seen from above the far end of the stage, so the layout stays under the stickman. */
+:root[data-table3d='on'] .cr-stage {
+  perspective: 1500px;
+  perspective-origin: 50% 0;
+}
+
+/*
+ * Tilted back from its near edge, which stays put at the bottom of the
+ * stage. Tilted, it stands cos(tilt) as tall as it's deep, so it can be
+ * that much deeper, and the far edge shrinks, so it can be a little wider.
+ */
+:root[data-table3d='on'] .cr-felt {
+  --tilt: 22deg;
+  --u: calc(min(103cqw, (100cqh - 4px) / cos(var(--tilt)) * 1000 / var(--felt-h, 620)) / 1000);
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  translate: -50% 0;
+  transform-origin: 50% 100%;
+  transform: rotateX(var(--tilt));
+  transform-style: preserve-3d;
+}
+
+/* The tall layout is deep already; tipped back as far, the numbers would be a sliver. */
+:root[data-table3d='on'] .cr-felt[data-shape='tall'] {
+  --tilt: 12deg;
+}
+
+:root[data-table3d='on'] .cr-zone {
+  transform: translateZ(0.5px);
+}
+
+:root[data-table3d='on'] :is(.cr-stack, .cr-chips-tap) {
+  transform-style: preserve-3d;
+  transform: translateZ(1px);
+}
+
+:root[data-table3d='on'] .cr-chips-tap .cr-stack {
+  transform: none;
+}
+
+:root[data-table3d='on'] .cr-stack__chip {
+  translate: 0 0 calc(var(--i) * 0.06 * var(--cd));
+}
+
+:root[data-table3d='on'] .cr-stack:not(.is-paid, .is-back, .is-taken) .cr-stack__chip {
+  animation-name: cr-chip-drop-3d;
+}
+
+@keyframes cr-chip-drop-3d {
+  from {
+    translate: 0 0 calc((var(--i) * 0.06 + 0.6) * var(--cd));
+    opacity: 0;
+  }
+}
+
+:root[data-table3d='on'] .cr-stack__off {
+  transform: translateZ(calc(0.7 * var(--cd)));
+}
+
+:root[data-table3d='on'] .cr-puck {
+  transform: translateZ(2px);
+}
+
+:root[data-table3d='on'] .cr-dice {
+  transform-style: preserve-3d;
+}
+
+:root[data-table3d='on'] .cr-die {
+  perspective: none;
+  transform-style: preserve-3d;
+  transform: translateZ(calc(var(--dd) / 2));
+  animation-name: cr-throw-3d;
+}
+
+/* The shadow stays on the felt, under the die. */
+:root[data-table3d='on'] .cr-die::before {
+  transform: translateZ(calc(var(--dd) / -2 + 0.5px));
+  inset: 4% -4% -6% 6%;
+}
+
+@keyframes cr-throw-3d {
+  0% {
+    translate: calc(var(--sx) * var(--u)) calc(var(--sy) * var(--u)) calc(var(--dd) * 4);
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.25, 0.4, 0.6, 1);
+  }
+  8% {
+    opacity: 1;
+  }
+  44% {
+    translate: calc(var(--wx) * var(--u)) calc(var(--wy) * var(--u)) calc(var(--dd) * 0.4);
+    animation-timing-function: cubic-bezier(0.2, 0.6, 0.5, 1);
+  }
+  62% {
+    translate: calc(var(--hx) * var(--u)) calc(var(--hy) * var(--u)) calc(var(--dd) * 0.9);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  76% {
+    translate: calc(var(--hx) * var(--u) * 0.3) calc(var(--hy) * var(--u) * 0.3) 0;
+  }
+  84% {
+    translate: calc(var(--hx) * var(--u) * 0.1) calc(var(--hy) * var(--u) * 0.1) calc(var(--dd) * 0.15);
+  }
+  100% {
+    translate: 0 0 0;
+  }
+}
+
+/* Your result and the rail's remarks float just off the felt; the plates sit on the rail. */
+:root[data-table3d='on'] .cr-burst {
+  translate: -50% -50% 6px;
+}
+
+:root[data-table3d='on'] .cr-talk--seat {
+  translate: 0 0 6px;
+}
+
+:root[data-table3d='on'] .cr-plate {
+  transform: translateZ(2px);
+}

@@ -6,6 +6,10 @@ import { useSave } from '../../../store/save'
 import { REGULARS, STAKES, type TableMode } from '../content'
 import { SPOT_INDEXES, WIDE_LAYOUT } from './layout'
 import { useSession } from './session'
+import { GAME, SEATS, startOnline } from './online'
+import { OnlinePanel } from '../../../net/ui/OnlinePanel'
+
+const ONLINE_CLASSES = { card: 'bj-panel', button: 'bj-button', primary: 'bj-button bj-button--primary', field: 'bj-field', dim: 'bj-ink-dim' }
 
 const MODES: { id: TableMode; name: string; blurb: string }[] = [
   {
@@ -20,7 +24,67 @@ const MODES: { id: TableMode; name: string; blurb: string }[] = [
   },
 ]
 
-export function Lobby() {
+export function Lobby({ inviteCode = null }: { inviteCode?: string | null }) {
+  const [where, setWhere] = useState<'casino' | 'online'>(inviteCode ? 'online' : 'casino')
+  return (
+    <div className="bj-lobby">
+      <div className="bj-tabs" role="tablist" aria-label="Where to play">
+        <button role="tab" aria-selected={where === 'casino'} className="bj-tab" onClick={() => setWhere('casino')}>
+          At the casino
+        </button>
+        <button role="tab" aria-selected={where === 'online'} className="bj-tab" onClick={() => setWhere('online')}>
+          Online
+        </button>
+      </div>
+      {where === 'casino' ? <CasinoSetup /> : <OnlineSetup inviteCode={inviteCode} />}
+    </div>
+  )
+}
+
+function OnlineSetup({ inviteCode }: { inviteCode: string | null }) {
+  const caps = useSave((s) => s.wallet.caps)
+  const [mode, setMode] = useState<TableMode>('full')
+  const [stakesId, setStakes] = useState(STAKES[0].id)
+  const stakes = STAKES.find((s) => s.id === stakesId) ?? STAKES[0]
+  const seats = ['Middle', 'Right of the middle', 'Left of the middle', 'Third base', 'First base']
+  return (
+    <OnlinePanel
+      game={GAME}
+      seats={SEATS}
+      lateJoin
+      classes={ONLINE_CLASSES}
+      inviteCode={inviteCode}
+      tablePath="/blackjack/play"
+      seatLabel={(seat) => seats[seat]}
+      startable={() => (caps >= stakes.limits.min ? true : `You need ${stakes.limits.min} caps for the ${stakes.name.toLowerCase()} table.`)}
+      roomOptions={
+        <div className="bj-online-options">
+          <label className="bj-field">
+            <span>Table</span>
+            <select value={stakesId} onChange={(e) => setStakes(e.target.value)}>
+              {STAKES.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}, {s.limits.min}–{s.limits.max} caps
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="bj-field">
+            <span>Empty seats</span>
+            <select value={mode} onChange={(e) => setMode(e.target.value as TableMode)}>
+              <option value="full">Regulars fill them</option>
+              <option value="heads-up">Stay empty</option>
+            </select>
+          </label>
+        </div>
+      }
+      onStart={(link) => startOnline(link, stakesId, mode)}
+      note="Everyone bets their own caps, and the hands you play go on your record. Friends can join between rounds, up to five at the table."
+    />
+  )
+}
+
+function CasinoSetup() {
   const caps = useSave((s) => s.wallet.caps)
   const seated = useSession((s) => s.state !== null)
   const sit = useSession((s) => s.sit)
@@ -39,7 +103,7 @@ export function Lobby() {
   }
 
   return (
-    <div className="bj-lobby">
+    <>
       {seated && (
         <div className="bj-panel bj-resume">
           <p>You still have a seat at the {useSession.getState().stakes?.name.toLowerCase()} table.</p>
@@ -132,7 +196,7 @@ export function Lobby() {
           </ul>
         </section>
       )}
-    </div>
+    </>
   )
 }
 

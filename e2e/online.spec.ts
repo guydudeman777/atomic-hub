@@ -1,5 +1,5 @@
 import { type Browser, type Page, expect, test } from '@playwright/test'
-import { watchErrors } from './helpers.ts'
+import { finishBlackjackRound, watchErrors } from './helpers.ts'
 
 /**
  * Online tables, with two tabs of one browser talking over a
@@ -132,6 +132,41 @@ test('two players play Caravan online, each with their own hand', async ({ brows
   await second.getByRole('button', { name: 'Leave table' }).click()
   await second.getByRole('button', { name: 'Resign and leave' }).click()
   await expect(first.getByRole('heading', { name: 'You win' })).toBeVisible({ timeout: 10_000 })
+  expect(errors.flat()).toEqual([])
+  await context.close()
+})
+
+test('two players share a Blackjack table online, with the regulars', async ({ browser }) => {
+  // Two rounds dealt at the table's own pace.
+  test.setTimeout(90_000)
+  const { context, host, guest, errors } = await twoPlayers(browser)
+  const code = await hostTable(host, 'blackjack', 'Hostess')
+  await joinTable(guest, 'blackjack', code, 'Guesty')
+  await host.getByRole('button', { name: 'Start' }).click()
+  for (const page of [host, guest]) await expect(page.getByRole('region', { name: 'Blackjack table' })).toBeVisible({ timeout: 10_000 })
+
+  // Each sees the other at the table, and two regulars in the other seats.
+  await expect(host.locator('.bj-plate.is-player')).toHaveText('Guesty')
+  await expect(guest.locator('.bj-plate.is-player')).toHaveText('Hostess')
+  await expect(host.locator('.bj-plate:not(.is-player):not(.is-you):not(.is-open)')).toHaveCount(3)
+
+  // The deal waits for both bets.
+  await host.getByRole('button', { name: /^Deal/ }).click()
+  await expect(host.getByText(/Waiting for Guesty to bet/)).toBeVisible()
+  await guest.getByRole('button', { name: /^Deal/ }).click()
+  await Promise.all([finishBlackjackRound(host), finishBlackjackRound(guest)])
+
+  // Both tables played the same round.
+  const dealerLines = (page: Page) =>
+    page.getByRole('list', { name: 'Table log' }).locator('li').evaluateAll((lis) => lis.map((li) => li.textContent!).filter((t) => /^The dealer (stands|busts|checks)/.test(t)))
+  await expect.poll(() => dealerLines(guest)).toEqual(await dealerLines(host))
+  expect((await dealerLines(host)).length).toBeGreaterThan(0)
+
+  // A second round, then the guest gets up and the host plays on.
+  await guest.getByRole('button', { name: 'Leave table' }).click()
+  await expect(host.getByRole('list', { name: 'Table log' })).toContainText('Guesty gets up from the table.')
+  await host.getByRole('button', { name: /^Deal/ }).click()
+  await finishBlackjackRound(host)
   expect(errors.flat()).toEqual([])
   await context.close()
 })

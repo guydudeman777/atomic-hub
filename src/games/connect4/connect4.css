@@ -1,0 +1,1773 @@
+/*
+ * Connect Four: the boardwalk midway at dusk. The sky going from navy to
+ * sunset over the sea, a ferris wheel turning on the pier, and a booth
+ * under a striped awning with a string of bulbs, where the big blue rack
+ * stands on the counter. Cards and buttons are painted plywood signs, and
+ * the lettering is Bungee, a sign painter's face. The in-game HUD reuses
+ * the hub's terminal screen. The 3D view is in connect4-3d.css.
+ *
+ * The rack is sized in pitches (--pitch, the distance from one hole to the
+ * next), so the frame, the checkers and their falls all scale with it.
+ */
+
+.c4 {
+  --navy: #141a45;
+  --dusk: #3a2464;
+  --sunset: #f0884a;
+  --rack: #2468d4;
+  --rack-dark: #123a80;
+  --rack-light: #4a8ef0;
+  --red: #d8262f;
+  --red-deep: #8f1219;
+  --red-light: #ff7a66;
+  --yellow: #f7c531;
+  --yellow-deep: #a87c08;
+  --yellow-light: #ffe58a;
+  --stripe: #d9372b;
+  --stripe-cream: #fbeed2;
+  --cream: #fff4dc;
+  --cream-dim: #d9c9a8;
+  --paper: #fdf0d3;
+  --ink: #2a1c14;
+  --ink-dim: #6e5a48;
+  --wood: #8a5a32;
+  --wood-light: #b07a46;
+  --wood-dark: #4e2f17;
+  --bulb: #ffd66b;
+  --teal: #1f8f87;
+  --font-midway: 'Bungee', 'Arial Black', sans-serif;
+
+  color: var(--cream);
+  min-height: var(--app-height);
+  font-family: var(--font-body);
+}
+
+/* The sky: navy overhead, purple, then the last of the sunset low over the water, with a few early stars. */
+.c4-midway {
+  background-color: #1d1a45;
+  background-image:
+    radial-gradient(ellipse 70% 45% at 50% 100%, rgba(255, 150, 80, 0.5), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='160' viewBox='0 0 220 160'%3E%3Cg fill='%23fff4dc'%3E%3Ccircle cx='18' cy='22' r='1.1' fill-opacity='.7'/%3E%3Ccircle cx='96' cy='12' r='.8' fill-opacity='.5'/%3E%3Ccircle cx='150' cy='40' r='1.2' fill-opacity='.6'/%3E%3Ccircle cx='202' cy='16' r='.7' fill-opacity='.5'/%3E%3Ccircle cx='60' cy='70' r='.8' fill-opacity='.35'/%3E%3Ccircle cx='186' cy='92' r='.9' fill-opacity='.3'/%3E%3Ccircle cx='122' cy='118' r='.7' fill-opacity='.2'/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(180deg, #121640 0%, #2a2160 34%, #5b2c6d 62%, #a8456a 82%, #ec8a50 100%);
+  background-size: auto, 220px 160px, auto;
+  background-repeat: no-repeat, repeat-x, no-repeat;
+  background-attachment: fixed;
+}
+
+/* Phones don't keep fixed backgrounds still, and repaint them on every scroll. */
+@media (hover: none) {
+  .c4-midway {
+    background-attachment: scroll;
+  }
+}
+
+.c4-ink-dim {
+  color: var(--ink-dim);
+}
+
+/* ---- Cards, buttons, fields ------------------------------------------------ */
+
+/* A painted plywood sign: cream boards inside a red frame. */
+.c4-card {
+  background:
+    repeating-linear-gradient(180deg, transparent 0 46px, rgba(110, 70, 30, 0.07) 46px 48px),
+    radial-gradient(ellipse at 15% 0%, rgba(255, 255, 255, 0.6), transparent 55%),
+    var(--paper);
+  color: var(--ink);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 4px var(--red),
+    0 0 0 6px var(--red-deep),
+    0 18px 34px rgba(0, 0, 0, 0.5);
+  padding: clamp(16px, 2vw, 26px);
+}
+
+.c4-card h2,
+.c4-card h3 {
+  font-family: var(--font-midway);
+  font-weight: 400;
+  line-height: 1.1;
+  margin: 0 0 10px;
+  color: var(--red-deep);
+}
+
+.c4-card h2 {
+  font-size: var(--step-2);
+}
+
+.c4-card h3 {
+  font-size: var(--step-0);
+  margin-top: 18px;
+  letter-spacing: 0.04em;
+  color: var(--rack-dark);
+}
+
+.c4-card p {
+  margin: 0 0 10px;
+}
+
+.c4-card a {
+  color: var(--red-deep);
+}
+
+.c4-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px 8px;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-midway);
+  font-size: var(--step--1);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: 0 4px 0 var(--ink);
+  transition: translate 0.08s ease-out;
+}
+
+.c4-button:active:not(:disabled) {
+  translate: 0 3px;
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+@media (hover: hover) {
+  .c4-button:hover:not(:disabled) {
+    background: #fffaf0;
+  }
+}
+
+.c4-button--primary {
+  background: var(--red);
+  border-color: var(--red-deep);
+  color: var(--yellow-light);
+  box-shadow: 0 4px 0 var(--red-deep);
+  text-shadow: 0 1px 0 var(--red-deep);
+}
+
+.c4-button--primary:active:not(:disabled) {
+  box-shadow: 0 1px 0 var(--red-deep);
+}
+
+@media (hover: hover) {
+  .c4-button--primary:hover:not(:disabled) {
+    background: #e8343b;
+  }
+}
+
+.c4-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.c4-field {
+  display: grid;
+  gap: 4px;
+}
+
+.c4-field > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--step--1);
+  color: var(--ink-dim);
+}
+
+.c4-field input,
+.c4-field select {
+  padding: 6px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: #fffaf0;
+  color: var(--ink);
+  min-width: 0;
+}
+
+.c4 .c4-card :focus-visible {
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--rack);
+}
+
+/* ---- Portraits and checker icons ----------------------------------------------- */
+
+.c4-portrait {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #5a5560;
+  color: #fff8e8;
+  border: 2px solid rgba(255, 244, 220, 0.85);
+  font-family: var(--font-midway);
+  font-size: var(--step--1);
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.c4-portrait--big {
+  width: 68px;
+  height: 68px;
+  font-size: var(--step-1);
+}
+
+.c4-checker-icon {
+  flex: none;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  vertical-align: -0.12em;
+  box-shadow: 0 0.08em 0 rgba(0, 0, 0, 0.5);
+}
+
+.c4-checker-icon[data-c='0'] {
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(0, 0, 0, 0.16) 36% 40%, transparent 42%),
+    radial-gradient(circle at 35% 30%, #ff8a7a, var(--red) 55%, #a8141d);
+}
+
+.c4-checker-icon[data-c='1'] {
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(90, 60, 0, 0.18) 36% 40%, transparent 42%),
+    radial-gradient(circle at 35% 30%, #fff2b0, var(--yellow) 55%, #c4930c);
+}
+
+/* ---- Pages: the lobby and the rules -------------------------------------------- */
+
+.c4-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.c4-header {
+  --gutter: clamp(16px, 3vw, 40px);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px clamp(14px, 2.4vw, 32px);
+  padding: max(14px, var(--safe-top)) max(var(--gutter), var(--safe-right)) 12px max(var(--gutter), var(--safe-left));
+  border-bottom: 4px solid var(--stripe);
+  background:
+    linear-gradient(180deg, rgba(10, 10, 32, 0.8), rgba(10, 10, 32, 0.35));
+}
+
+.c4-back {
+  color: var(--cream-dim);
+  font-size: var(--step--1);
+}
+
+@media (hover: hover) {
+  .c4-back:hover {
+    color: var(--cream);
+  }
+}
+
+/* The sign over the booth: yellow letters on a red board, in a frame of chasing bulbs. */
+.c4-sign {
+  position: relative;
+  margin: 0;
+  padding: 12px 20px 9px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #9a1e24, #5e0f14);
+  box-shadow:
+    inset 0 0 0 2px #c2402f,
+    0 6px 16px rgba(0, 0, 0, 0.5);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.c4-sign__text {
+  position: relative;
+  display: block;
+  font-family: var(--font-midway);
+  font-size: var(--step-3);
+  letter-spacing: 0.02em;
+  color: var(--yellow);
+  text-shadow:
+    3px 3px 0 var(--red-deep),
+    0 0 16px rgba(255, 214, 107, 0.5);
+}
+
+.c4-sign__bulbs {
+  position: absolute;
+  inset: 0;
+  padding: 5px;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 4px 50%, #fffbe6 0 1.4px, var(--bulb) 2.2px, transparent 3.4px) 0 0 / 14px 10px,
+    radial-gradient(circle at 11px 50%, #6e3a12 0 1.4px, transparent 2.4px) 0 0 / 14px 10px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  animation: c4-chase 0.6s steps(1, end) infinite;
+}
+
+@keyframes c4-chase {
+  50% {
+    background-position: 7px 0, 7px 0;
+  }
+}
+
+.c4-nav {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.c4-nav__link {
+  padding: 8px 14px 6px;
+  border-radius: 8px;
+  color: var(--cream);
+  text-decoration: none;
+  font-family: var(--font-midway);
+  font-size: var(--step--1);
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+@media (hover: hover) {
+  .c4-nav__link:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+}
+
+.c4-nav__link[aria-current='page'] {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.c4-header__wheel {
+  flex: none;
+  width: 54px;
+  height: auto;
+  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.45));
+}
+
+.c4-main {
+  --gutter: clamp(16px, 3vw, 40px);
+  flex: 1;
+  padding: clamp(18px, 2.6vw, 34px) max(var(--gutter), var(--safe-right)) max(40px, var(--safe-bottom)) max(var(--gutter), var(--safe-left));
+}
+
+.c4-rules-page {
+  max-width: 82ch;
+  margin: 0 auto;
+}
+
+.c4-lobby {
+  display: grid;
+  gap: 22px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.c4-resume {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+}
+
+.c4-resume p {
+  margin: 0;
+}
+
+.c4-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.c4-tab {
+  padding: 9px 16px 7px;
+  border: 2px solid rgba(255, 244, 220, 0.5);
+  border-radius: 10px;
+  background: rgba(10, 10, 32, 0.35);
+  color: var(--cream);
+  font-family: var(--font-midway);
+  font-size: var(--step--1);
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.c4-tab[aria-selected='true'] {
+  background: var(--cream);
+  border-color: var(--cream);
+  color: var(--ink);
+}
+
+.c4-setup {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.c4-ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+/* Each opponent's ticket, punched along the left. */
+.c4-ladder__row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 0 50%, var(--navy) 0 7px, transparent 8px),
+    rgba(10, 10, 32, 0.55);
+  color: var(--cream);
+  text-align: left;
+}
+
+.c4-ladder__row .c4-portrait {
+  grid-row: span 2;
+}
+
+@media (hover: hover) {
+  .c4-ladder__row:hover {
+    background:
+      radial-gradient(circle at 0 50%, var(--navy) 0 7px, transparent 8px),
+      rgba(10, 10, 32, 0.75);
+  }
+}
+
+.c4-ladder__row.is-active {
+  border-color: var(--yellow);
+  background:
+    radial-gradient(circle at 0 50%, var(--navy) 0 7px, transparent 8px),
+    rgba(10, 10, 32, 0.8);
+}
+
+.c4-ladder__row.is-locked {
+  opacity: 0.6;
+}
+
+.c4-ladder__name {
+  font-family: var(--font-midway);
+  font-size: var(--step-0);
+  line-height: 1.15;
+}
+
+.c4-ladder__meta {
+  font-size: var(--step--1);
+  color: var(--cream-dim);
+}
+
+.c4-opponent {
+  max-width: 640px;
+}
+
+.c4-opponent__head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.c4-opponent__head h2,
+.c4-opponent__head p {
+  margin: 0;
+}
+
+.c4-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 14px 0 16px;
+  padding: 12px 14px;
+  border: 2px dashed rgba(42, 28, 20, 0.25);
+  border-radius: 12px;
+}
+
+.c4-colors legend {
+  padding: 0 6px;
+  font-size: var(--step--1);
+  color: var(--ink-dim);
+}
+
+.c4-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.c4-color input {
+  accent-color: var(--red);
+}
+
+.c4-start {
+  font-size: var(--step-0);
+  padding: 12px 26px 10px;
+}
+
+.c4-note {
+  margin-top: 12px;
+}
+
+.c4-hotseat {
+  max-width: 640px;
+}
+
+.c4-hotseat__players {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 14px 0;
+}
+
+/* Rules */
+
+.c4-rules ul {
+  margin: 0 0 10px;
+  padding-left: 1.2em;
+}
+
+.c4-rules li {
+  margin-bottom: 6px;
+}
+
+.c4-rules strong {
+  color: var(--red-deep);
+}
+
+.c4-rules__keys {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.c4-rules__keys dt {
+  color: var(--rack-dark);
+  font-weight: 700;
+}
+
+.c4-rules__keys dd {
+  margin: 0;
+}
+
+/* ---- The ferris wheel ------------------------------------------------------------ */
+
+.c4-ferris__wheel {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  animation: c4-turn 90s linear infinite;
+}
+
+.c4-ferris__car {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  rotate: calc(var(--a) * -1);
+  animation: c4-turn 90s linear infinite reverse;
+}
+
+.c4-ferris__bulb {
+  fill: var(--bulb);
+  animation: c4-twinkle 2.1s steps(1, end) infinite;
+}
+
+@keyframes c4-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes c4-twinkle {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ---- The table ---------------------------------------------------------------- */
+
+.c4-game {
+  --gutter: clamp(10px, 1.6vw, 24px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 22vw, 340px);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'awning hud'
+    'top hud'
+    'stage hud'
+    'bottom hud';
+  height: var(--app-height);
+  /* Clip rather than hide, so nothing can scroll the table out of place. */
+  overflow: hidden;
+  overflow: clip;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* No pull-to-refresh or rubber-banding mid-game. */
+:root:has(.c4-game) {
+  overscroll-behavior: none;
+}
+
+/* The booth's awning: red and cream stripes, scalloped, with the bulbs strung under it. */
+.c4-awning {
+  position: relative;
+  z-index: 4;
+  height: 62px;
+  pointer-events: none;
+}
+
+.c4-game__awning {
+  grid-area: awning;
+  margin-left: var(--safe-left);
+}
+
+.c4-awning__cloth {
+  position: relative;
+  height: 32px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 40%, rgba(0, 0, 0, 0.18)),
+    repeating-linear-gradient(90deg, var(--stripe) 0 36px, var(--stripe-cream) 36px 72px);
+  box-shadow: 0 3px 0 rgba(60, 10, 10, 0.5);
+}
+
+/* The scallops: a half circle hanging from each stripe. */
+.c4-awning__cloth::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 15px;
+  background:
+    radial-gradient(circle at 18px 0, var(--stripe) 0 17px, transparent 18px) 0 0 / 72px 15px repeat-x,
+    radial-gradient(circle at 54px 0, var(--stripe-cream) 0 17px, transparent 18px) 0 0 / 72px 15px repeat-x;
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.35));
+}
+
+.c4-bulbs {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 47px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* The wire they hang from. */
+.c4-bulbs::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  top: 0;
+  height: 2px;
+  background: #241733;
+}
+
+.c4-bulb {
+  position: relative;
+  top: 1px;
+  width: 9px;
+  height: 11px;
+  border-radius: 50% 50% 45% 45%;
+  background: radial-gradient(circle at 50% 35%, #fffbe6, var(--bulb) 60%);
+  box-shadow: 0 0 10px 2px rgba(255, 214, 107, 0.65);
+  animation: c4-twinkle 2.4s steps(1, end) infinite;
+  animation-delay: calc(var(--i) * -0.3s);
+}
+
+.c4-bulb:nth-child(4n + 2) {
+  background: radial-gradient(circle at 50% 35%, #ffe0d8, #ff6a5c 60%);
+  box-shadow: 0 0 10px 2px rgba(255, 106, 92, 0.6);
+}
+
+.c4-bulb:nth-child(4n + 3) {
+  background: radial-gradient(circle at 50% 35%, #e0ecff, #6fa8ff 60%);
+  box-shadow: 0 0 10px 2px rgba(111, 168, 255, 0.6);
+}
+
+/* A win: the whole string chases. */
+.c4-awning.is-lit .c4-bulb {
+  animation-duration: 0.5s;
+  animation-delay: calc(var(--i) * -0.125s);
+}
+
+/* The players' name plates: who's who, whose turn, and the checkers each has left. */
+.c4-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 52px;
+  padding: 5px 12px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: rgba(12, 10, 34, 0.6);
+}
+
+.c4-bar--top {
+  grid-area: top;
+  /* The speech bubble hangs off it, over the rack. */
+  position: relative;
+  z-index: 20;
+  margin: 4px var(--gutter) 0 max(var(--gutter), var(--safe-left));
+}
+
+.c4-bar--bottom {
+  grid-area: bottom;
+  margin: 0 var(--gutter) max(10px, var(--safe-bottom)) max(var(--gutter), var(--safe-left));
+}
+
+.c4-bar.is-active {
+  border-color: var(--yellow);
+  box-shadow: 0 0 16px rgba(247, 197, 49, 0.35);
+}
+
+.c4-bar__who {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.c4-bar__name {
+  font-family: var(--font-midway);
+  font-size: var(--step-0);
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.c4-bar__count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--step-2);
+}
+
+.c4-bar__number {
+  min-width: 1.4em;
+  font-family: var(--font-midway);
+  font-size: var(--step-1);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--yellow);
+  text-align: right;
+}
+
+/* The AI thinking: three dots taking turns. */
+.c4-bar__thinking {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.c4-bar__thinking span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bulb);
+  animation: c4-think 1.1s ease-in-out infinite;
+}
+
+.c4-bar__thinking span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.c4-bar__thinking span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes c4-think {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+    translate: 0 0;
+  }
+  30% {
+    opacity: 1;
+    translate: 0 -3px;
+  }
+}
+
+/* The opponent's remarks: a cream bubble pointing back at their name. */
+.c4-talk {
+  position: absolute;
+  left: calc(100% + 16px);
+  top: 50%;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.c4-talk__bubble {
+  position: absolute;
+  width: max-content;
+  max-width: min(360px, 34vw);
+  margin: 0;
+  padding: 8px 13px 9px;
+  translate: 0 -50%;
+  transform-origin: 0 50%;
+  border-radius: 14px;
+  background: var(--cream);
+  color: var(--ink);
+  font-size: var(--step--1);
+  line-height: 1.35;
+  box-shadow:
+    0 0 0 2px var(--red),
+    0 8px 16px rgba(0, 0, 0, 0.45);
+  animation:
+    c4-pop-in 0.24s cubic-bezier(0.3, 1.5, 0.5, 1) backwards,
+    c4-pop-out 0.3s ease-in var(--hold) forwards;
+}
+
+.c4-talk__bubble::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  margin-top: -7px;
+  border: 7px solid transparent;
+  border-right: 10px solid var(--red);
+  border-left-width: 0;
+}
+
+@keyframes c4-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@keyframes c4-pop-out {
+  to {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+
+/* The stage holds the view past the booth, the counter and the rack, as big as fits. */
+.c4-stage {
+  grid-area: stage;
+  position: relative;
+  /* What's layered on the rack stays under the plates, the HUD and its menu. */
+  isolation: isolate;
+  min-height: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  overflow: clip;
+}
+
+/* ---- The view past the booth ---------------------------------------------------- */
+
+.c4-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.c4-backdrop__sea {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14%;
+  width: 100%;
+  height: 22%;
+}
+
+.c4-backdrop__wheel {
+  position: absolute;
+  left: max(2%, var(--safe-left));
+  bottom: 20%;
+  height: 72%;
+  width: auto;
+  opacity: 0.92;
+}
+
+.c4-backdrop__coaster {
+  position: absolute;
+  right: 2%;
+  bottom: 30%;
+  width: 26%;
+  height: 22%;
+  opacity: 0.85;
+}
+
+/* ---- The rack ------------------------------------------------------------------------ */
+
+/*
+ * The figure: the rack and its legs, with room above it for the checker
+ * waiting to drop. Sizes are in pitches: the face is 7.64 by 6.64 (seven
+ * holes and six, and the frame), with a pitch above it and one below for
+ * the legs.
+ */
+.c4-figure {
+  --pitch: min((100cqw - 16px) / 8.5, (100cqh - 12px) / 8.7);
+  --face-w: calc(var(--pitch) * (7 + var(--pad) * 2));
+  --face-h: calc(var(--pitch) * (6 + var(--pad) * 2));
+  position: relative;
+  width: calc(var(--pitch) * 8.5);
+  height: calc(var(--pitch) * 8.7);
+}
+
+/* The booth's counter, from the feet of the rack down. */
+.c4-counter {
+  position: absolute;
+  left: -100vw;
+  right: -100vw;
+  top: calc(var(--pitch) * 7.6);
+  height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(255, 220, 170, 0.35), transparent 6px),
+    repeating-linear-gradient(90deg, transparent 0 130px, rgba(40, 20, 6, 0.35) 130px 133px),
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0 2px, transparent 2px 9px),
+    linear-gradient(180deg, var(--wood-light), var(--wood) 30%, var(--wood-dark));
+  box-shadow: 0 -2px 0 rgba(40, 20, 6, 0.6);
+}
+
+.c4-rack {
+  position: absolute;
+  left: calc((100% - var(--face-w)) / 2);
+  top: var(--pitch);
+  width: var(--face-w);
+  height: var(--face-h);
+}
+
+.c4-rack__face,
+.c4-rack__back {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.c4-rack__face {
+  z-index: 4;
+  filter: drop-shadow(0 calc(var(--pitch) * 0.08) calc(var(--pitch) * 0.12) rgba(0, 0, 0, 0.45));
+}
+
+/* Flat, the back of the rack is just the frame's shadow; the 3D view shows it. */
+.c4-rack__back {
+  display: none;
+}
+
+.c4-rack__face svg,
+.c4-rack__back svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.c4-stand {
+  position: absolute;
+  z-index: 1;
+  left: calc(var(--pitch) * -0.4);
+  width: calc(var(--face-w) + var(--pitch) * 0.8);
+  height: calc(var(--pitch) * 1.7);
+  bottom: calc(var(--pitch) * -1);
+  pointer-events: none;
+}
+
+.c4-slots {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* Behind the holes: the dusk, seen through the rack. */
+.c4-slots::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--pitch) * 0.1);
+  border-radius: calc(var(--pitch) * 0.2);
+  background: linear-gradient(180deg, rgba(20, 22, 64, 0.5), rgba(80, 40, 90, 0.35));
+}
+
+/* The release slider along the bottom of the rack, with its tab at the left end. */
+.c4-slider {
+  position: absolute;
+  z-index: 5;
+  left: calc(var(--pitch) * 0.12);
+  right: calc(var(--pitch) * 0.12);
+  bottom: calc(var(--pitch) * -0.1);
+  height: calc(var(--pitch) * 0.16);
+  border-radius: calc(var(--pitch) * 0.06);
+  background: linear-gradient(180deg, #5c9bf5, #1d55b5);
+  box-shadow: 0 calc(var(--pitch) * 0.04) 0 #0b2552;
+  pointer-events: none;
+}
+
+.c4-slider__tab {
+  position: absolute;
+  left: calc(var(--pitch) * -0.3);
+  top: calc(var(--pitch) * -0.06);
+  width: calc(var(--pitch) * 0.36);
+  height: calc(var(--pitch) * 0.28);
+  border-radius: calc(var(--pitch) * 0.08);
+  background: linear-gradient(180deg, #7db1ff, #2d6fd6);
+  box-shadow: 0 calc(var(--pitch) * 0.04) 0 #0b2552;
+}
+
+.c4-slider.is-pulled {
+  animation: c4-pull var(--release-ms) ease-out;
+}
+
+@keyframes c4-pull {
+  12%,
+  75% {
+    translate: calc(var(--pitch) * -0.55) 0;
+  }
+}
+
+/* ---- Checkers --------------------------------------------------------------------- */
+
+/* Everything placed in a hole: positioned by column and row, from the bottom left of the face. */
+.c4-checker,
+.c4-threat,
+.c4-ring,
+.c4-hover {
+  position: absolute;
+  left: calc(var(--pitch) * (var(--pad) + var(--c) + 0.06));
+  bottom: calc(var(--pitch) * (var(--pad) + var(--r) + 0.06));
+  width: calc(var(--pitch) * 0.88);
+  height: calc(var(--pitch) * 0.88);
+  border-radius: 50%;
+}
+
+/*
+ * A checker: a raised rim and a recessed middle with fine rings in it, the
+ * plastic catching the bulbs' light from the top left.
+ */
+.c4-checker {
+  box-shadow:
+    inset 0 0 0 calc(var(--pitch) * 0.035) rgba(0, 0, 0, 0.28),
+    inset 0 calc(var(--pitch) * -0.05) calc(var(--pitch) * 0.08) rgba(0, 0, 0, 0.3);
+}
+
+.c4-checker[data-c='0'] {
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.5), transparent 26%),
+    radial-gradient(circle at 50% 50%, #e8333b 0 70%, #c41c25 72%, #ff6f61 78%, var(--red) 86%, #a8141d 100%);
+}
+
+.c4-checker[data-c='1'] {
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.6), transparent 26%),
+    radial-gradient(circle at 50% 50%, #ffd23f 0 70%, #e3ab14 72%, #fff0a6 78%, var(--yellow) 86%, #c4930c 100%);
+}
+
+/* The recessed middle, ringed like the real thing. */
+.c4-checker::before {
+  content: '';
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle at 50% 50%, transparent 0 9%, rgba(0, 0, 0, 0.12) 9% 13%);
+  box-shadow:
+    inset 0 calc(var(--pitch) * 0.025) calc(var(--pitch) * 0.04) rgba(0, 0, 0, 0.35),
+    0 calc(var(--pitch) * 0.012) 0 rgba(255, 255, 255, 0.35);
+}
+
+/* The last checker dropped wears a small white pip. */
+.c4-last {
+  position: absolute;
+  inset: 43%;
+  z-index: 1;
+  border-radius: 50%;
+  background: #fffbe6;
+  box-shadow: 0 0 calc(var(--pitch) * 0.08) rgba(255, 251, 230, 0.9);
+  animation: c4-pip 0.3s ease-out backwards;
+}
+
+@keyframes c4-pip {
+  from {
+    scale: 0;
+  }
+}
+
+/* Dropped: it falls from over the rack, picking up speed, and bounces once on the one below. */
+.c4-checker[data-anim='drop'] {
+  animation:
+    c4-fall var(--fall-ms) cubic-bezier(0.55, 0.085, 0.68, 0.53) backwards,
+    c4-bounce var(--bounce-ms) cubic-bezier(0.3, 0.7, 0.4, 1) var(--fall-ms);
+}
+
+.c4-checker[data-anim='drop'] .c4-last {
+  animation-delay: var(--fall-ms);
+}
+
+@keyframes c4-fall {
+  from {
+    translate: 0 calc(var(--pitch) * var(--fall) * -1);
+  }
+}
+
+@keyframes c4-bounce {
+  40% {
+    translate: 0 calc(var(--pitch) * -0.1);
+  }
+}
+
+/* The slider's pulled: last game's checkers drop out of the bottom, the bottom row first. */
+.c4-checker[data-anim='release'] {
+  animation: c4-out 420ms cubic-bezier(0.55, 0.085, 0.68, 0.53) var(--delay) forwards;
+}
+
+@keyframes c4-out {
+  70% {
+    opacity: 1;
+  }
+  to {
+    translate: 0 calc(var(--pitch) * var(--drop-to));
+    opacity: 0;
+  }
+}
+
+/* The four that won light up, one after another, and keep glowing. */
+.c4-checker.is-win::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 255, 230, 0.75), transparent 62%);
+  animation: c4-glow 0.9s ease-in-out 0.4s infinite alternate backwards;
+}
+
+@keyframes c4-glow {
+  from {
+    opacity: 0;
+  }
+}
+
+/* A ring of light round each winning hole, over the face. */
+.c4-ring {
+  z-index: 6;
+  border: calc(var(--pitch) * 0.07) solid #fff3b8;
+  box-shadow:
+    0 0 calc(var(--pitch) * 0.2) calc(var(--pitch) * 0.04) var(--bulb),
+    inset 0 0 calc(var(--pitch) * 0.14) var(--bulb);
+  pointer-events: none;
+  animation:
+    c4-ring-on 0.35s cubic-bezier(0.3, 1.5, 0.5, 1) calc(0.3s + var(--k) * 0.12s) backwards,
+    c4-twinkle 1.4s steps(1, end) calc(1s + var(--k) * 0.18s) infinite;
+}
+
+@keyframes c4-ring-on {
+  from {
+    scale: 0.4;
+    opacity: 0;
+  }
+}
+
+/* A hole that would make four, marked in the color of whoever it's for. */
+.c4-threat {
+  scale: 0.56;
+  border: calc(var(--pitch) * 0.09) dashed;
+  animation: c4-mark 0.3s ease-out backwards;
+}
+
+.c4-threat[data-c='0'] {
+  border-color: var(--red-light);
+}
+
+.c4-threat[data-c='1'] {
+  border-color: var(--yellow-light);
+}
+
+@keyframes c4-mark {
+  from {
+    scale: 0;
+  }
+}
+
+/* The checker waiting to drop, over the column you're pointing at. */
+.c4-hover {
+  --r: calc(5 + var(--hover-rows));
+  z-index: 3;
+  transition: left 0.12s ease-out;
+  pointer-events: none;
+  animation: c4-hover-in 0.3s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+}
+
+.c4-hover[data-c='0'] {
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.5), transparent 26%),
+    radial-gradient(circle at 50% 50%, #e8333b 0 70%, #c41c25 72%, #ff6f61 78%, var(--red) 86%, #a8141d 100%);
+}
+
+.c4-hover[data-c='1'] {
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.6), transparent 26%),
+    radial-gradient(circle at 50% 50%, #ffd23f 0 70%, #e3ab14 72%, #fff0a6 78%, var(--yellow) 86%, #c4930c 100%);
+}
+
+.c4-hover {
+  box-shadow: 0 calc(var(--pitch) * 0.12) calc(var(--pitch) * 0.16) rgba(0, 0, 0, 0.45);
+}
+
+@keyframes c4-hover-in {
+  from {
+    translate: 0 calc(var(--pitch) * -0.3);
+    opacity: 0;
+  }
+}
+
+/* The columns you drop into: the full height of the rack, and the space above it. */
+.c4-columns {
+  position: absolute;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  top: calc(var(--pitch) * -1);
+  bottom: 0;
+}
+
+.c4-column {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--pitch) * (var(--pad) + var(--c)));
+  width: var(--pitch);
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--pitch) * 0.2);
+  background: transparent;
+  cursor: default;
+}
+
+.c4-figure:not(.is-waiting) .c4-column.is-open {
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .c4-figure:not(.is-waiting) .c4-column.is-open:hover {
+    background: linear-gradient(180deg, rgba(255, 214, 107, 0.16), rgba(255, 214, 107, 0.06));
+  }
+}
+
+/* The keyboard's column, and a column in focus. */
+.c4-column.is-cursor,
+.c4-column:focus-visible {
+  box-shadow:
+    inset 0 0 0 calc(var(--pitch) * 0.05) var(--bulb),
+    0 0 calc(var(--pitch) * 0.2) rgba(255, 214, 107, 0.55);
+}
+
+/* ---- HUD: the terminal on the counter ------------------------------------------------ */
+
+.c4-hud.screen {
+  grid-area: hud;
+  margin: max(12px, var(--safe-top)) max(12px, var(--safe-right)) max(12px, var(--safe-bottom)) 0;
+  border-radius: 12px;
+  padding: 16px 16px 14px;
+  gap: 10px;
+  color: var(--ph);
+  font-size: var(--step--1);
+}
+
+.c4-hud p {
+  margin: 0;
+}
+
+.c4-hud__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.c4-hud__score {
+  color: var(--ph-strong);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.c4-hud__status {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  line-height: 1.05;
+  color: var(--ph-strong);
+}
+
+.c4-hud__help {
+  min-height: 3.2em;
+  line-height: 1.45;
+}
+
+.c4-hud__actions,
+.c4-hud__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.c4-hud .term-button {
+  font-size: var(--step-0);
+  padding: 4px 10px;
+}
+
+.c4-hud__log {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 4px 0 0;
+  padding: 8px 0 0;
+  list-style: none;
+  border-top: 2px solid var(--ph-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.4;
+  color: var(--ph-dim);
+}
+
+.c4-hud__log li::before {
+  content: '> ';
+}
+
+.c4-hud__log li[data-mine] {
+  color: var(--ph);
+}
+
+/* ---- Overlays ------------------------------------------------------------------------ */
+
+.c4-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(20px, var(--safe-top)) max(20px, var(--safe-right)) max(20px, var(--safe-bottom)) max(20px, var(--safe-left));
+  background: rgba(14, 10, 34, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+/* Centered, or from the top and scrolling when it's taller than a phone held sideways. */
+.c4-overlay > * {
+  margin: auto;
+}
+
+.c4-gameover {
+  max-width: 520px;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  text-align: center;
+  animation: c4-pop-in 0.3s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+}
+
+.c4-gameover h2 {
+  font-size: var(--step-3);
+  margin: 0;
+}
+
+.c4-gameover__checker {
+  font-size: 3.2rem;
+  line-height: 1;
+}
+
+.c4-gameover__checker .c4-checker-icon {
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3), 0 0 0 4px var(--paper), 0 0 0 6px var(--bulb);
+}
+
+.c4-gameover__how {
+  font-family: var(--font-midway);
+  font-size: var(--step--1);
+  letter-spacing: 0.04em;
+  color: var(--rack-dark);
+}
+
+.c4-gameover blockquote {
+  margin: 0;
+  font-style: italic;
+}
+
+.c4-gameover blockquote footer {
+  color: var(--ink-dim);
+  font-style: normal;
+  font-size: var(--step--1);
+}
+
+.c4-gameover__unlock {
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: rgba(36, 104, 212, 0.12);
+  color: var(--rack-dark);
+}
+
+.c4-gameover__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.c4-rules-modal {
+  max-width: 78ch;
+  max-height: calc(var(--app-height) * 0.86);
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  font-size: var(--step-0);
+}
+
+/* The table's menu on phones: the move log and table controls. */
+.c4-menu.screen {
+  width: min(100%, 460px);
+  max-height: min(560px, calc(var(--app-height) - 40px));
+  padding: 14px 16px 16px;
+  gap: 12px;
+  border-radius: 12px;
+  color: var(--ph);
+  font-size: var(--step--1);
+}
+
+.c4-menu .c4-hud__log {
+  min-height: 4.5em;
+  margin: 0;
+  padding: 0 0 8px;
+  border-top: 0;
+  border-bottom: 2px solid var(--ph-faint);
+}
+
+.c4-menu .term-button {
+  font-size: var(--step-0);
+  padding: 6px 12px;
+}
+
+.c4-menu > .term-button--primary {
+  align-self: flex-start;
+}
+
+/* Nothing turns or twinkles for anyone who'd rather it didn't. */
+@media (prefers-reduced-motion: reduce) {
+  .c4-ferris__wheel,
+  .c4-ferris__car,
+  .c4-ferris__bulb,
+  .c4-bulb,
+  .c4-sign__bulbs {
+    animation: none;
+  }
+}
+
+/* ---- Pages on narrow screens ---------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .c4-setup {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The ladder scrolls sideways rather than push the opponent off the screen. */
+  .c4-ladder {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(210px, 1fr);
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+}
+
+@media (max-width: 520px) {
+  .c4-header {
+    gap: 8px 12px;
+  }
+
+  .c4-sign {
+    padding: 10px 14px 7px;
+  }
+
+  .c4-sign__text {
+    font-size: var(--step-2);
+    text-shadow:
+      2px 2px 0 var(--red-deep),
+      0 0 12px rgba(255, 214, 107, 0.5);
+  }
+
+  .c4-header__wheel {
+    width: 40px;
+  }
+
+  .c4-nav {
+    order: 1;
+    flex-basis: 100%;
+  }
+
+  .c4-hotseat__players {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .c4-opponent__head {
+    gap: 12px;
+  }
+
+  .c4-portrait--big {
+    width: 52px;
+    height: 52px;
+    font-size: var(--step-0);
+  }
+}
+
+@media (max-width: 360px) {
+  .c4-sign__text {
+    font-size: var(--step-1);
+  }
+}
+
+/* ---- The table on phones and small windows -----------------------------------------------
+ * Keep these queries in step with COMPACT_TABLE in Table.tsx.
+ *
+ * Upright, the sky and awning, the opponent, the rack, you and the HUD
+ * stack, and the rack is as wide as the screen. Sideways (the next block),
+ * the rack takes the left, as tall as the screen, and the plates and HUD
+ * share a column on the right.
+ */
+
+@media (max-width: 900px), (max-height: 520px) {
+  /*
+   * The rack is as wide as the screen and the plates hug it. Whatever height
+   * is left over goes to the sky above, under the awning, so the rack and the
+   * HUD stay down where your thumbs are.
+   */
+  .c4-game {
+    --gutter: 8px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto auto auto;
+    grid-template-areas: 'wall' 'top' 'stage' 'bottom' 'hud';
+  }
+
+  .c4-wall {
+    grid-area: wall;
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+    overflow: clip;
+  }
+
+  .c4-game__awning {
+    grid-area: wall;
+    align-self: start;
+    margin-left: 0;
+  }
+
+  .c4-wall__view .c4-backdrop__sea {
+    bottom: 0;
+    height: 34%;
+  }
+
+  .c4-wall__view .c4-backdrop__wheel {
+    left: 50%;
+    bottom: 6%;
+    height: 82%;
+    translate: -50% 0;
+  }
+
+  .c4-wall__view .c4-backdrop__coaster {
+    display: none;
+  }
+
+  /* The plates and the HUD need about 290px between them; the rack gets the rest, up to the screen's width. */
+  .c4-stage {
+    height: min((100vw - var(--safe-left) - var(--safe-right)) * 8.7 / 8.5 + 4px, var(--app-height) - var(--safe-top) - var(--safe-bottom) - 300px);
+  }
+
+  .c4-figure {
+    --pitch: min((100cqw - 6px) / 8.5, (100cqh - 6px) / 8.7);
+  }
+
+  .c4-bar {
+    min-height: 40px;
+    padding: 3px 10px;
+    gap: 10px;
+  }
+
+  .c4-bar--top {
+    margin: 4px max(8px, var(--safe-right)) 0 max(8px, var(--safe-left));
+  }
+
+  .c4-bar--bottom {
+    margin: 0 max(8px, var(--safe-right)) 6px max(8px, var(--safe-left));
+  }
+
+  .c4-bar .c4-portrait {
+    width: 30px;
+    height: 30px;
+    font-size: 0.7rem;
+  }
+
+  .c4-bar__name {
+    font-size: var(--step--1);
+  }
+
+  .c4-bar__count {
+    font-size: var(--step-1);
+  }
+
+  .c4-bar__number {
+    font-size: var(--step-0);
+  }
+
+  /* Remarks drop below the name, pointing up at the speaker. */
+  .c4-talk {
+    left: 0;
+    top: calc(100% + 12px);
+  }
+
+  .c4-talk__bubble {
+    max-width: min(420px, calc(100vw - 40px));
+    translate: none;
+    transform-origin: 15px 0;
+  }
+
+  .c4-talk__bubble::before {
+    right: auto;
+    left: 12px;
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    border: 7px solid transparent;
+    border-bottom: 10px solid var(--red);
+    border-top-width: 0;
+  }
+
+  /* The HUD: status and count, the hint, then the buttons. */
+  .c4-hud.screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'status score'
+      'help help'
+      'actions actions';
+    align-content: start;
+    gap: 4px 10px;
+    margin: 0 max(8px, var(--safe-right)) max(8px, var(--safe-bottom)) max(8px, var(--safe-left));
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .c4-hud__head {
+    display: contents;
+  }
+
+  .c4-hud__label {
+    display: none;
+  }
+
+  .c4-hud__score {
+    grid-area: score;
+    align-self: center;
+  }
+
+  .c4-hud__status {
+    grid-area: status;
+    font-size: var(--step-1);
+  }
+
+  .c4-hud__help {
+    grid-area: help;
+    min-height: 2.8em;
+    line-height: 1.4;
+  }
+
+  .c4-hud__actions {
+    grid-area: actions;
+  }
+
+  .c4-hud .term-button {
+    padding: 6px 12px;
+  }
+
+  .c4-hud__menu {
+    margin-left: auto;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .c4-game {
+    --hud-w: clamp(210px, 34vw, 300px);
+    grid-template-columns: minmax(0, 1fr) var(--hud-w);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'stage top'
+      'stage bottom'
+      'stage hud';
+  }
+
+  .c4-wall,
+  .c4-game__awning {
+    display: none;
+  }
+
+  .c4-stage {
+    height: auto;
+    padding-left: var(--safe-left);
+  }
+
+  .c4-bar--top {
+    margin: max(6px, var(--safe-top)) max(8px, var(--safe-right)) 6px 0;
+  }
+
+  .c4-bar--bottom {
+    margin: 0 max(8px, var(--safe-right)) 6px 0;
+  }
+
+  /* The opponent sits on the right here, so remarks go out over the rack, pointing back at them. */
+  .c4-talk {
+    left: auto;
+    right: calc(100% + 26px);
+    top: 50%;
+  }
+
+  .c4-talk__bubble {
+    right: 0;
+    max-width: min(320px, 40vw);
+    translate: 0 -50%;
+    transform-origin: 100% 50%;
+  }
+
+  .c4-talk__bubble::before {
+    left: 100%;
+    right: auto;
+    top: 50%;
+    bottom: auto;
+    margin-top: -7px;
+    border: 7px solid transparent;
+    border-left: 10px solid var(--red);
+    border-right-width: 0;
+  }
+
+  .c4-hud.screen {
+    margin: 0 max(8px, var(--safe-right)) max(8px, var(--safe-bottom)) 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'status' 'score' 'help' 'actions';
+    overflow: auto;
+  }
+
+  .c4-hud__score {
+    justify-self: start;
+  }
+
+  .c4-hud__help {
+    min-height: 0;
+  }
+}

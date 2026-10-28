@@ -1,0 +1,97 @@
+/*
+ * The 3D rack, on while Settings → 3D tables is (html[data-table3d='on']).
+ * Plain CSS 3D transforms, as at the other tables:
+ *
+ * - The rack stands upright on the booth's counter, seen from a little
+ *   above, through the stage's perspective. Its front and back faces stand
+ *   apart, the checkers fall between them, and you can see the slot along
+ *   the top they're dropped through.
+ * - The counter is a real shelf: a top you can see the rack's feet on, and
+ *   the booth's front hanging from its edge.
+ * - Looking from above, a checker shows a little low in its hole, the way
+ *   it does through the real thing.
+ *
+ * filter, opacity below 1 and overflow flatten 3D for everything inside, so
+ * keep them off the chain from the figure down to the rack's faces.
+ */
+
+:root[data-table3d='on'] .c4-stage {
+  perspective: 1100px;
+  /* Seen from well above the stage: the rack stays upright, and the tops of things show. */
+  perspective-origin: 50% -60%;
+}
+
+:root[data-table3d='on'] .c4-figure {
+  --depth: calc(var(--pitch) * 0.42);
+  transform-style: preserve-3d;
+}
+
+:root[data-table3d='on'] .c4-rack {
+  transform-style: preserve-3d;
+}
+
+/* The faces stand apart, with the checkers in the gap between them. */
+:root[data-table3d='on'] .c4-rack__face {
+  transform: translateZ(calc(var(--depth) / 2));
+}
+
+:root[data-table3d='on'] .c4-rack__back {
+  display: block;
+  transform: translateZ(calc(var(--depth) / -2));
+}
+
+:root[data-table3d='on'] .c4-slots::before {
+  display: none;
+}
+
+/* The top of the rack: two plastic rails, and the slot between them the checkers go in by. */
+:root[data-table3d='on'] .c4-rack::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--depth);
+  border-radius: calc(var(--pitch) * 0.12);
+  transform-origin: 50% 0;
+  transform: translateZ(calc(var(--depth) / -2)) rotateX(90deg);
+  background: linear-gradient(180deg, #1a4fa8, #3d7fe6 18%, #1d55b5 34%, #0b1a3a 36% 64%, #1d55b5 66%, #3d7fe6 82%, #1a4fa8);
+  pointer-events: none;
+}
+
+:root[data-table3d='on'] .c4-ring {
+  transform: translateZ(calc(var(--depth) / 2 + 1px));
+}
+
+:root[data-table3d='on'] .c4-columns {
+  transform: translateZ(calc(var(--depth) / 2 + 2px));
+}
+
+/* The counter: the booth's front stands nearer you, and its top runs back under the rack's feet. */
+:root[data-table3d='on'] .c4-counter {
+  top: calc(var(--pitch) * 8.64);
+  transform-style: preserve-3d;
+  transform: translateZ(calc(var(--pitch) * 1.7));
+}
+
+:root[data-table3d='on'] .c4-counter::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(var(--pitch) * 2.6);
+  transform-origin: 50% 0;
+  transform: rotateX(-90deg);
+  background:
+    radial-gradient(ellipse 30% 60% at 50% 70%, rgba(255, 214, 107, 0.22), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0 2px, transparent 2px 11px),
+    linear-gradient(0deg, #c08a54, #9a663a);
+}
+
+/* A phone's stage is small: a nearer eye, so the tops still show. */
+@media (max-width: 900px), (max-height: 520px) {
+  :root[data-table3d='on'] .c4-stage {
+    perspective: 800px;
+  }
+}

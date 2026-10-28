@@ -87,6 +87,7 @@ Every gambling game shares one caps balance. You start with 500. If you drop bel
   - The counter, betting 1 to 8 units with the count, comes out about 0.4% ahead.
 - **Coach and count:** the coach lights the basic strategy play for your hand and notes in the log when you play something else. *Count* shows the Hi-Lo running and true counts. The full chart is on the *Strategy chart* page, drawn from the same data the coach uses (`strategy.ts`).
 - **Table talk:** the regulars say hello, cheer a dealer bust, groan at a dealer blackjack, and have opinions about you splitting tens or taking the dealer's bust card. `banter.ts` decides who speaks and when; the dealer calls insurance, the peek and their total.
+- **Tempers** (`tilt.ts`): every loss stings, more for a lost double or split, a dealer blackjack or a run of losses. Depending on their temper, a regular may swear about it (uncensored), slam the table so it shakes and the chips jump, or storm off. Slam it too often and security walks them out; bet like a card counter and the pit boss has a word. At most one scene a round, the most dramatic. An emptied seat stays open for one to three rounds before someone new sits down. In self-play, Big Sal, the worst of them, slams the table about 5 times in 100 rounds; Granny Pearl only ever swears.
 
 ## Credits
 

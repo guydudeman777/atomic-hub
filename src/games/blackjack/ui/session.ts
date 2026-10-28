@@ -10,7 +10,7 @@ import { crowdReaction } from '../../../core/audio/live'
 import { playSfx } from '../../../core/audio/sfx'
 import { createRng, pick, randomSeed } from '../../../core/rng'
 import { useSave } from '../../../store/save'
-import { TableTalk, type Talker, dealerCall } from '../banter'
+import { type Scripted, TableTalk, type Talker, dealerCall } from '../banter'
 import { type BetMemory, botAction, botBet, freshMemory, remember } from '../bots'
 import { REGULARS, type Regular, SPOTS, type Stakes, type TableMode, YOUR_SPOT, seatRegulars, stakesById } from '../content'
 import {
@@ -22,12 +22,14 @@ import {
   apply,
   createTable,
   currentHand,
+  dealerHasBlackjack,
   handTotal,
   isLegal,
   legalActions,
   upCard,
 } from '../engine'
 import { ACTION_LABEL, basicStrategy, describeHand, describeUp } from '../strategy'
+import { type Mood, type Scene, calmMood, headline, moodAfter, sceneAfter, sting, vacancyRounds } from '../tilt'
 
 export interface SitConfig {
   mode: TableMode
@@ -38,8 +40,18 @@ export interface Occupant {
   regular: Regular
   stack: number
   memory: BetMemory
-  /** Broke: they get up before the next deal. */
-  leaving: boolean
+  mood: Mood
+  /** Why they get up before the next deal: out of caps, storming off, or thrown out. */
+  leaving: false | 'broke' | 'quit' | 'kicked'
+}
+
+/** A regular blowing up at the table: the felt shakes under their fist. */
+export interface Fx {
+  id: number
+  kind: 'slam'
+  spot: number
+  /** Milliseconds from now, in step with what they say. */
+  delay: number
 }
 
 export interface LogEntry {
@@ -56,6 +68,8 @@ export interface Remark {
   text: string
   /** Milliseconds to wait before showing it, so the cards land first. */
   delay: number
+  /** Said in a temper. */
+  angry?: boolean
 }
 
 /** Your result for the round just paid. */
@@ -72,6 +86,11 @@ interface SessionStore {
   state: TableState | null
   /** Who's in each spot. Yours is always null; so are empty seats. */
   seats: (Occupant | null)[]
+  /** For each empty seat, the rounds left before someone new sits down. */
+  waits: number[]
+  /** Regulars thrown out this sitting. They don't come back. */
+  banned: string[]
+  fx: Fx | null
   /** Your bet for the next deal. */
   bet: number
   log: LogEntry[]
@@ -101,6 +120,55 @@ const rng = createRng(randomSeed())
 
 const REMARK_DELAY_MS = 500
 const HELLO_DELAY_MS = 900
+/** A scene waits for the chips to be paid, so everyone sees what they lost. */
+const SCENE_DELAY_MS = 900
+let fxId = 0
+
+interface Staging {
+  /** What they say. */
+  line: Scripted
+  /** What the dealer says first, if anything. */
+  call?: string
+  slam: boolean
+  /** Whether they get up after the round. */
+  leave: Occupant['leaving']
+  log: (name: string, said: string | null) => string
+}
+
+const quote = (said: string | null) => (said ? `: “${said}”` : '.')
+
+/** How a scene plays out at the table. */
+function stage(scene: Scene, o: Occupant): Staging {
+  switch (scene.kind) {
+    case 'kicked':
+      return scene.why === 'counting'
+        ? {
+            line: 'kickedOut',
+            call: 'Sir, the pit boss would like a word.',
+            slam: false,
+            leave: 'kicked',
+            log: (name, said) => `The pit boss has a word with ${name}, who colors up and leaves${quote(said)}`,
+          }
+        : {
+            line: 'kickedOut',
+            call: 'Security. That’s enough, sir.',
+            slam: true,
+            leave: 'kicked',
+            log: (name, said) => `Security walks ${name} out for slamming the table${quote(said)}`,
+          }
+    case 'quit':
+      return {
+        line: 'rageQuit',
+        slam: scene.slam && o.regular.banter.lines.mySlam !== undefined,
+        leave: 'quit',
+        log: (name, said) => `${name} ${scene.slam ? 'slams the table and ' : ''}storms off${quote(said)}`,
+      }
+    case 'slam':
+      return { line: 'mySlam', slam: true, leave: false, log: (name, said) => `${name} slams the table${quote(said)}` }
+    case 'curse':
+      return { line: 'myCurse', slam: false, leave: false, log: (name, said) => `${name} mutters${quote(said)}` }
+  }
+}
 
 const caps = () => useSave.getState().wallet.caps
 
@@ -215,6 +283,15 @@ function playResultSounds(state: TableState, result: RoundResult) {
   }, 350)
 }
 
+/** A regular taking a seat with a fresh buy-in, in a good mood. */
+const seatRegular = (regular: Regular, stakes: Stakes): Occupant => ({
+  regular,
+  stack: regular.bankroll * stakes.limits.min,
+  memory: freshMemory(),
+  mood: calmMood(),
+  leaving: false,
+})
+
 const talkers = (seats: (Occupant | null)[]): Talker[] =>
   seats.flatMap((o, spot) => (o ? [{ spot, id: o.regular.id, banter: o.regular.banter }] : []))
 
@@ -228,6 +305,8 @@ export const useSession = create<SessionStore>()((set, get) => {
     let nextSeats = seats
     let result: RoundResult | null = get().result
     const leaving: Occupant[] = []
+    const scenes: { spot: number; scene: Scene }[] = []
+    const banned = get().banned.slice()
     for (const e of events) {
       if (e.type === 'staked') {
         if (e.spot === YOUR_SPOT) useSave.getState().adjustCaps(-e.amount)
@@ -249,12 +328,53 @@ export const useSession = create<SessionStore>()((set, get) => {
             // What they bet on the deal, before any double.
             const first = next.spots[i].hands[0]
             const bet = first ? (first.doubled ? first.bet / 2 : first.bet) : 0
-            const updated = { ...o, stack, memory: remember(bet, net), leaving: broke }
-            if (broke) leaving.push(updated)
+            const mood = moodAfter(o.mood, net)
+            const updated: Occupant = { ...o, stack, memory: remember(bet, net), mood, leaving: broke ? 'broke' : false }
+            if (broke) {
+              leaving.push(updated)
+            } else {
+              const buyIn = o.regular.bankroll * stakes.limits.min
+              const scene = sceneAfter(
+                {
+                  temper: o.regular.temper,
+                  mood,
+                  sting: sting(next.spots[i].hands, net, mood.losses, dealerHasBlackjack(next)),
+                  down: Math.max(0, (buyIn - stack) / buyIn),
+                  hotBet: o.regular.style.betting === 'spread' && bet >= stakes.limits.min * 6,
+                },
+                rng,
+              )
+              if (scene) scenes.push({ spot: i, scene })
+            }
             return updated
           })
         }
       }
+    }
+
+    // The round's scene, if anyone makes one: the most dramatic wins.
+    const scene = headline(scenes)
+    let fx: Fx | null = get().fx
+    let sceneTalk: Remark | null = null
+    let sceneCall: Remark | null = null
+    const sceneLog: LogEntry[] = []
+    if (scene && nextSeats[scene.spot]) {
+      const o = nextSeats[scene.spot]!
+      const { line, call, slam, leave, log: logText } = stage(scene.scene, o)
+      const text = talk?.say({ spot: scene.spot, id: o.regular.id, banter: o.regular.banter }, line) ?? null
+      const mood = slam ? { ...o.mood, slams: o.mood.slams + 1 } : o.mood
+      nextSeats = nextSeats.map((s, i) => (i === scene.spot && s ? { ...s, mood, leaving: leave } : s))
+      if (slam) {
+        fx = { id: ++fxId, kind: 'slam', spot: scene.spot, delay: SCENE_DELAY_MS }
+        playSfx('slam', { pan: SPOT_PAN[scene.spot] * 0.7, delay: SCENE_DELAY_MS / 1000 })
+      }
+      if (call) sceneCall = { id: ++remarkId, spot: 'dealer', text: call, delay: SCENE_DELAY_MS + (slam ? 500 : 0) }
+      // Fists and storming off are said in a temper; a counter takes the pit boss calmly.
+      const angry = slam || scene.scene.kind === 'quit'
+      if (text) sceneTalk = { id: ++remarkId, spot: scene.spot, text, delay: SCENE_DELAY_MS + (call ? 900 : 0), angry: angry || undefined }
+      if (leave === 'kicked' || (slam && rng() < 0.5)) window.setTimeout(() => crowdReaction('laugh'), SCENE_DELAY_MS + 400)
+      sceneLog.push({ id: ++logId, mine: false, text: logText(o.regular.name, text) })
+      if (leave === 'kicked') banned.push(o.regular.id)
     }
 
     playStepSounds(events)
@@ -267,13 +387,22 @@ export const useSession = create<SessionStore>()((set, get) => {
       const bye = talk?.say({ spot, id: o.regular.id, banter: o.regular.banter }, 'goodbye')
       if (bye) remark = { id: ++remarkId, spot, text: bye, delay: REMARK_DELAY_MS + 600 }
     }
+    // A scene drowns out the small talk.
+    if (sceneTalk) remark = sceneTalk
     const callText = dealerCall(state, events, next, YOUR_SPOT)
-    const call = callText ? { id: ++remarkId, spot: 'dealer' as const, text: callText, delay: 250 } : lastCall
+    const call = sceneCall ?? (callText ? { id: ++remarkId, spot: 'dealer' as const, text: callText, delay: 250 } : lastCall)
 
     set({
       state: next,
       seats: nextSeats,
-      log: [...log, ...describe(state, events, next, nextSeats), ...leaving.map((o) => ({ id: ++logId, mine: false, text: `${o.regular.name} is out of caps and gets up.` }))].slice(-120),
+      banned,
+      fx,
+      log: [
+        ...log,
+        ...describe(state, events, next, nextSeats),
+        ...leaving.map((o) => ({ id: ++logId, mine: false, text: `${o.regular.name} is out of caps and gets up.` })),
+        ...sceneLog,
+      ].slice(-120),
       talk: remark,
       call,
       result,
@@ -288,6 +417,9 @@ export const useSession = create<SessionStore>()((set, get) => {
     stakes: null,
     state: null,
     seats: [],
+    waits: [],
+    banned: [],
+    fx: null,
     bet: 0,
     log: [],
     talk: null,
@@ -303,7 +435,7 @@ export const useSession = create<SessionStore>()((set, get) => {
       const seats: (Occupant | null)[] = Array.from({ length: SPOTS }, () => null)
       ;[0, 1, 3, 4].forEach((spot, k) => {
         const regular = regulars[k]
-        if (regular) seats[spot] = { regular, stack: regular.bankroll * stakes.limits.min, memory: freshMemory(), leaving: false }
+        if (regular) seats[spot] = seatRegular(regular, stakes)
       })
       // One of the regulars says hello once everyone's settled in; the dealer greets you first.
       const greeters = talkers(seats)
@@ -315,6 +447,9 @@ export const useSession = create<SessionStore>()((set, get) => {
         stakes,
         state,
         seats,
+        waits: Array.from({ length: SPOTS }, () => 0),
+        banned: [],
+        fx: null,
         bet: Math.min(stakes.limits.min, caps()),
         log: [{ id: ++logId, mine: false, text: `You sit down at the ${stakes.name.toLowerCase()} table. ${stakes.dealer.name} is dealing.` }],
         talk: hello && helloText ? { id: ++remarkId, spot: hello.spot, text: helloText, delay: HELLO_DELAY_MS + 1600 } : null,
@@ -349,18 +484,22 @@ export const useSession = create<SessionStore>()((set, get) => {
         return false
       }
 
-      // Broke regulars get up; at a full table, someone new takes an empty seat.
-      let nextSeats = seats.map((o) => (o?.leaving ? null : o))
+      // Whoever's leaving gets up, and their seat stays empty a round or three.
+      // At a full table, once a seat has been empty long enough, someone new sits down.
+      const waits = get().waits.map((w, spot) => (seats[spot] === null ? Math.max(0, w - 1) : w))
+      let nextSeats = seats.map((o, spot) => {
+        if (!o?.leaving) return o
+        waits[spot] = vacancyRounds(rng)
+        return null
+      })
       let arrival: { spot: number; regular: Regular } | null = null
       if (get().config?.mode === 'full') {
-        const empty = [0, 1, 3, 4].filter((spot) => !nextSeats[spot])
-        const seated = new Set(nextSeats.flatMap((o) => (o ? [o.regular.id] : [])))
-        const free = REGULARS.filter((r) => !seated.has(r.id))
-        if (empty.length && free.length && seats.every((o) => !o?.leaving)) {
-          arrival = { spot: pick(empty, rng), regular: pick(free, rng) }
-          nextSeats = nextSeats.map((o, i) =>
-            i === arrival!.spot ? { regular: arrival!.regular, stack: arrival!.regular.bankroll * stakes.limits.min, memory: freshMemory(), leaving: false } : o,
-          )
+        const ready = [0, 1, 3, 4].filter((spot) => seats[spot] === null && waits[spot] === 0)
+        const away = new Set([...nextSeats.flatMap((o) => (o ? [o.regular.id] : [])), ...seats.flatMap((o) => (o ? [o.regular.id] : [])), ...get().banned])
+        const free = REGULARS.filter((r) => !away.has(r.id))
+        if (ready.length && free.length) {
+          arrival = { spot: pick(ready, rng), regular: pick(free, rng) }
+          nextSeats = nextSeats.map((o, i) => (i === arrival!.spot ? seatRegular(arrival!.regular, stakes) : o))
         }
       }
 
@@ -370,7 +509,7 @@ export const useSession = create<SessionStore>()((set, get) => {
       nextSeats = nextSeats.map((o, spot) => (o ? { ...o, stack: o.stack - bets[spot] } : o))
       bets.forEach((b, spot) => b > 0 && playSfx('chip', { pan: SPOT_PAN[spot] * 0.6, delay: 0.05 * spot }))
 
-      set({ seats: nextSeats, result: null })
+      set({ seats: nextSeats, waits, result: null })
       run({ type: 'deal', bets }, Infinity)
       if (arrival) {
         const hello = talk?.say({ spot: arrival.spot, id: arrival.regular.id, banter: arrival.regular.banter }, 'hello')
@@ -435,7 +574,7 @@ export const useSession = create<SessionStore>()((set, get) => {
       const staked = yourStake(get().state)
       if (staked > 0) useSave.getState().recordResult('blackjack', 'loss', -staked)
       talk = null
-      set({ config: null, stakes: null, state: null, seats: [], bet: 0, log: [], talk: null, call: null, result: null })
+      set({ config: null, stakes: null, state: null, seats: [], waits: [], banned: [], fx: null, bet: 0, log: [], talk: null, call: null, result: null })
     },
   }
 })

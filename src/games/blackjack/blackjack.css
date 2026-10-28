@@ -709,6 +709,7 @@
 .bj-plate,
 .bj-talk--seat,
 .bj-talk--table,
+.bj-impact,
 .bj-shoe,
 .bj-discards,
 .bj-glow,
@@ -724,6 +725,74 @@
 .bj-plate,
 .bj-burst {
   translate: -50% -50%;
+}
+
+/* ---- Scenes: a fist on the table, a seat left empty ----------------------- */
+
+/* The whole table jumps, then settles. */
+.bj-stage.is-shaking {
+  animation: bj-slam 0.65s cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
+@keyframes bj-slam {
+  0% {
+    translate: 0 0;
+  }
+  6% {
+    translate: -7px 6px;
+  }
+  16% {
+    translate: 6px -4px;
+  }
+  28% {
+    translate: -4px 3px;
+  }
+  42% {
+    translate: 3px -2px;
+  }
+  60% {
+    translate: -1px 1px;
+  }
+  100% {
+    translate: 0 0;
+  }
+}
+
+/* Where the fist lands, two rings run out through the felt. */
+.bj-impact {
+  width: 0;
+  height: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.bj-impact::before,
+.bj-impact::after {
+  content: '';
+  position: absolute;
+  width: calc(70 * var(--u) * var(--scale, 1));
+  height: calc(70 * var(--u) * var(--scale, 1));
+  translate: -50% -50%;
+  border-radius: 50%;
+  border: calc(4 * var(--u)) solid rgba(255, 236, 190, 0.8);
+  animation: bj-impact 0.6s ease-out forwards;
+}
+
+.bj-impact::after {
+  border-color: rgba(255, 255, 255, 0.45);
+  animation-delay: 0.09s;
+  opacity: 0;
+}
+
+@keyframes bj-impact {
+  from {
+    scale: 0.2;
+    opacity: 1;
+  }
+  to {
+    scale: 3.6;
+    opacity: 0;
+  }
 }
 
 /* Cards */
@@ -987,6 +1056,54 @@
   opacity: 0.5;
 }
 
+/* Someone new sits down. */
+.bj-plate {
+  animation: bj-plate-in 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+}
+
+@keyframes bj-plate-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+/* Their hand comes down: the plate jolts and flushes red. */
+.bj-plate.is-slamming {
+  animation: bj-plate-jolt 0.5s ease-out;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 0 calc(2 * var(--u)) #e0484f,
+    0 0 calc(16 * var(--u)) rgba(224, 72, 79, 0.8);
+}
+
+@keyframes bj-plate-jolt {
+  12% {
+    translate: -50% calc(-50% - 7 * var(--u));
+  }
+  30% {
+    translate: calc(-50% + 4 * var(--u)) -50%;
+  }
+  50% {
+    translate: calc(-50% - 3 * var(--u)) -50%;
+  }
+}
+
+/* Walked out by security, or by the pit boss. */
+.bj-plate.is-kicked {
+  opacity: 1;
+  background: linear-gradient(180deg, #d4575c, #8e1d24);
+  color: #fff2e8;
+}
+
+/* An empty seat at a full table, until someone new sits down. */
+.bj-plate.is-open {
+  background: rgba(20, 6, 8, 0.4);
+  box-shadow: none;
+  outline: 1px dashed rgba(227, 194, 106, 0.55);
+  color: var(--cream-dim);
+}
+
 /* The shoe and the discard tray */
 
 .bj-shoe {
@@ -1190,6 +1307,30 @@
   font-family: var(--font-deco);
   font-weight: 400;
   color: #6a1219;
+}
+
+/* Said in a temper: a red edge, and the bubble shakes with it. */
+.bj-talk__bubble.is-angry {
+  background: linear-gradient(180deg, #fff3ee, #f8ddd5);
+  box-shadow:
+    0 0 0 2px #b3262c,
+    0 6px 14px rgba(0, 0, 0, 0.45);
+  font-weight: 700;
+  animation:
+    talk-in 0.24s cubic-bezier(0.3, 1.5, 0.5, 1) backwards,
+    bj-fume 0.45s ease-in-out 0.24s,
+    talk-out 0.3s ease-in var(--hold) forwards;
+}
+
+@keyframes bj-fume {
+  20%,
+  60% {
+    rotate: -2.5deg;
+  }
+  40%,
+  80% {
+    rotate: 2.5deg;
+  }
 }
 
 @keyframes talk-in {

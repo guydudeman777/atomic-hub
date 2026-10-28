@@ -65,7 +65,7 @@ type Recorded = 'talk' | 'laugh'
  */
 const TAKES: Record<Recorded, number> = { talk: 10, laugh: 3 }
 
-export type CrowdReaction = 'cheer' | 'groan'
+export type CrowdReaction = 'cheer' | 'groan' | 'laugh'
 
 export class Crowd {
   private readonly m: Mixer
@@ -139,13 +139,16 @@ export class Crowd {
     }
   }
 
-  /** The room reacts to the end of a game. */
+  /** The room reacts: to the end of a game, or a scene at the next table. */
   react(kind: CrowdReaction, t: number) {
     const everyone = this.tables.flatMap((table) => table.speakers)
     const some = (n: number) => [...everyone].sort(() => this.rng() - 0.5).slice(0, n)
     if (kind === 'cheer') {
       this.applause(t, 2.8)
       for (const s of some(3)) this.speak(s, t + 0.1 + this.rng() * 0.7, this.rng() < 0.6 ? 'woo' : 'laugh')
+    } else if (kind === 'laugh') {
+      // Someone at the next table caught that.
+      for (const s of some(3)) this.speak(s, t + this.rng() * 0.6, 'laugh')
     } else {
       for (const s of some(4)) this.speak(s, t + this.rng() * 0.2, 'aww')
     }

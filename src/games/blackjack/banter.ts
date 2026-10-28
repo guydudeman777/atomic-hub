@@ -26,6 +26,14 @@ import { trueCount, upValue } from './strategy'
 export const MOMENTS = [
   'hello',
   'goodbye',
+  /** Thrown out: security for slamming the table, or the pit boss for counting cards. */
+  'kickedOut',
+  /** Storming off after one loss too many. */
+  'rageQuit',
+  /** Slamming the table after a bad loss (tilt.ts decides when). */
+  'mySlam',
+  /** Swearing about one. */
+  'myCurse',
   'dealerBlackjack',
   /** You hit a stiff against a weak dealer, and the card you took would have busted them. */
   'yourBustCard',
@@ -54,8 +62,14 @@ export interface Banter {
   lines: Partial<Record<Moment, readonly string[]>>
 }
 
+/**
+ * Moments a regular always speaks to when they happen: arriving, leaving,
+ * and the scenes tilt.ts picks. The table talk never rolls for these.
+ */
+export type Scripted = 'hello' | 'goodbye' | 'kickedOut' | 'rageQuit' | 'mySlam' | 'myCurse'
+
 /** Moments about one spot's hand. The rest are about the table, and anyone may remark on them. */
-const MINE = new Set<Moment>(['hello', 'goodbye', 'myBlackjack', 'myDoubleWon', 'myDoubleLost', 'myBust'])
+const MINE = new Set<Moment>(['hello', 'goodbye', 'kickedOut', 'rageQuit', 'mySlam', 'myCurse', 'myBlackjack', 'myDoubleWon', 'myDoubleLost', 'myBust'])
 
 export interface Found {
   moment: Moment
@@ -63,10 +77,14 @@ export interface Found {
   spot?: number
 }
 
-/** Chance of a remark, before chattiness. */
+/** Chance of a remark, before chattiness. Scripted moments are never rolled for. */
 const CHANCE: Record<Moment, number> = {
   hello: 1,
   goodbye: 1,
+  kickedOut: 0,
+  rageQuit: 0,
+  mySlam: 0,
+  myCurse: 0,
   dealerBlackjack: 0.6,
   yourBustCard: 0.75,
   yourSplitTens: 0.85,
@@ -204,8 +222,8 @@ export class TableTalk {
     return null
   }
 
-  /** Something a regular always says: hello as they sit down, goodbye as they leave. */
-  say(talker: Talker, moment: 'hello' | 'goodbye'): string | null {
+  /** Something a regular always says: hello as they sit down, goodbye as they leave, or a scene's line. */
+  say(talker: Talker, moment: Scripted): string | null {
     if (!talker.banter.lines[moment]?.length) return null
     this.lastStep = this.step
     this.lastSpeaker = talker.spot

@@ -746,7 +746,7 @@ function Hud({ book }: { book: DrawPlan | null }) {
     <aside className="dw-hud screen" aria-label="Game status">
       <div className="dw-hud__head">
         <p className="term-dim">Five-Card Draw, {table!.name.toLowerCase()}</p>
-        {inPot > 0 && <p className="dw-hud__stake">In the pot {inPot}</p>}
+        {inPot > 0 && <p className="dw-hud__stake">You’ve put in {inPot}</p>}
       </div>
       <p className="dw-hud__status" aria-live="polite">
         {status(s, seats, result)}

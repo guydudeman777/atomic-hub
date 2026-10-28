@@ -31,6 +31,8 @@ export interface Settings {
   /** Talk, laughter and glasses at the tables. */
   chatter: boolean
   chatterVolume: number
+  /** What other players see at online tables. */
+  playerName: string
 }
 
 export interface GameStats {
@@ -130,6 +132,7 @@ export const newSave = (): SaveData => ({
     musicVolume: 0.5,
     chatter: true,
     chatterVolume: 0.5,
+    playerName: '',
   },
   stats: {},
   caravan: {

@@ -222,3 +222,25 @@ export function tallLayout(h: number): Layout {
   if (!layout) tallLayouts.set(depth, (layout = layoutFor(tallShape(depth))))
   return layout
 }
+
+/**
+ * The table as seen from chair `me` of `n`: every chair moved round so
+ * yours is at the foot, and the others keep their order clockwise from it.
+ * The layout's functions take the chair's real number.
+ */
+export function seenFrom(layout: Layout, me: number, n: number): Layout {
+  if (me === 0) return layout
+  const v = (seat: number) => (seat - me + n) % n
+  return {
+    ...layout,
+    sideOf: (seat, n) => layout.sideOf(v(seat), n),
+    plateOf: (seat, n) => layout.plateOf(v(seat), n),
+    handNameOf: (seat, n) => layout.handNameOf(v(seat), n),
+    drewOf: (seat, n) => layout.drewOf(v(seat), n),
+    handOf: (seat, n) => layout.handOf(v(seat), n),
+    betOf: (seat, n) => layout.betOf(v(seat), n),
+    buttonOf: (seat, n) => layout.buttonOf(v(seat), n),
+    cardOf: (seat, n, k) => layout.cardOf(v(seat), n, k),
+    cardW: (seat) => layout.cardW(v(seat)),
+  }
+}

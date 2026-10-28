@@ -1,4 +1,4 @@
-import { Suspense, useEffect } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useMediaQuery } from './components/useMediaQuery'
 import { setAudioScene } from './core/audio/live'
@@ -25,12 +25,13 @@ function useDisplaySettings() {
 }
 
 function Screen({ path }: { path: string }) {
+  const game = screenFor(path)
+  // Already loaded when we got here through navigate(); lazy for direct links. Kept for
+  // the life of the screen: switching to the loaded one later would remount the game.
+  const [GameApp] = useState(() => game && (game.component ?? game.lazy))
   if (path === '/records') return <RecordsScreen />
   if (path === '/settings') return <SettingsScreen />
-  const game = screenFor(path)
-  if (game) {
-    // Already loaded when we got here through navigate(); lazy for direct links.
-    const GameApp = game.component ?? game.lazy
+  if (GameApp) {
     return (
       <Suspense fallback={<div className="loading">Loading…</div>}>
         <GameApp path={path} />

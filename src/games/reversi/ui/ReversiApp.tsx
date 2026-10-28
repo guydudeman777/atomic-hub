@@ -1,5 +1,7 @@
+import { codeFromPath } from '../../../net/codes'
 import { Link } from '../../../router'
 import { Lobby } from './Lobby'
+import { GAME, useReversiOnline } from './online'
 import { RulesText } from './Rules'
 import { StarburstClock } from './StarburstClock'
 import { Table } from './Table'
@@ -13,6 +15,7 @@ const SECTIONS = [
 ]
 
 export default function ReversiApp({ path }: { path: string }) {
+  useReversiOnline(path)
   if (path === '/reversi/play') {
     return (
       <div className="rv rv-den">
@@ -27,7 +30,7 @@ export default function ReversiApp({ path }: { path: string }) {
         <RulesText />
       </div>
     ) : (
-      <Lobby />
+      <Lobby inviteCode={codeFromPath(path, GAME)} />
     )
 
   return (
@@ -45,7 +48,7 @@ export default function ReversiApp({ path }: { path: string }) {
         </h1>
         <nav className="rv-nav" aria-label="Reversi">
           {SECTIONS.map((s) => (
-            <Link key={s.path} to={s.path} className="rv-nav__link" aria-current={path === s.path ? 'page' : undefined}>
+            <Link key={s.path} to={s.path} className="rv-nav__link" aria-current={path === s.path || (s.path === '/reversi' && path.startsWith('/reversi/join/')) ? 'page' : undefined}>
               <span className="wide-only">{s.label}</span>
               <span className="narrow-only">{s.short}</span>
             </Link>

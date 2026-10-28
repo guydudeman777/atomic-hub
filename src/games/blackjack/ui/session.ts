@@ -2,6 +2,15 @@
  * The table you're sitting at: the round in play, who's in each seat, and
  * caps moving between your wallet and the felt. Not persisted. Caps go on
  * the table when they're bet, so leaving mid-round forfeits them.
+ *
+ * Online, friends sit in other spots. Every browser at the table runs this
+ * same session from the host's seed, and what the players do arrives as
+ * numbered inputs (net/link.ts): a bet for the next round, a decision on a
+ * hand, insurance. Each input waits in `queue` until the table is ready for
+ * it (`pump`): a decision on a hand waits for that hand's turn, and the deal
+ * waits until every player has bet. The dealer and the regulars play the
+ * same everywhere, since all their choices come from the shared seed. Each
+ * browser only moves its own player's caps.
  */
 
 import { create } from 'zustand'
@@ -12,6 +21,7 @@ import { createRng, pick, randomSeed } from '../../../core/rng'
 import { useSave } from '../../../store/save'
 import { type Scripted, TableTalk, type Talker, dealerCall } from '../banter'
 import { type BetMemory, botAction, botBet, freshMemory, remember } from '../bots'
+import { type Entry, isSys } from '../../../net/link'
 import { REGULARS, type Regular, SPOTS, type Stakes, type TableMode, YOUR_SPOT, seatRegulars, stakesById } from '../content'
 import {
   type Action,
@@ -34,7 +44,52 @@ import { type Mood, type Scene, calmMood, headline, moodAfter, sceneAfter, sting
 export interface SitConfig {
   mode: TableMode
   stakesId: string
+  /** Online: the shared seed, your spot, and the other players by spot. */
+  online?: { seed: number; me: number; humans: (Human | null)[] }
 }
+
+/** Another player at an online table. */
+export interface Human {
+  /** Their seat at the table link. */
+  seat: number
+  name: string
+  /** Their line dropped or they got up: their hands stand, and the spot clears before the next deal. */
+  gone: boolean
+}
+
+/**
+ * What players send at an online table. `available` is their caps, for
+ * doubles, splits and insurance. Each says where in the game it was made
+ * (the round, and for a decision the hand and its cards), so a repeat that
+ * arrives after the moment has passed is dropped rather than played later.
+ */
+export type Input =
+  | { type: 'bet'; round: number; amount: number }
+  | { type: 'act'; round: number; hand: number; cards: number; action: PlayerAction; available: number }
+  | { type: 'insure'; round: number; take: boolean; available: number }
+  /** Host: deal now, with whoever has bet. */
+  | { type: 'deal-now'; round: number }
+
+/** Your input for the moment the table's at, to send. */
+export function inputFor(state: TableState, move: { type: 'bet'; amount: number } | { type: 'act'; action: PlayerAction } | { type: 'insure'; take: boolean } | { type: 'deal-now' }): Input {
+  const round = state.round
+  switch (move.type) {
+    case 'bet':
+      return { type: 'bet', round, amount: move.amount }
+    case 'deal-now':
+      return { type: 'deal-now', round }
+    case 'insure':
+      return { type: 'insure', round, take: move.take, available: caps() }
+    case 'act': {
+      const turn = state.turn
+      const cards = turn ? (state.spots[turn.spot].hands[turn.hand]?.cards.length ?? 0) : 0
+      return { type: 'act', round, hand: turn?.hand ?? 0, cards, action: move.action, available: caps() }
+    }
+  }
+}
+
+/** Online spots by link seat: the host in the middle, then outward. */
+export const SPOT_OF_SEAT = [2, 3, 1, 4, 0]
 
 export interface Occupant {
   regular: Regular
@@ -82,6 +137,14 @@ interface SessionStore {
   /** Increments every time you sit down, so the table remounts. */
   sitting: number
   config: SitConfig | null
+  /** Your spot: the middle one, unless an online table put you elsewhere. */
+  me: number
+  /** Online: the other players, by spot. */
+  humans: (Human | null)[]
+  /** Online: each player's bet for the next deal, by spot, once they've placed it. */
+  ready: (number | null)[]
+  /** Online: inputs that arrived before the table was ready for them. */
+  queue: Entry[]
   stakes: Stakes | null
   state: TableState | null
   /** Who's in each spot. Yours is always null; so are empty seats. */
@@ -107,8 +170,14 @@ interface SessionStore {
   /** Your decision on your hand. */
   act: (action: PlayerAction) => void
   insure: (take: boolean) => void
-  /** The dealer's or a regular's next move. Does nothing while it's your turn. */
+  /** The dealer's or a regular's next move. Does nothing while it's a player's turn. */
   step: () => void
+  /** Online: play waiting inputs the table is ready for, calling `after` as each one is played. */
+  pump: (after?: (entry: Entry) => void) => void
+  /** Online: play everything waiting at once, the dealer and the regulars included, without a sound. */
+  catchUp: (after?: (entry: Entry) => void) => void
+  /** Online: inputs from the table link, in order. */
+  receive: (entries: Entry[]) => void
   /** Get up. Anything still on the table this round is lost. */
   leave: () => void
 }
@@ -116,7 +185,14 @@ interface SessionStore {
 let logId = 0
 let remarkId = 0
 let talk: TableTalk | null = null
-const rng = createRng(randomSeed())
+/** The table's shared randomness: who sits down, and how tempers flare. Seeded by the host online. */
+let rng = createRng(randomSeed())
+/**
+ * Catching up on an online table's past: everything is played through, but
+ * quietly, and without touching your caps or your record. Those rounds
+ * happened before you sat down (or before you reloaded the page).
+ */
+let quiet = false
 
 const REMARK_DELAY_MS = 500
 const HELLO_DELAY_MS = 900
@@ -175,7 +251,8 @@ const caps = () => useSave.getState().wallet.caps
 /** Stereo position of each spot, as you see the table: first base is on your right. */
 export const SPOT_PAN = [0.55, 0.3, 0, -0.3, -0.55]
 
-const nameOf = (seats: (Occupant | null)[], spot: number) => (spot === YOUR_SPOT ? 'You' : (seats[spot]?.regular.name ?? 'Someone'))
+/** Who's in a spot, for the log: you, a regular, or another player. */
+type Names = (spot: number) => string
 
 const totalText = (cards: Parameters<typeof handTotal>[0]) => {
   const { total, soft } = handTotal(cards)
@@ -183,14 +260,15 @@ const totalText = (cards: Parameters<typeof handTotal>[0]) => {
 }
 
 /** What's on the felt for you this round, insurance included. */
-export function yourStake(state: TableState | null): number {
+export function yourStake(state: TableState | null, me = YOUR_SPOT): number {
   if (!state || state.phase === 'settled' || state.phase === 'betting') return 0
-  const spot = state.spots[YOUR_SPOT]
+  const spot = state.spots[me]
   return spot.hands.reduce((n, h) => n + h.bet, 0) + (spot.insurance ?? 0)
 }
 
 /** Plain-language log lines for one step. */
-function describe(before: TableState, events: TableEvent[], after: TableState, seats: (Occupant | null)[]): LogEntry[] {
+function describe(before: TableState, events: TableEvent[], after: TableState, nameOf: Names, me: number): LogEntry[] {
+  const YOUR_SPOT = me
   const lines: LogEntry[] = []
   const add = (text: string, mine = false) => lines.push({ id: ++logId, mine, text })
   for (let i = 0; i < events.length; i++) {
@@ -200,7 +278,7 @@ function describe(before: TableState, events: TableEvent[], after: TableState, s
         add('The dealer shuffles a fresh shoe.')
         break
       case 'insured':
-        if (e.amount > 0) add(`${nameOf(seats, e.spot)} ${e.spot === YOUR_SPOT ? 'take' : 'takes'} insurance for ${e.amount}.`, e.spot === YOUR_SPOT)
+        if (e.amount > 0) add(`${nameOf(e.spot)} ${e.spot === YOUR_SPOT ? 'take' : 'takes'} insurance for ${e.amount}.`, e.spot === YOUR_SPOT)
         else if (e.spot === YOUR_SPOT) add('You decline insurance.', true)
         break
       case 'peeked':
@@ -211,7 +289,7 @@ function describe(before: TableState, events: TableEvent[], after: TableState, s
         break
       case 'acted': {
         const you = e.spot === YOUR_SPOT
-        const who = nameOf(seats, e.spot)
+        const who = nameOf(e.spot)
         const verb = { hit: you ? 'hit' : 'hits', stand: you ? 'stand' : 'stands', double: you ? 'double' : 'doubles', split: you ? 'split' : 'splits' }[e.action]
         const hands = after.spots[e.spot].hands
         if (e.action === 'stand') {
@@ -266,8 +344,8 @@ function playStepSounds(events: TableEvent[]) {
 }
 
 /** The chips get pushed, and the room reacts to your blackjacks and your big hands. */
-function playResultSounds(state: TableState, result: RoundResult) {
-  const hands = state.spots[YOUR_SPOT].hands
+function playResultSounds(state: TableState, result: RoundResult, me: number) {
+  const hands = state.spots[me].hands
   const net = result.returned - result.staked
   const big = (h: (typeof hands)[number]) => h.doubled || h.split
   window.setTimeout(() => {
@@ -296,9 +374,12 @@ const talkers = (seats: (Occupant | null)[]): Talker[] =>
   seats.flatMap((o, spot) => (o ? [{ spot, id: o.regular.id, banter: o.regular.banter }] : []))
 
 export const useSession = create<SessionStore>()((set, get) => {
+  /** You, a regular, or another player. */
+  const nameOf: Names = (spot) => (spot === get().me ? 'You' : (get().seats[spot]?.regular.name ?? get().humans[spot]?.name ?? 'Someone'))
+
   /** Apply one action and everything that follows from it: caps, sounds, the log, the talk. */
   const run = (action: Action, available: number) => {
-    const { state, seats, log, talk: lastTalk, call: lastCall, stakes } = get()
+    const { state, seats, log, talk: lastTalk, call: lastCall, stakes, me } = get()
     if (!state || !stakes) return
     const { state: next, events } = apply(state, action, available)
 
@@ -309,13 +390,16 @@ export const useSession = create<SessionStore>()((set, get) => {
     const banned = get().banned.slice()
     for (const e of events) {
       if (e.type === 'staked') {
-        if (e.spot === YOUR_SPOT) useSave.getState().adjustCaps(-e.amount)
+        if (e.spot === me) {
+          if (!quiet) useSave.getState().adjustCaps(-e.amount)
+        }
         else nextSeats = nextSeats.map((o, i) => (i === e.spot && o ? { ...o, stack: o.stack - e.amount } : o))
       } else if (e.type === 'settled') {
         for (const r of e.results) {
           const net = r.returned - r.staked
-          if (r.spot === YOUR_SPOT) {
+          if (r.spot === me) {
             result = { staked: r.staked, returned: r.returned }
+            if (quiet) continue
             const save = useSave.getState()
             save.adjustCaps(r.returned)
             save.recordResult('blackjack', net > 0 ? 'win' : net < 0 ? 'loss' : 'draw', net)
@@ -329,10 +413,10 @@ export const useSession = create<SessionStore>()((set, get) => {
             const first = next.spots[i].hands[0]
             const bet = first ? (first.doubled ? first.bet / 2 : first.bet) : 0
             const mood = moodAfter(o.mood, net)
-            const updated: Occupant = { ...o, stack, memory: remember(bet, net), mood, leaving: broke ? 'broke' : false }
+            const updated: Occupant = { ...o, stack, memory: remember(bet, net), mood, leaving: broke ? 'broke' : o.leaving }
             if (broke) {
               leaving.push(updated)
-            } else {
+            } else if (!o.leaving) {
               const buyIn = o.regular.bankroll * stakes.limits.min
               const scene = sceneAfter(
                 {
@@ -364,7 +448,7 @@ export const useSession = create<SessionStore>()((set, get) => {
       const text = talk?.say({ spot: scene.spot, id: o.regular.id, banter: o.regular.banter }, line) ?? null
       const mood = slam ? { ...o.mood, slams: o.mood.slams + 1 } : o.mood
       nextSeats = nextSeats.map((s, i) => (i === scene.spot && s ? { ...s, mood, leaving: leave } : s))
-      if (slam) {
+      if (slam && !quiet) {
         fx = { id: ++fxId, kind: 'slam', spot: scene.spot, delay: SCENE_DELAY_MS }
         playSfx('slam', { pan: SPOT_PAN[scene.spot] * 0.7, delay: SCENE_DELAY_MS / 1000 })
       }
@@ -372,13 +456,13 @@ export const useSession = create<SessionStore>()((set, get) => {
       // Fists and storming off are said in a temper; a counter takes the pit boss calmly.
       const angry = slam || scene.scene.kind === 'quit'
       if (text) sceneTalk = { id: ++remarkId, spot: scene.spot, text, delay: SCENE_DELAY_MS + (call ? 900 : 0), angry: angry || undefined }
-      if (leave === 'kicked' || (slam && rng() < 0.5)) window.setTimeout(() => crowdReaction('laugh'), SCENE_DELAY_MS + 400)
+      if ((leave === 'kicked' || (slam && rng() < 0.5)) && !quiet) window.setTimeout(() => crowdReaction('laugh'), SCENE_DELAY_MS + 400)
       sceneLog.push({ id: ++logId, mine: false, text: logText(o.regular.name, text) })
       if (leave === 'kicked') banned.push(o.regular.id)
     }
 
-    playStepSounds(events)
-    if (result && result !== get().result) playResultSounds(next, result)
+    if (!quiet) playStepSounds(events)
+    if (result && result !== get().result && !quiet) playResultSounds(next, result, me)
 
     const said = talk?.react(state, events, next, talkers(nextSeats))
     let remark: Remark | null = said ? { id: ++remarkId, spot: said.spot, text: said.text, delay: REMARK_DELAY_MS } : lastTalk
@@ -389,7 +473,7 @@ export const useSession = create<SessionStore>()((set, get) => {
     }
     // A scene drowns out the small talk.
     if (sceneTalk) remark = sceneTalk
-    const callText = dealerCall(state, events, next, YOUR_SPOT)
+    const callText = dealerCall(state, events, next, me)
     const call = sceneCall ?? (callText ? { id: ++remarkId, spot: 'dealer' as const, text: callText, delay: 250 } : lastCall)
 
     set({
@@ -399,7 +483,7 @@ export const useSession = create<SessionStore>()((set, get) => {
       fx,
       log: [
         ...log,
-        ...describe(state, events, next, nextSeats),
+        ...describe(state, events, next, nameOf, me),
         ...leaving.map((o) => ({ id: ++logId, mine: false, text: `${o.regular.name} is out of caps and gets up.` })),
         ...sceneLog,
       ].slice(-120),
@@ -411,9 +495,191 @@ export const useSession = create<SessionStore>()((set, get) => {
     })
   }
 
+  /**
+   * Deal the next round with these bets, by spot. Whoever's leaving gets up
+   * first, and at a full table someone new may sit down in a seat that's
+   * been empty long enough. Your own bet comes out of your wallet.
+   */
+  const dealRound = (bets: number[]): boolean => {
+    const { state, stakes, seats, me, humans, config } = get()
+    if (!state || !stakes) return false
+    const online = !!config?.online
+    // Players who've gone get up; their spots are open again.
+    const nextHumans = humans.map((h) => (h?.gone ? null : h))
+
+    // Whoever's leaving gets up, and their seat stays empty a round or three.
+    // At a full table, once a seat has been empty long enough, someone new sits down.
+    // A regular in a spot a player now holds gets up too.
+    const waits = get().waits.map((w, spot) => (seats[spot] === null ? Math.max(0, w - 1) : w))
+    let nextSeats = seats.map((o, spot) => {
+      if (!o || (!o.leaving && !nextHumans[spot])) return o
+      waits[spot] = vacancyRounds(rng)
+      return null
+    })
+    let arrival: { spot: number; regular: Regular } | null = null
+    if (config?.mode === 'full') {
+      const ready = REGULAR_SPOTS.filter((spot) => spot !== me && !nextHumans[spot] && seats[spot] === null && waits[spot] === 0)
+      const away = new Set([...nextSeats.flatMap((o) => (o ? [o.regular.id] : [])), ...seats.flatMap((o) => (o ? [o.regular.id] : [])), ...get().banned])
+      const free = REGULARS.filter((r) => !away.has(r.id))
+      if (ready.length && free.length) {
+        arrival = { spot: pick(ready, rng), regular: pick(free, rng) }
+        nextSeats = nextSeats.map((o, i) => (i === arrival!.spot ? seatRegular(arrival!.regular, stakes) : o))
+      }
+    }
+
+    // A bet the table can't take sits that player out, the same at every table.
+    const clean = bets.map((b, spot) => (spot === me || nextHumans[spot] ? (b >= stakes.limits.min && b <= stakes.limits.max ? b : 0) : 0))
+    const all = nextSeats.map((o, spot) => (o ? botBet(o.regular.style, o.memory, state, o.stack) : clean[spot]))
+    if (!isLegal(state, { type: 'deal', bets: all })) return false
+    if (all[me] > 0 && !quiet && !useSave.getState().spendCaps(all[me])) {
+      if (!online) return false
+      // Online the bet was placed already, so it stands.
+      useSave.getState().adjustCaps(-all[me])
+    }
+    nextSeats = nextSeats.map((o, spot) => (o ? { ...o, stack: o.stack - all[spot] } : o))
+    if (!quiet) all.forEach((b, spot) => b > 0 && spot !== me && playSfx('chip', { pan: SPOT_PAN[spot] * 0.6, delay: 0.05 * spot }))
+
+    set({ seats: nextSeats, waits, humans: nextHumans, ready: nextHumans.map(() => null), result: null })
+    run({ type: 'deal', bets: all }, Infinity)
+    if (arrival) {
+      const hello = talk?.say({ spot: arrival.spot, id: arrival.regular.id, banter: arrival.regular.banter }, 'hello')
+      set((s) => ({
+        log: [...s.log, { id: ++logId, mine: false, text: `${arrival.regular.name} sits down.` }],
+        talk: hello ? { id: ++remarkId, spot: arrival.spot, text: hello, delay: 300 } : s.talk,
+      }))
+    }
+    return true
+  }
+
+  /** Online: deal once every player still here has bet. */
+  const dealIfReady = (force = false) => {
+    const { ready, humans, state } = get()
+    if (!state || !canBet(state)) return
+    const players = humans.flatMap((h, spot) => (h && !h.gone ? [spot] : []))
+    if (!force && players.some((spot) => ready[spot] === null)) return
+    if (players.every((spot) => !ready[spot])) return
+    dealRound(ready.map((b) => b ?? 0))
+  }
+
+  /**
+   * Whether the table is ready for this input: now, not yet (the dealer is
+   * still dealing, or someone before them is playing), or never, because its
+   * moment has passed. Inputs wait in order until the table's ready.
+   */
+  const readiness = (entry: Entry): 'now' | 'wait' | 'drop' => {
+    const { state } = get()
+    if (!state) return 'wait'
+    if (isSys(entry.input)) return 'now'
+    const input = entry.input as Input
+    const spot = spotOf(entry.seat)
+    if (state.round > input.round) return 'drop'
+    if (state.round < input.round) return 'wait'
+    // In seat order: a turn still coming waits; one that's gone by is dropped.
+    const order = (turnSpot: number, turnHand = 0, hand = 0) =>
+      turnSpot < spot || (turnSpot === spot && turnHand < hand) ? 'wait' : turnSpot === spot && turnHand === hand ? 'now' : 'drop'
+    switch (input.type) {
+      case 'bet':
+      case 'deal-now':
+        // This round is still being played here.
+        return canBet(state) ? 'now' : 'wait'
+      case 'insure':
+        if (state.phase === 'dealing') return 'wait'
+        return state.phase === 'insurance' && state.turn ? order(state.turn.spot) : 'drop'
+      case 'act': {
+        if (state.phase === 'dealing' || state.phase === 'insurance' || state.phase === 'peek') return 'wait'
+        if (state.phase !== 'playing' || !state.turn) return 'drop'
+        const when = order(state.turn.spot, state.turn.hand, input.hand)
+        if (when !== 'now') return when
+        return (currentHand(state)?.cards.length ?? 0) === input.cards ? 'now' : 'drop'
+      }
+    }
+  }
+
+  /** Play one input. Anything the rules don't allow is dropped, the same at every table. */
+  const play = (entry: Entry) => {
+    const { state, me } = get()
+    if (!state) return
+    const spot = spotOf(entry.seat)
+    if (isSys(entry.input)) {
+      if (entry.input.sys === 'join') {
+        const human: Human = { seat: entry.seat, name: entry.input.name, gone: false }
+        set((s) => ({
+          humans: s.humans.map((h, i) => (i === spot ? human : h)),
+          log: spot === me ? s.log : [...s.log, { id: ++logId, mine: false, text: `${human.name} pulls up a chair.` }],
+        }))
+      } else {
+        const gone = get().humans[spot]
+        if (!gone) return
+        set((s) => ({
+          humans: s.humans.map((h, i) => (i === spot && h ? { ...h, gone: true } : h)),
+          ready: s.ready.map((b, i) => (i === spot ? null : b)),
+          log: [...s.log, { id: ++logId, mine: false, text: `${gone.name} gets up from the table.` }],
+        }))
+        dealIfReady()
+      }
+      return
+    }
+    const input = entry.input as Input
+    switch (input.type) {
+      case 'bet':
+        set((s) => ({ ready: s.ready.map((b, i) => (i === spot ? Math.max(0, Math.floor(input.amount)) : b)) }))
+        dealIfReady()
+        break
+      case 'deal-now':
+        if (entry.seat === 0) dealIfReady(true)
+        break
+      case 'act': {
+        const available = Math.max(0, input.available)
+        if (!isLegal(state, { type: input.action }, available)) return
+        if (spot === me && !quiet) coach(input.action, available)
+        else run({ type: input.action }, available)
+        break
+      }
+      case 'insure': {
+        const available = Math.max(0, input.available)
+        if (!isLegal(state, { type: 'insurance', take: input.take }, available)) return
+        run({ type: 'insurance', take: input.take }, available)
+        if (spot === me && input.take && !quiet) coachInsurance()
+        break
+      }
+    }
+  }
+
+  /** Your decision, with a word from the coach when it isn't the book's. */
+  const coach = (action: PlayerAction, available: number) => {
+    const { state } = get()
+    if (!state) return
+    const hand = currentHand(state)!
+    const up = upCard(state)!
+    const allowed = new Set(legalActions(state, available).map((a) => a.type))
+    const book = basicStrategy(hand.cards, up, { canDouble: allowed.has('double'), canSplit: allowed.has('split') })
+    run({ type: action }, available)
+    if (book !== action && useSave.getState().blackjack.coach) {
+      set((s) => ({
+        log: [
+          ...s.log,
+          { id: ++logId, mine: true, text: `Coach: the book says ${ACTION_LABEL[book].toLowerCase()} on ${describeHand(hand.cards)} against ${describeUp(up)}.` },
+        ],
+      }))
+    }
+  }
+
+  const coachInsurance = () => {
+    if (useSave.getState().blackjack.coach) {
+      set((s) => ({ log: [...s.log, { id: ++logId, mine: true, text: 'Coach: the book never takes insurance. It only pays when the shoe is rich in tens.' }] }))
+    }
+  }
+
+  /** Online: the link seat sitting in each spot. */
+  const spotOf = (seat: number) => SPOT_OF_SEAT[seat] ?? -1
+
   return {
     sitting: 0,
     config: null,
+    me: YOUR_SPOT,
+    humans: [],
+    ready: [],
+    queue: [],
     stakes: null,
     state: null,
     seats: [],
@@ -428,12 +694,17 @@ export const useSession = create<SessionStore>()((set, get) => {
 
     sit: (config) => {
       const stakes = stakesById(config.stakesId)
-      if (caps() < stakes.limits.min) return false
-      const state = createTable({ spots: SPOTS, limits: stakes.limits, seed: randomSeed() })
-      talk = new TableTalk(createRng(randomSeed()), YOUR_SPOT)
-      const regulars = config.mode === 'full' ? seatRegulars(rng) : []
+      const online = config.online
+      if (!online && caps() < stakes.limits.min) return false
+      rng = createRng(online?.seed ?? randomSeed())
+      const me = online?.me ?? YOUR_SPOT
+      const humans = online?.humans ?? Array.from({ length: SPOTS }, () => null)
+      const state = createTable({ spots: SPOTS, limits: stakes.limits, seed: online ? (online.seed ^ 0x5bd1e995) >>> 0 : randomSeed() })
+      talk = new TableTalk(createRng(randomSeed()), me)
+      const open = REGULAR_SPOTS.filter((spot) => spot !== me && !humans[spot])
+      const regulars = config.mode === 'full' ? seatRegulars(rng, open.length) : []
       const seats: (Occupant | null)[] = Array.from({ length: SPOTS }, () => null)
-      ;[0, 1, 3, 4].forEach((spot, k) => {
+      open.forEach((spot, k) => {
         const regular = regulars[k]
         if (regular) seats[spot] = seatRegular(regular, stakes)
       })
@@ -441,9 +712,14 @@ export const useSession = create<SessionStore>()((set, get) => {
       const greeters = talkers(seats)
       const hello = greeters.length ? pick(greeters, rng) : null
       const helloText = hello ? talk.say(hello, 'hello') : null
+      const others = humans.flatMap((h) => (h ? [h.name] : []))
       set((s) => ({
         sitting: s.sitting + 1,
         config,
+        me,
+        humans,
+        ready: humans.map(() => null),
+        queue: [],
         stakes,
         state,
         seats,
@@ -451,7 +727,13 @@ export const useSession = create<SessionStore>()((set, get) => {
         banned: [],
         fx: null,
         bet: Math.min(stakes.limits.min, caps()),
-        log: [{ id: ++logId, mine: false, text: `You sit down at the ${stakes.name.toLowerCase()} table. ${stakes.dealer.name} is dealing.` }],
+        log: [
+          {
+            id: ++logId,
+            mine: false,
+            text: `You sit down at the ${stakes.name.toLowerCase()} table${others.length ? ` with ${listNames(others)}` : ''}. ${stakes.dealer.name} is dealing.`,
+          },
+        ],
         talk: hello && helloText ? { id: ++remarkId, spot: hello.spot, text: helloText, delay: HELLO_DELAY_MS + 1600 } : null,
         call: { id: ++remarkId, spot: 'dealer', text: pick(stakes.dealer.hello, rng), delay: HELLO_DELAY_MS },
         result: null,
@@ -460,8 +742,9 @@ export const useSession = create<SessionStore>()((set, get) => {
     },
 
     addChip: (value) => {
-      const { stakes, bet } = get()
-      if (!stakes || !canBet(get().state)) return
+      const { stakes, bet, state, ready, me, config } = get()
+      if (!stakes || !canBet(state)) return
+      if (config?.online && ready[me] !== null) return
       const next = Math.min(bet + value, stakes.limits.max, caps())
       if (next === bet) {
         playSfx('error')
@@ -472,112 +755,102 @@ export const useSession = create<SessionStore>()((set, get) => {
     },
 
     clearBet: () => {
-      if (!canBet(get().state)) return
+      const { state, ready, me, config } = get()
+      if (!canBet(state) || (config?.online && ready[me] !== null)) return
       set({ bet: 0 })
     },
 
     deal: () => {
-      const { state, stakes, bet, seats } = get()
+      const { state, stakes, bet, me } = get()
       if (!state || !stakes || !canBet(state)) return false
       if (bet < stakes.limits.min || bet > caps()) {
         playSfx('error')
         return false
       }
-
-      // Whoever's leaving gets up, and their seat stays empty a round or three.
-      // At a full table, once a seat has been empty long enough, someone new sits down.
-      const waits = get().waits.map((w, spot) => (seats[spot] === null ? Math.max(0, w - 1) : w))
-      let nextSeats = seats.map((o, spot) => {
-        if (!o?.leaving) return o
-        waits[spot] = vacancyRounds(rng)
-        return null
-      })
-      let arrival: { spot: number; regular: Regular } | null = null
-      if (get().config?.mode === 'full') {
-        const ready = [0, 1, 3, 4].filter((spot) => seats[spot] === null && waits[spot] === 0)
-        const away = new Set([...nextSeats.flatMap((o) => (o ? [o.regular.id] : [])), ...seats.flatMap((o) => (o ? [o.regular.id] : [])), ...get().banned])
-        const free = REGULARS.filter((r) => !away.has(r.id))
-        if (ready.length && free.length) {
-          arrival = { spot: pick(ready, rng), regular: pick(free, rng) }
-          nextSeats = nextSeats.map((o, i) => (i === arrival!.spot ? seatRegular(arrival!.regular, stakes) : o))
-        }
-      }
-
-      const bets = nextSeats.map((o, spot) => (spot === YOUR_SPOT ? bet : o ? botBet(o.regular.style, o.memory, state, o.stack) : 0))
-      if (!isLegal(state, { type: 'deal', bets })) return false
-      if (!useSave.getState().spendCaps(bet)) return false
-      nextSeats = nextSeats.map((o, spot) => (o ? { ...o, stack: o.stack - bets[spot] } : o))
-      bets.forEach((b, spot) => b > 0 && playSfx('chip', { pan: SPOT_PAN[spot] * 0.6, delay: 0.05 * spot }))
-
-      set({ seats: nextSeats, waits, result: null })
-      run({ type: 'deal', bets }, Infinity)
-      if (arrival) {
-        const hello = talk?.say({ spot: arrival.spot, id: arrival.regular.id, banter: arrival.regular.banter }, 'hello')
-        set((s) => ({
-          log: [...s.log, { id: ++logId, mine: false, text: `${arrival.regular.name} sits down.` }],
-          talk: hello ? { id: ++remarkId, spot: arrival.spot, text: hello, delay: 300 } : s.talk,
-        }))
-      }
-      return true
+      return dealRound(Array.from({ length: SPOTS }, (_, spot) => (spot === me ? bet : 0)))
     },
 
     act: (action) => {
-      const { state } = get()
-      if (!state || state.phase !== 'playing' || actor(state) !== YOUR_SPOT) return
+      const { state, me } = get()
+      if (!state || state.phase !== 'playing' || actor(state) !== me) return
       const available = caps()
       if (!isLegal(state, { type: action }, available)) {
         playSfx('error')
         return
       }
-      const hand = currentHand(state)!
-      const up = upCard(state)!
-      const allowed = new Set(legalActions(state, available).map((a) => a.type))
-      const book = basicStrategy(hand.cards, up, { canDouble: allowed.has('double'), canSplit: allowed.has('split') })
-      run({ type: action }, available)
-      if (book !== action && useSave.getState().blackjack.coach) {
-        set((s) => ({
-          log: [
-            ...s.log,
-            { id: ++logId, mine: true, text: `Coach: the book says ${ACTION_LABEL[book].toLowerCase()} on ${describeHand(hand.cards)} against ${describeUp(up)}.` },
-          ],
-        }))
-      }
+      coach(action, available)
     },
 
     insure: (take) => {
-      const { state } = get()
-      if (!state || state.phase !== 'insurance' || actor(state) !== YOUR_SPOT) return
+      const { state, me } = get()
+      if (!state || state.phase !== 'insurance' || actor(state) !== me) return
       const available = caps()
       if (!isLegal(state, { type: 'insurance', take }, available)) {
         playSfx('error')
         return
       }
       run({ type: 'insurance', take }, available)
-      if (take && useSave.getState().blackjack.coach) {
-        set((s) => ({ log: [...s.log, { id: ++logId, mine: true, text: 'Coach: the book never takes insurance. It only pays when the shoe is rich in tens.' }] }))
-      }
+      if (take) coachInsurance()
     },
 
     step: () => {
-      const { state, seats } = get()
+      const { state, seats, humans } = get()
       if (!state) return
       const who = actor(state)
       if (who === 'dealer') run({ type: 'next' }, Infinity)
-      else if (who !== null && who !== YOUR_SPOT) {
+      else if (who !== null) {
         const occupant = seats[who]
-        if (!occupant) return
-        run(botAction(occupant.regular.style, state, occupant.stack), occupant.stack)
+        if (occupant) run(botAction(occupant.regular.style, state, occupant.stack), occupant.stack)
+        // A player who's gone stands, and turns insurance down.
+        else if (humans[who]?.gone) run(state.phase === 'insurance' ? { type: 'insurance', take: false } : { type: 'stand' }, 0)
       }
     },
 
+    pump: (after) => {
+      for (;;) {
+        const [entry, ...rest] = get().queue
+        if (!entry) break
+        const when = readiness(entry)
+        if (when === 'wait') break
+        set({ queue: rest })
+        if (when === 'now') play(entry)
+        after?.(entry)
+      }
+    },
+
+    catchUp: (after) => {
+      quiet = true
+      try {
+        for (let guard = 0; guard < 100_000; guard++) {
+          get().pump(after)
+          const { state, queue, seats, humans } = get()
+          if (!state || !queue.length) break
+          // The table moves on by itself while it's the dealer's, a regular's or a departed player's turn.
+          const who = actor(state)
+          if (who === null || (who !== 'dealer' && !seats[who] && !humans[who]?.gone)) break
+          get().step()
+        }
+      } finally {
+        quiet = false
+      }
+    },
+
+    receive: (entries) => set((s) => ({ queue: [...s.queue, ...entries] })),
+
     leave: () => {
-      const staked = yourStake(get().state)
+      const staked = yourStake(get().state, get().me)
       if (staked > 0) useSave.getState().recordResult('blackjack', 'loss', -staked)
       talk = null
-      set({ config: null, stakes: null, state: null, seats: [], waits: [], banned: [], fx: null, bet: 0, log: [], talk: null, call: null, result: null })
+      set({ config: null, stakes: null, state: null, seats: [], waits: [], banned: [], fx: null, bet: 0, log: [], talk: null, call: null, result: null, me: YOUR_SPOT, humans: [], ready: [], queue: [] })
     },
   }
 })
+
+/** Spots the regulars sit in when you're alone: all but the middle. */
+const REGULAR_SPOTS = [0, 1, 3, 4]
+
+/** "Ann", "Ann and Bo", "Ann, Bo and Cy". */
+export const listNames = (names: string[]): string => (names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`)
 
 /** Bets go down between rounds. */
 export const canBet = (state: TableState | null): boolean => !!state && (state.phase === 'betting' || state.phase === 'settled')

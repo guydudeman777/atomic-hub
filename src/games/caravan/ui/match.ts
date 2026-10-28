@@ -16,13 +16,22 @@ import { type GameEvent, type GameState, type Lane, type Move, type PlayerId, ap
 export const LANE_NAMES: Record<Lane, string> = { 0: 'left', 1: 'middle', 2: 'right' }
 
 export interface MatchConfig {
-  mode: 'ai' | 'hotseat'
+  mode: 'ai' | 'hotseat' | 'online'
   /** Set in AI mode. The AI always sits in seat 1. */
   opponentId?: string
   wager: number
+  /** Against the AI and online, yours is "You". */
   names: [string, string]
   decks: [Card[], Card[]]
+  /** Your seat online. Against the AI it's 0. */
+  you?: PlayerId
+  /** Online, both tables deal the same game from the same seed. */
+  seed?: number
+  firstPlayer?: PlayerId
 }
+
+/** Your seat, or null at hot-seat, where both are people at one screen. */
+export const yourSeat = (config: MatchConfig): PlayerId | null => (config.mode === 'hotseat' ? null : (config.you ?? 0))
 
 export interface LogEntry {
   id: number
@@ -41,6 +50,8 @@ export interface Remark {
 export interface Settlement {
   winner: PlayerId
   reason: GameState['endReason']
+  /** Online: who gave the game up. */
+  resigned?: PlayerId
   capsDelta: number
   newCards: Card[]
   bonusCaps: number
@@ -60,8 +71,11 @@ interface MatchStore {
   remark: Remark | null
   settlement: Settlement | null
   start: (config: MatchConfig) => boolean
-  play: (move: Move) => void
+  /** `quiet` plays a move without its sounds, for catching up on an online game. */
+  play: (move: Move, quiet?: boolean) => void
   forfeit: () => void
+  /** Online: a player gives the game up, and the other wins. */
+  concede: (player: PlayerId) => void
   leave: () => void
 }
 
@@ -75,9 +89,9 @@ const HELLO_DELAY_MS = 1500
 const REMARK_DELAY_MS = 450
 
 /** Plain-language log lines, written from the table's point of view. */
-function describe(events: GameEvent[], names: [string, string], mode: MatchConfig['mode']): LogEntry[] {
-  const possessive = (p: PlayerId) => (mode === 'ai' && p === 0 ? 'your' : `${names[p]}’s`)
-  const wins = (p: PlayerId) => (mode === 'ai' && p === 0 ? `${names[p]} win` : `${names[p]} wins`)
+function describe(events: GameEvent[], names: [string, string], me: PlayerId | null): LogEntry[] {
+  const possessive = (p: PlayerId) => (p === me ? 'your' : `${names[p]}’s`)
+  const wins = (p: PlayerId) => (p === me ? `${names[p]} win` : `${names[p]} wins`)
   const entries: LogEntry[] = []
   for (const e of events) {
     let text: string | null = null
@@ -86,7 +100,7 @@ function describe(events: GameEvent[], names: [string, string], mode: MatchConfi
       case 'played':
         player = e.player
         text = e.target
-          ? `${names[e.player]} played ${cardLabel(e.card)} on ${e.owner === e.player ? (mode === 'ai' && e.player === 0 ? 'your' : 'their') : possessive(e.owner)} ${cardLabel(e.target)} (${LANE_NAMES[e.lane]})`
+          ? `${names[e.player]} played ${cardLabel(e.card)} on ${e.owner === e.player ? (e.player === me ? 'your' : 'their') : possessive(e.owner)} ${cardLabel(e.target)} (${LANE_NAMES[e.lane]})`
           : `${names[e.player]} played ${cardLabel(e.card)} on the ${LANE_NAMES[e.lane]} caravan`
         break
       case 'removed':
@@ -173,8 +187,9 @@ export const useMatch = create<MatchStore>()((set, get) => ({
 
   start: (config) => {
     if (config.wager > 0 && !useSave.getState().spendCaps(config.wager)) return false
-    const rng = createRng(randomSeed())
-    const firstPlayer: PlayerId = rng() < 0.5 ? 0 : 1
+    const rng = createRng(config.seed ?? randomSeed())
+    const toss: PlayerId = rng() < 0.5 ? 0 : 1
+    const firstPlayer = config.firstPlayer ?? toss
     const state = createGame({ decks: config.decks, rng, firstPlayer })
     const opponent = config.mode === 'ai' ? opponentById(config.opponentId ?? '') : undefined
     talk = opponent ? new TableTalk(opponent.banter, createRng(randomSeed())) : null
@@ -187,20 +202,20 @@ export const useMatch = create<MatchStore>()((set, get) => ({
       recent: [],
       lastMover: null,
       remark,
-      log: [{ id: ++logId, player: firstPlayer, text: `New game. ${config.mode === 'ai' && firstPlayer === 0 ? 'You go' : `${config.names[firstPlayer]} goes`} first.` }],
+      log: [{ id: ++logId, player: firstPlayer, text: `New game. ${yourSeat(config) === firstPlayer ? 'You go' : `${config.names[firstPlayer]} goes`} first.` }],
     }))
     return true
   },
 
-  play: (move) => {
+  play: (move, quiet = false) => {
     const { state, config, log, remark } = get()
     if (!state || !config || state.winner !== null) return
     const { state: next, events } = applyMove(state, move)
     const mover = state.current
-    playMoveSounds(events, next.players[mover].deck.length < state.players[mover].deck.length)
+    if (!quiet) playMoveSounds(events, next.players[mover].deck.length < state.players[mover].deck.length)
     const settlement = next.winner !== null ? settle(config, next) : null
-    if (settlement) {
-      const humanWon = config.mode === 'hotseat' || settlement.winner === 0
+    if (settlement && !quiet) {
+      const humanWon = config.mode === 'hotseat' || settlement.winner === yourSeat(config)
       window.setTimeout(() => {
         playSfx(humanWon ? 'win' : 'lose')
         crowdReaction(humanWon ? 'cheer' : 'groan')
@@ -209,11 +224,24 @@ export const useMatch = create<MatchStore>()((set, get) => ({
     const said = talk?.react(state, events, next)
     set({
       state: next,
-      log: [...log, ...describe(events, config.names, config.mode)].slice(-120),
+      log: [...log, ...describe(events, config.names, yourSeat(config))].slice(-120),
       recent: touched(events),
       lastMover: state.current,
       remark: said ? { id: ++remarkId, text: said, delay: REMARK_DELAY_MS } : remark,
       settlement,
+    })
+  },
+
+  concede: (player) => {
+    const { state, config, log } = get()
+    if (!state || !config || state.winner !== null) return
+    const winner = other(player)
+    const me = yourSeat(config)
+    window.setTimeout(() => playSfx(winner === me ? 'win' : 'lose'), 150)
+    set({
+      state: { ...state, winner },
+      settlement: { winner, reason: null, resigned: player, capsDelta: 0, newCards: [], bonusCaps: 0 },
+      log: [...log, { id: ++logId, player, text: `${config.names[player]} ${player === me ? 'resign' : 'resigns'}. ${config.names[winner]} ${winner === me ? 'win' : 'wins'}.` }].slice(-120),
     })
   },
 

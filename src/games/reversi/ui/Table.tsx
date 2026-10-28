@@ -33,8 +33,11 @@ import {
   settleTime,
   useMatch,
 } from './match'
+import { type Input, GAME, leaveOnline } from './online'
 import { RulesText } from './Rules'
 import { StarburstClock } from './StarburstClock'
+import { LinkBanner } from '../../../net/ui/LinkBanner'
+import { useGameLink, useLink } from '../../../net/store'
 
 /**
  * Phones and small windows get the compact table in reversi.css, whose
@@ -61,6 +64,9 @@ export function Table() {
     if (!config || !state) navigate('/reversi')
   }, [config, state])
 
+  const link = useGameLink(GAME)
+  const banner = config?.mode === 'online' && <LinkBanner link={link} waitsForOthers onGone={() => void navigate('/reversi', { during: leaveOnline })} />
+
   // The AI moves once the discs from the last move have settled.
   const aiRng = useRef(createRng(randomSeed()))
   useEffect(() => {
@@ -75,7 +81,12 @@ export function Table() {
   }, [config, state, lastMove, play])
 
   if (!config || !state) return null
-  return <TableView key={gameId} config={config} state={state} />
+  return (
+    <>
+      <TableView key={gameId} config={config} state={state} />
+      {banner}
+    </>
+  )
 }
 
 // ---------------------------------------------------------------------------------
@@ -85,7 +96,12 @@ function TableView({ config, state }: { config: MatchConfig; state: GameState })
   const play = useMatch((s) => s.play)
   const showMoves = useSave((s) => s.reversi.showMoves)
   const hotseat = config.mode === 'hotseat'
-  const yourTurn = !state.over && (hotseat || state.current === config.you)
+  const online = config.mode === 'online'
+  const link = useGameLink(GAME)
+  // Online, a move counts once the table has it; one at a time.
+  const [sent, setSent] = useState<number | null>(null)
+  const waiting = online && sent === state.turn
+  const yourTurn = !state.over && !waiting && (hotseat || state.current === config.you)
   const legal = useMemo(() => new Set(yourTurn ? legalMoves(state) : []), [state, yourTurn])
   const compact = useMediaQuery(COMPACT_TABLE)
 
@@ -109,7 +125,14 @@ function TableView({ config, state }: { config: MatchConfig; state: GameState })
       return
     }
     setRefused(null)
-    play(square)
+    if (online) {
+      if (!link || link.status !== 'open') {
+        playSfx('error')
+        return
+      }
+      setSent(state.turn)
+      link.submit({ square } satisfies Input)
+    } else play(square)
   }
 
   // The game-over card waits for the last discs to land, and can be put away to look at the board.
@@ -156,16 +179,18 @@ function TableView({ config, state }: { config: MatchConfig; state: GameState })
 
   const [black, white] = discCount(state)
   const counts: [number, number] = [black, white]
-  const who = (p: Player) => (hotseat ? config.names[p] : p === config.you ? 'You' : (opponent?.name ?? COLOR_NAME[p]))
+  const who = (p: Player) => (hotseat ? config.names[p] : p === config.you ? 'You' : (opponent?.name ?? config.names[p] ?? COLOR_NAME[p]))
 
   let status: string
   if (state.over) status = 'Game over'
   else if (hotseat) status = `${config.names[state.current]} to play`
-  else if (yourTurn) status = 'Your turn'
+  else if (yourTurn || waiting) status = 'Your turn'
+  else if (online) status = `${config.names[state.current]} to play`
   else status = `${opponent?.name ?? 'Your opponent'} is thinking…`
 
   let help = ''
-  if (result) help = endLine(config, result.winner, result.score)
+  if (result?.resigned !== undefined) help = `${who(result.resigned)} ${result.resigned === config.you && !hotseat ? 'resign' : 'resigns'}.`
+  else if (result) help = endLine(config, result.winner, result.score)
   else if (yourTurn && refused !== null) help = `${squareName(refused)} doesn’t flank anything. Pick a square with a line of ${COLOR_NAME[other(state.current)].toLowerCase()} discs between it and one of yours.`
   else if (yourTurn) {
     const n = legal.size
@@ -190,7 +215,7 @@ function TableView({ config, state }: { config: MatchConfig; state: GameState })
         player={top}
         count={counts[top]}
         active={!state.over && state.current === top}
-        thinking={!hotseat && !state.over && state.current === top}
+        thinking={config.mode === 'ai' && !state.over && state.current === top}
         portrait={!hotseat && opponent ? { initials: opponent.initials, color: opponent.color } : null}
         remark={hotseat ? null : remark}
       />
@@ -474,8 +499,8 @@ function PassNotice({ notice, config }: { notice: Notice | null; config: MatchCo
     }
   }, [notice])
   if (!notice || shown !== notice.id) return null
-  // Against the AI, your name is "You".
-  const you = (p: Player) => config.mode === 'ai' && p === config.you
+  // Against the AI and online, your name is "You".
+  const you = (p: Player) => config.mode !== 'hotseat' && p === config.you
   const passer = notice.player
   const mover = other(passer)
   return (
@@ -528,8 +553,15 @@ function Hud({ config, state, status, help, log, compact, onShowResult }: HudPro
 
   const opponent = opponentById(config.opponentId ?? '')
   const [black, white] = discCount(state)
-  const midGame = !state.over && config.mode === 'ai'
-  const getUp = () => void navigate('/reversi', { during: midGame ? resign : leave })
+  const online = config.mode === 'online'
+  const midGame = !state.over && config.mode !== 'hotseat'
+  const getUp = () => {
+    if (online) {
+      if (midGame) currentLink()?.submit({ resign: true } satisfies Input)
+      void navigate('/reversi', { during: leaveOnline })
+    } else void navigate('/reversi', { during: midGame ? resign : leave })
+  }
+  const again = () => (online ? currentLink()?.submit({ again: true } satisfies Input) : start(config))
 
   const moveLog = (
     <ol className="rv-hud__log" ref={logRef} aria-label="Move log">
@@ -572,7 +604,9 @@ function Hud({ config, state, status, help, log, compact, onShowResult }: HudPro
   return (
     <aside className="rv-hud screen" aria-label="Game status">
       <div className="rv-hud__head">
-        <p className="rv-hud__label term-dim">{config.mode === 'ai' ? `Reversi against ${opponent?.name}` : 'Reversi, hot-seat'}</p>
+        <p className="rv-hud__label term-dim">
+          {config.mode === 'ai' ? `Reversi against ${opponent?.name}` : online ? `Reversi online with ${config.names[other(config.you)]}` : 'Reversi, hot-seat'}
+        </p>
         <p className="rv-hud__score" aria-label={`Black ${black}, White ${white}`}>
           B {black} · W {white}
         </p>
@@ -585,7 +619,7 @@ function Hud({ config, state, status, help, log, compact, onShowResult }: HudPro
         <div className="rv-hud__actions">
           {state.over && (
             <>
-              <button className="term-button term-button--primary" onClick={() => start(config)}>
+              <button className="term-button term-button--primary" onClick={again}>
                 Play again
               </button>
               <button className="term-button" onClick={onShowResult}>
@@ -634,11 +668,13 @@ function GameOver({ onLook }: { onLook: () => void }) {
   if (!config || !result) return null
   const opponent = opponentById(config.opponentId ?? '')
   const hotseat = config.mode === 'hotseat'
+  const online = config.mode === 'online'
   const won = !hotseat && result.winner === config.you
   let title: string
   if (result.winner === null) title = 'A draw'
   else if (hotseat) title = `${config.names[result.winner]} wins`
-  else title = won ? 'You win' : `${opponent?.name ?? 'Your opponent'} wins`
+  else title = won ? 'You win' : `${opponent?.name ?? config.names[result.winner]} wins`
+  const resigned = result.resigned === undefined ? null : result.resigned === config.you ? 'You resigned.' : `${config.names[result.resigned]} resigned.`
   const quote = !hotseat && opponent ? (result.winner === null ? opponent.lines.draw : won ? opponent.lines.lose : opponent.lines.win) : null
   // The winner's count first.
   const first: Player = result.winner ?? 0
@@ -652,6 +688,7 @@ function GameOver({ onLook }: { onLook: () => void }) {
           <span className="rv-gameover__dash">–</span>
           {result.score[other(first)]} <DiscIcon player={other(first)} />
         </p>
+        {resigned && <p>{resigned}</p>}
         {quote && (
           <blockquote>
             <p>“{quote}”</p>
@@ -660,17 +697,27 @@ function GameOver({ onLook }: { onLook: () => void }) {
         )}
         {result.unlocked && <p className="rv-gameover__unlock">{result.unlocked} is next on the ladder, and the board’s set up.</p>}
         <div className="rv-gameover__actions">
-          <button className="rv-button rv-button--primary" onClick={() => start(config)} autoFocus>
+          <button
+            className="rv-button rv-button--primary"
+            onClick={() => (online ? currentLink()?.submit({ again: true } satisfies Input) : start(config))}
+            autoFocus
+          >
             Play again
           </button>
           <button className="rv-button" onClick={onLook}>
             Look at the board
           </button>
-          <button className="rv-button" onClick={() => void navigate('/reversi', { during: leave })}>
+          <button className="rv-button" onClick={() => void navigate('/reversi', { during: online ? leaveOnline : leave })}>
             Back to the lobby
           </button>
         </div>
       </div>
     </div>
   )
+}
+
+/** The online table, read outside of rendering. */
+function currentLink() {
+  const link = useLink.getState().link
+  return link?.game === GAME ? link : null
 }

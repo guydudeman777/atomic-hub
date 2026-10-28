@@ -1,21 +1,9 @@
 import { type Page, expect, test } from '@playwright/test'
-import { skipBoot, watchErrors } from './helpers.ts'
+import { finishDrawHand, skipBoot, watchErrors } from './helpers.ts'
 
 test.beforeEach(async ({ page }) => {
   await skipBoot(page)
 })
-
-/** Play out the Five-Card Draw hand in front of you, checking and calling, standing pat or taking the marked draw. */
-async function finishDrawHand(page: Page) {
-  const next = page.getByRole('button', { name: /^Deal the next hand/ })
-  const draw = page.getByRole('button', { name: /^(Draw|Stand pat)/ })
-  const checkOrCall = page.locator('.dw-controls button:not([disabled])').filter({ hasText: /^(Check|Call|All in)/ })
-  await expect(async () => {
-    if (await draw.isVisible({ timeout: 100 }).catch(() => false)) await draw.click({ timeout: 500 }).catch(() => {})
-    else if (await checkOrCall.count()) await checkOrCall.first().click({ timeout: 500 }).catch(() => {})
-    await expect(next).toBeVisible({ timeout: 300 })
-  }).toPass({ timeout: 45_000 })
-}
 
 /** Check or call until it's your draw. Nobody folds to a check, so heads up you always get there. */
 async function playToTheDraw(page: Page) {

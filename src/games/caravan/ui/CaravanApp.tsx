@@ -1,7 +1,9 @@
+import { codeFromPath } from '../../../net/codes'
 import { Link } from '../../../router'
 import { useSave } from '../../../store/save'
 import { DeckBuilder } from './DeckBuilder'
 import { Lobby } from './Lobby'
+import { GAME, useCaravanOnline } from './online'
 import { RulesText } from './Rules'
 import { Table } from './Table'
 import { Trader } from './Trader'
@@ -16,6 +18,7 @@ const SECTIONS = [
 ]
 
 export default function CaravanApp({ path }: { path: string }) {
+  useCaravanOnline(path)
   if (path === '/caravan/play') {
     return (
       <div className="cv cv-wood">
@@ -33,7 +36,7 @@ export default function CaravanApp({ path }: { path: string }) {
         <RulesText />
       </div>
     )
-  else page = <Lobby />
+  else page = <Lobby inviteCode={codeFromPath(path, GAME)} />
 
   return (
     <div className="cv cv-wood cv-page">
@@ -45,7 +48,7 @@ export default function CaravanApp({ path }: { path: string }) {
         <h1 className="cv-title">Caravan</h1>
         <nav className="cv-nav" aria-label="Caravan">
           {SECTIONS.map((s) => (
-            <Link key={s.path} to={s.path} className="cv-nav__link" aria-current={path === s.path ? 'page' : undefined}>
+            <Link key={s.path} to={s.path} className="cv-nav__link" aria-current={path === s.path || (s.path === '/caravan' && path.startsWith('/caravan/join/')) ? 'page' : undefined}>
               <span className="wide-only">{s.label}</span>
               <span className="narrow-only">{s.short}</span>
             </Link>

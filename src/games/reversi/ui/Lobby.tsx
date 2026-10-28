@@ -7,10 +7,14 @@ import { LEVEL_LABEL, OPPONENTS, isUnlocked } from '../content'
 import type { Player } from '../engine'
 import { DiscIcon } from './DiscIcon'
 import { type MatchConfig, useMatch } from './match'
+import { GAME, SEATS, startOnline } from './online'
+import { OnlinePanel } from '../../../net/ui/OnlinePanel'
 
-export function Lobby() {
-  const [mode, setMode] = useState<'ai' | 'hotseat'>('ai')
-  const inProgress = useMatch((s) => s.state !== null && !s.state.over)
+const ONLINE_CLASSES = { card: 'rv-card', button: 'rv-button', primary: 'rv-button rv-button--primary', field: 'rv-field', dim: 'rv-ink-dim' }
+
+export function Lobby({ inviteCode = null }: { inviteCode?: string | null }) {
+  const [mode, setMode] = useState<'ai' | 'hotseat' | 'online'>(inviteCode ? 'online' : 'ai')
+  const inProgress = useMatch((s) => s.state !== null && !s.state.over && s.config?.mode !== 'online')
 
   return (
     <div className="rv-lobby">
@@ -45,8 +49,19 @@ export function Lobby() {
         >
           Hot-seat
         </button>
+        <button
+          role="tab"
+          aria-selected={mode === 'online'}
+          className="rv-tab"
+          onClick={() => {
+            setMode('online')
+            playSfx('tick')
+          }}
+        >
+          Online
+        </button>
       </div>
-      {mode === 'ai' ? <AiSetup /> : <HotseatSetup />}
+      {mode === 'ai' ? <AiSetup /> : mode === 'hotseat' ? <HotseatSetup /> : <OnlineSetup inviteCode={inviteCode} />}
     </div>
   )
 }
@@ -181,5 +196,34 @@ function HotseatSetup() {
         Start the game
       </button>
     </section>
+  )
+}
+
+function OnlineSetup({ inviteCode }: { inviteCode: string | null }) {
+  const [color, setColor] = useState<Player | 'random'>('random')
+  return (
+    <OnlinePanel
+      game={GAME}
+      seats={SEATS}
+      lateJoin={false}
+      classes={ONLINE_CLASSES}
+      inviteCode={inviteCode}
+      tablePath="/reversi/play"
+      seatLabel={(seat) => (seat === 0 ? 'Host' : 'Guest')}
+      startable={(roster) => (roster.length >= 2 ? true : 'Waiting for someone to sit across from you.')}
+      roomOptions={
+        <fieldset className="rv-colors">
+          <legend>You play</legend>
+          {(['random', 0, 1] as const).map((p) => (
+            <label key={p} className="rv-color">
+              <input type="radio" name="rv-online-color" checked={color === p} onChange={() => setColor(p)} />
+              {p === 'random' ? 'Toss for it' : <><DiscIcon player={p} /> {p === 0 ? 'Black, moves first' : 'White'}</>}
+            </label>
+          ))}
+        </fieldset>
+      }
+      onStart={(link) => startOnline(link, color)}
+      note="Online games don’t go on your record. Colors swap every game."
+    />
   )
 }

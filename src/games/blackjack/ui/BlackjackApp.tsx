@@ -1,6 +1,8 @@
+import { codeFromPath } from '../../../net/codes'
 import { Link } from '../../../router'
 import { useSave } from '../../../store/save'
 import { Lobby } from './Lobby'
+import { GAME, useBlackjackOnline } from './online'
 import { RulesText, StrategyChart } from './Rules'
 import { Table } from './Table'
 import '@fontsource/limelight/latin-400.css'
@@ -14,6 +16,7 @@ const SECTIONS = [
 ]
 
 export default function BlackjackApp({ path }: { path: string }) {
+  useBlackjackOnline(path)
   if (path === '/blackjack/play') {
     return (
       <div className="bj bj-room">
@@ -25,7 +28,7 @@ export default function BlackjackApp({ path }: { path: string }) {
   let page
   if (path === '/blackjack/strategy') page = <div className="bj-panel bj-page-panel"><StrategyChart /></div>
   else if (path === '/blackjack/rules') page = <div className="bj-panel bj-page-panel"><RulesText /></div>
-  else page = <Lobby />
+  else page = <Lobby inviteCode={codeFromPath(path, GAME)} />
 
   return (
     <div className="bj bj-room bj-page">
@@ -41,7 +44,7 @@ export default function BlackjackApp({ path }: { path: string }) {
         </h1>
         <nav className="bj-nav" aria-label="Blackjack">
           {SECTIONS.map((s) => (
-            <Link key={s.path} to={s.path} className="bj-nav__link" aria-current={path === s.path ? 'page' : undefined}>
+            <Link key={s.path} to={s.path} className="bj-nav__link" aria-current={path === s.path || (s.path === '/blackjack' && path.startsWith('/blackjack/join/')) ? 'page' : undefined}>
               {s.label}
             </Link>
           ))}

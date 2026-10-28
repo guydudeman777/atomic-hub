@@ -6,8 +6,61 @@ import { useSave } from '../../../store/save'
 import { STAKES } from '../content'
 import { REGULARS } from '../rail'
 import { useSession } from './session'
+import { GAME, SEATS, startOnline } from './online'
+import { OnlinePanel } from '../../../net/ui/OnlinePanel'
 
-export function Lobby() {
+const ONLINE_CLASSES = { card: 'cr-panel', button: 'cr-button', primary: 'cr-button cr-button--primary', field: 'cr-field', dim: 'cr-ink-dim' }
+
+export function Lobby({ inviteCode = null }: { inviteCode?: string | null }) {
+  const [where, setWhere] = useState<'pit' | 'online'>(inviteCode ? 'online' : 'pit')
+  return (
+    <div className="cr-lobby">
+      <div className="cr-tabs" role="tablist" aria-label="Where to play">
+        <button role="tab" aria-selected={where === 'pit'} className="cr-tab" onClick={() => setWhere('pit')}>
+          In the pit
+        </button>
+        <button role="tab" aria-selected={where === 'online'} className="cr-tab" onClick={() => setWhere('online')}>
+          Online
+        </button>
+      </div>
+      {where === 'pit' ? <PitSetup /> : <OnlineSetup inviteCode={inviteCode} />}
+    </div>
+  )
+}
+
+function OnlineSetup({ inviteCode }: { inviteCode: string | null }) {
+  const caps = useSave((s) => s.wallet.caps)
+  const [stakesId, setStakes] = useState(STAKES[0].id)
+  const stakes = STAKES.find((s) => s.id === stakesId) ?? STAKES[0]
+  return (
+    <OnlinePanel
+      game={GAME}
+      seats={SEATS}
+      lateJoin
+      classes={ONLINE_CLASSES}
+      inviteCode={inviteCode}
+      tablePath="/craps/play"
+      seatLabel={(seat) => (seat === 0 ? 'First shooter' : `Rail ${seat}`)}
+      startable={() => (caps >= stakes.limits.min ? true : `You need ${stakes.limits.min} caps for the ${stakes.name.toLowerCase()} table.`)}
+      roomOptions={
+        <label className="cr-field">
+          <span>Table</span>
+          <select value={stakesId} onChange={(e) => setStakes(e.target.value)}>
+            {STAKES.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}, {s.limits.min}–{s.limits.max.toLocaleString()} caps
+              </option>
+            ))}
+          </select>
+        </label>
+      }
+      onStart={(link) => startOnline(link, stakesId)}
+      note="Everyone bets their own caps on the same dice, and the dice go round on a seven-out. Friends can step up to the rail any time, up to four at the table."
+    />
+  )
+}
+
+function PitSetup() {
   const caps = useSave((s) => s.wallet.caps)
   const seated = useSession((s) => s.state !== null)
   const sit = useSession((s) => s.sit)
@@ -25,7 +78,7 @@ export function Lobby() {
   }
 
   return (
-    <div className="cr-lobby">
+    <>
       {seated && (
         <div className="cr-panel cr-resume">
           <p>You still have chips on the {useSession.getState().stakes?.name.toLowerCase()} layout.</p>
@@ -114,6 +167,6 @@ export function Lobby() {
           The guide at the table tells you what any bet pays and what it costs, and lights up the best one. <Link to="/craps/bets">Every bet and its odds</Link>.
         </p>
       </section>
-    </div>
+    </>
   )
 }

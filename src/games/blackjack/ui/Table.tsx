@@ -5,7 +5,8 @@ import { useMediaQuery } from '../../../components/useMediaQuery'
 import { playSfx } from '../../../core/audio/sfx'
 import { navigate } from '../../../navigation'
 import { useSave } from '../../../store/save'
-import { YOUR_SPOT } from '../content'
+import { useGameLink } from '../../../net/store'
+import { LinkBanner } from '../../../net/ui/LinkBanner'
 import {
   type Hand,
   type PlayerAction,
@@ -28,7 +29,8 @@ import { ChipStack, Chip } from './Chip'
 import { Felt } from './Felt'
 import { type Layout, type Place, SPOT_INDEXES, WIDE_LAYOUT, tallLayout } from './layout'
 import { RulesText } from './Rules'
-import { type Fx, type Occupant, type Remark, canBet, useSession, yourStake } from './session'
+import { type Fx, type Human, type Occupant, type Remark, canBet, listNames, useSession, yourStake } from './session'
+import { GAME, checksumAfter, leaveOnline, yourMoves } from './online'
 
 /**
  * Phones and small windows get the compact table in blackjack.css, whose
@@ -78,25 +80,36 @@ function pace(state: TableState): number {
 }
 
 export function Table() {
-  const { sitting, state, stakes } = useSession()
+  const { sitting, state, stakes, me, humans, queue, config } = useSession()
   const step = useSession((s) => s.step)
+  const link = useGameLink(GAME)
 
   // No seat? Back to the lobby.
   useEffect(() => {
     if (!state || !stakes) navigate('/blackjack')
   }, [state, stakes])
 
-  // The dealer and the regulars take their turns after a beat.
+  // The dealer and the regulars take their turns after a beat. Players take theirs.
   useEffect(() => {
     if (!state) return
     const who = actor(state)
-    if (who === null || who === YOUR_SPOT) return
+    if (who === null || who === me || (who !== 'dealer' && humans[who] && !humans[who].gone)) return
     const t = window.setTimeout(step, pace(state))
     return () => window.clearTimeout(t)
-  }, [state, step])
+  }, [state, step, me, humans])
+
+  // Online: play the other players' moves as the table gets to them.
+  useEffect(() => {
+    if (queue.length) useSession.getState().pump(checksumAfter(link))
+  }, [state, queue, link])
 
   if (!state || !stakes) return null
-  return <TableView key={sitting} />
+  return (
+    <>
+      <TableView key={sitting} />
+      {config?.online && <LinkBanner link={link} waitsForOthers={false} onGone={() => void navigate('/blackjack', { during: leaveOnline })} />}
+    </>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -120,11 +133,12 @@ function usePlaying(fx: Fx | null): Fx | null {
 }
 
 function TableView() {
-  const { state, stakes, seats, talk, call, result, bet, fx, config } = useSession()
+  const { state, stakes, seats, talk, call, result, bet, fx, config, me, humans, ready } = useSession()
   const slam = usePlaying(fx)
   const caps = useSave((s) => s.wallet.caps)
   const coach = useSave((s) => s.blackjack.coach)
-  const { act, insure, deal, addChip, clearBet } = useSession.getState()
+  const { addChip, clearBet } = useSession.getState()
+  const { act, insure, deal } = yourMoves
   // The shuffle as you sit down. (Deferred so a StrictMode double mount doesn't play it twice.)
   useEffect(() => {
     const t = window.setTimeout(() => playSfx('shuffle'), 200)
@@ -132,7 +146,7 @@ function TableView() {
   }, [])
 
   const s = state!
-  const yourTurn = actor(s) === YOUR_SPOT
+  const yourTurn = actor(s) === me
   const legal = new Set(yourTurn ? legalActions(s, caps).map((a) => (a.type === 'insurance' ? (a.take ? 'take' : 'decline') : a.type)) : [])
   const hand = yourTurn ? currentHand(s) : null
   const up = upCard(s)
@@ -159,7 +173,7 @@ function TableView() {
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  const occupied = SPOT_INDEXES.map((spot) => spot === YOUR_SPOT || !!seats[spot])
+  const occupied = SPOT_INDEXES.map((spot) => spot === me || !!seats[spot] || !!humans[spot])
   // The tall table is as deep as the stage is tall for its width. Tilted
   // (blackjack-3d.css), it's 4% wider than the stage and stands about 4%
   // shorter than it's deep, so the same depth fits.
@@ -192,13 +206,14 @@ function TableView() {
                 spot={spot}
                 state={s}
                 occupant={seats[spot]}
-                you={spot === YOUR_SPOT}
-                pendingBet={spot === YOUR_SPOT && betting ? bet : 0}
+                human={spot === me ? null : (humans[spot] ?? null)}
+                you={spot === me}
+                pendingBet={betting ? (spot === me ? (ready[me] ?? bet) : (ready[spot] ?? 0)) : 0}
                 activeHand={actor(s) === spot && s.phase === 'playing' ? (s.turn?.hand ?? null) : null}
                 acting={actor(s) === spot}
                 caps={caps}
                 talk={talk?.spot === spot && !shape.talk ? talk : null}
-                open={config?.mode === 'full' && spot !== YOUR_SPOT && !seats[spot]}
+                open={config?.mode === 'full' && spot !== me && !seats[spot] && !humans[spot]}
                 slamming={slam?.spot === spot}
               />
             ))}
@@ -213,7 +228,7 @@ function TableView() {
                 named
               />
             )}
-            {result && betting && <ResultBurst staked={result.staked} returned={result.returned} key={s.round} />}
+            {result && betting && <ResultBurst staked={result.staked} returned={result.returned} spot={me} key={s.round} />}
             </LayoutContext.Provider>
           </div>
         </div>
@@ -304,6 +319,8 @@ interface SpotProps {
   spot: number
   state: TableState
   occupant: Occupant | null
+  /** Another player, at an online table. */
+  human: Human | null
   you: boolean
   /** Your chips in the circle while you're betting. */
   pendingBet: number
@@ -317,17 +334,17 @@ interface SpotProps {
   slamming: boolean
 }
 
-function SpotView({ spot, state, occupant, you, pendingBet, activeHand, acting, caps, talk, open, slamming }: SpotProps) {
+function SpotView({ spot, state, occupant, human, you, pendingBet, activeHand, acting, caps, talk, open, slamming }: SpotProps) {
   const { hands, insurance } = state.spots[spot]
-  const seated = you || occupant
+  const seated = you || occupant || human
   const n = hands.length
   const betting = canBet(state)
   const dealerBlackjack = state.holeRevealed && dealerHasBlackjack(state)
   // Insurance is settled at the peek: lost unless the dealer turns up a blackjack.
   const insurancePaid = !!insurance && dealerBlackjack
   const insuranceLost = !!insurance && !dealerBlackjack && ['playing', 'dealer', 'settled'].includes(state.phase)
-  const name = you ? 'You' : (occupant?.regular.name ?? '')
-  const stack = you ? caps : (occupant?.stack ?? 0)
+  const name = you ? 'You' : (occupant?.regular.name ?? human?.name ?? '')
+  const stack = you ? caps : occupant ? occupant.stack : null
   const { plateOf, inSpot, shape, scale } = useLayout()
   const plate = plateOf(spot)
 
@@ -337,7 +354,7 @@ function SpotView({ spot, state, occupant, you, pendingBet, activeHand, acting, 
         <HandView key={h} spot={spot} hand={hand} h={h} n={n} active={activeHand === h} you={you} />
       ))}
       {/* Between rounds your chips wait in the circle, ready for the next deal. */}
-      {betting && you && pendingBet > 0 && <Stack amount={pendingBet} place={inSpot(spot, 0, shape.circleY)} />}
+      {betting && pendingBet > 0 && <Stack amount={pendingBet} place={inSpot(spot, 0, shape.circleY)} from={you ? undefined : 'player'} />}
       {!!insurance && (
         <>
           <Stack amount={insurance} place={inSpot(spot, -60 * scale, -6 * scale)} taken={insuranceLost} from="player" />
@@ -347,16 +364,18 @@ function SpotView({ spot, state, occupant, you, pendingBet, activeHand, acting, 
       {/* Keyed by who's sitting there, so a newcomer's plate arrives with them. */}
       {seated && (
         <div
-          key={occupant?.regular.id ?? 'you'}
-          className={`bj-plate${acting ? ' is-acting' : ''}${you ? ' is-you' : ''}${occupant?.leaving ? ' is-leaving' : ''}${occupant?.leaving === 'kicked' ? ' is-kicked' : ''}${slamming ? ' is-slamming' : ''}`}
+          key={occupant?.regular.id ?? (human ? `player-${human.seat}` : 'you')}
+          className={`bj-plate${acting ? ' is-acting' : ''}${you ? ' is-you' : ''}${human ? ' is-player' : ''}${occupant?.leaving || human?.gone ? ' is-leaving' : ''}${occupant?.leaving === 'kicked' ? ' is-kicked' : ''}${slamming ? ' is-slamming' : ''}`}
           style={at(plate)}
         >
           {!you && occupant && <span className="bj-portrait" style={{ background: occupant.regular.color }} aria-hidden="true" />}
           <span className="bj-plate__name">{name}</span>
-          <span className="bj-plate__stack">
-            {stack.toLocaleString()}
-            <span className="visually-hidden"> caps</span>
-          </span>
+          {stack !== null && (
+            <span className="bj-plate__stack">
+              {stack.toLocaleString()}
+              <span className="visually-hidden"> caps</span>
+            </span>
+          )}
         </div>
       )}
       {open && (
@@ -478,10 +497,10 @@ function Badge({ place, tone, children }: { place: Place; tone?: 'good' | 'bad';
 }
 
 /** Your result for the round, rising off your cards. */
-function ResultBurst({ staked, returned }: { staked: number; returned: number }) {
+function ResultBurst({ staked, returned, spot }: { staked: number; returned: number; spot: number }) {
   const net = returned - staked
   const { inSpot, scale } = useLayout()
-  const place = inSpot(YOUR_SPOT, 0, -20 * scale)
+  const place = inSpot(spot, 0, -20 * scale)
   return (
     <div className={`bj-burst${net > 0 ? ' is-up' : net < 0 ? ' is-down' : ''}`} style={at(place)} aria-hidden="true">
       {net > 0 ? `+${net}` : net < 0 ? `−${-net}` : 'Push'}
@@ -553,10 +572,33 @@ interface ControlsProps {
 const KEYS: Record<PlayerAction, string> = { hit: 'H', stand: 'S', double: 'D', split: 'P' }
 
 function Controls({ state, legal, coach, advice, bet, chips, min, max, caps }: ControlsProps) {
-  const { act, insure, deal, addChip, clearBet } = useSession.getState()
-  const yourTurn = actor(state) === YOUR_SPOT
+  const { addChip, clearBet } = useSession.getState()
+  const { act, insure, deal, dealNow } = yourMoves
+  const { me, ready, humans, config } = useSession()
+  const link = useGameLink(GAME)
+  const yourTurn = actor(state) === me
+  const online = !!config?.online
 
   if (canBet(state)) {
+    // Online, once your bet's down you wait for the others.
+    if (online && ready[me] !== null) {
+      const waiting = humans.flatMap((h, spot) => (h && !h.gone && spot !== me && ready[spot] === null ? [h.name] : []))
+      const host = link?.host
+      return (
+        <div className="bj-controls">
+          <p className="bj-controls__ask">
+            {ready[me] ? `Your bet of ${ready[me]} is down.` : 'You’re sitting this one out.'} Waiting for {listNames(waiting)} to bet.
+          </p>
+          {host && (
+            <div className="bj-controls__buttons">
+              <button className="bj-button" onClick={dealNow}>
+                Deal without them
+              </button>
+            </div>
+          )}
+        </div>
+      )
+    }
     if (caps < min) {
       return (
         <div className="bj-controls bj-controls--broke">
@@ -564,9 +606,15 @@ function Controls({ state, legal, coach, advice, bet, chips, min, max, caps }: C
             You need {min} caps to play this table and you have {caps}. Try a lower limit, or claim a refill from the hub menu
             once you’re under 50.
           </p>
-          <button className="bj-button" onClick={() => void navigate('/blackjack', { during: useSession.getState().leave })}>
-            Back to the tables
-          </button>
+          {online ? (
+            <button className="bj-button" onClick={() => deal(0)}>
+              Sit this one out
+            </button>
+          ) : (
+            <button className="bj-button" onClick={() => void navigate('/blackjack', { during: useSession.getState().leave })}>
+              Back to the tables
+            </button>
+          )}
         </div>
       )
     }
@@ -595,6 +643,11 @@ function Controls({ state, legal, coach, advice, bet, chips, min, max, caps }: C
           <button className="bj-button" onClick={clearBet} disabled={bet === 0}>
             Clear
           </button>
+          {online && (
+            <button className="bj-button" onClick={() => deal(0)}>
+              Sit out
+            </button>
+          )}
           <button className="bj-button bj-button--primary" onClick={() => deal()} disabled={bet < min || bet > caps}>
             Deal <span className="bj-key">Enter</span>
           </button>
@@ -604,8 +657,8 @@ function Controls({ state, legal, coach, advice, bet, chips, min, max, caps }: C
   }
 
   if (state.phase === 'insurance') {
-    const bet = state.spots[YOUR_SPOT].hands[0]?.bet ?? 0
-    const blackjack = isBlackjack(state.spots[YOUR_SPOT].hands[0] ?? { cards: [], split: false })
+    const bet = state.spots[me].hands[0]?.bet ?? 0
+    const blackjack = isBlackjack(state.spots[me].hands[0] ?? { cards: [], split: false })
     return (
       <div className="bj-controls">
         <p className="bj-controls__ask">
@@ -648,27 +701,27 @@ function Controls({ state, legal, coach, advice, bet, chips, min, max, caps }: C
 
 // ---- The terminal ------------------------------------------------------------------
 
-function status(state: TableState, seats: (Occupant | null)[], result: { staked: number; returned: number } | null): string {
+function status(state: TableState, seats: (Occupant | null)[], humans: (Human | null)[], me: number, result: { staked: number; returned: number } | null): string {
   const who = actor(state)
-  const name = (spot: number) => seats[spot]?.regular.name ?? 'Someone'
+  const name = (spot: number) => seats[spot]?.regular.name ?? humans[spot]?.name ?? 'Someone'
   switch (state.phase) {
     case 'betting':
       return 'Place your bet'
     case 'settled': {
-      if (!result) return 'Place your bet'
+      if (!result || !state.spots[me].hands.length) return 'Place your bet'
       const net = result.returned - result.staked
-      if (state.spots[YOUR_SPOT].hands.some((h) => h.outcome === 'blackjack')) return `Blackjack! You win ${net}`
+      if (state.spots[me].hands.some((h) => h.outcome === 'blackjack')) return `Blackjack! You win ${net}`
       return net > 0 ? `You win ${net} caps` : net < 0 ? `You lose ${-net} caps` : 'Push'
     }
     case 'dealing':
       return 'Dealing…'
     case 'insurance':
-      return who === YOUR_SPOT ? 'Insurance?' : `${name(who as number)} is deciding on insurance…`
+      return who === me ? 'Insurance?' : `${name(who as number)} is deciding on insurance…`
     case 'peek':
       return 'The dealer checks for blackjack…'
     case 'playing': {
-      if (who !== YOUR_SPOT) return `${name(who as number)} is playing…`
-      const hands = state.spots[YOUR_SPOT].hands
+      if (who !== me) return humans[who as number] ? `${name(who as number)}’s turn` : `${name(who as number)} is playing…`
+      const hands = state.spots[me].hands
       const prefix = hands.length > 1 ? `Hand ${state.turn!.hand + 1} of ${hands.length}: ` : 'Your turn: '
       return `${prefix}${describeHand(hands[state.turn!.hand].cards)}`
     }
@@ -678,7 +731,7 @@ function status(state: TableState, seats: (Occupant | null)[], result: { staked:
 }
 
 function Hud({ advice, hand }: { advice: PlayerAction | null; hand: Hand | null }) {
-  const { state, stakes, seats, log, result, leave } = useSession()
+  const { state, stakes, seats, log, result, leave, me, humans, config } = useSession()
   const { coach, count } = useSave((s) => s.blackjack)
   const updateBlackjack = useSave((s) => s.updateBlackjack)
   const table3d = useSave((s) => s.settings.table3d)
@@ -705,19 +758,19 @@ function Hud({ advice, hand }: { advice: PlayerAction | null; hand: Hand | null 
     return () => window.removeEventListener('keydown', onKey)
   }, [menuOpen])
   const s = state!
-  const onTable = yourStake(s)
+  const onTable = yourStake(s, me)
   const up = upCard(s)
 
   let help = ''
   if (coach && advice && hand && up) help = `The book says ${ACTION_LABEL[advice].toLowerCase()} on ${describeHand(hand.cards)} against ${describeUp(up)}.`
-  else if (coach && s.phase === 'insurance' && actor(s) === YOUR_SPOT) help = 'The book never takes insurance.'
+  else if (coach && s.phase === 'insurance' && actor(s) === me) help = 'The book never takes insurance.'
   else if (canBet(s) && caps < stakes!.limits.min) help = 'You’re out of caps for this table.'
   else if (canBet(s)) help = `${compact ? 'Tap' : 'Click'} chips to bet, then deal. Your bet stays up for the next round.`
 
   const decks = cardsLeft(s) / 52
   const tc = trueCount(s)
 
-  const getUp = () => void navigate('/blackjack', { during: leave })
+  const getUp = () => void navigate('/blackjack', { during: config?.online ? leaveOnline : leave })
 
   const tableLog = (
     <ol className="bj-hud__log" ref={logRef} aria-label="Table log">
@@ -767,11 +820,13 @@ function Hud({ advice, hand }: { advice: PlayerAction | null; hand: Hand | null 
   return (
     <aside className="bj-hud screen" aria-label="Game status">
       <div className="bj-hud__head">
-        <p className="term-dim">Blackjack, {stakes!.name.toLowerCase()}</p>
+        <p className="term-dim">
+          Blackjack{config?.online ? ' online' : ''}, {stakes!.name.toLowerCase()}
+        </p>
         {onTable > 0 && <p className="bj-hud__stake">On the table {onTable}</p>}
       </div>
       <p className="bj-hud__status" aria-live="polite">
-        {status(s, seats, result)}
+        {status(s, seats, humans, me, result)}
       </p>
       <p className="bj-hud__help" id="bj-advice">
         {help}

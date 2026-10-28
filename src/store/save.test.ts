@@ -74,7 +74,7 @@ describe('save store', () => {
     useSave.getState().updateCraps({ guide: false })
     useSave.getState().updateReversi({ showMoves: false })
     const { draw, craps, reversi, ...old } = snapshot(useSave.getState())
-    expect({ draw, craps, reversi }).toEqual({ draw: { hints: false }, craps: { guide: false }, reversi: { showMoves: false } })
+    expect({ draw, craps, reversi }).toEqual({ draw: { hints: false }, craps: { guide: false }, reversi: { showMoves: false, beaten: {} } })
     expect(useSave.getState().importSave(JSON.stringify(old))).toEqual({ ok: true })
     const fresh = newSave()
     expect(useSave.getState().draw).toEqual(fresh.draw)

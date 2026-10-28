@@ -83,7 +83,7 @@ export const GAMES: readonly GameInfo[] = [
   },
   {
     id: 'reversi', name: 'Reversi', category: 'board', ready: true, path: '/reversi', icon: 'reversi',
-    modes: 'Against the AI or hot-seat',
+    modes: 'Four opponents on a ladder, or hot-seat',
     blurb: 'Flank and flip. Corners win games. On a walnut board in an atomic-age den.',
   },
   {

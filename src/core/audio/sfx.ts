@@ -44,7 +44,8 @@ export interface SfxOptions {
 
 export function playSfx(name: Sfx, { pan = 0, delay = 0 }: SfxOptions = {}) {
   const { sound, volume } = useSave.getState().settings
-  if (!sound || volume <= 0) return
+  // Hidden, the audio is paused: everything played meanwhile would come out at once when the tab came back.
+  if (!sound || volume <= 0 || document.hidden) return
   const m = liveMixer()
   if (!m) return
   renderSfx(m, name, m.ctx.currentTime + 0.01 + delay, pan)

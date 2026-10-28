@@ -22,7 +22,7 @@
 :root[data-table3d='on'] .bj-felt {
   --tilt: 27deg;
   /* The far edge, the widest part of the table, shrinks into the distance; so does its height. */
-  --u: calc(min(104cqw, 230cqh) / 1000);
+  --u: calc(min(104cqw, 115cqh * 1000 / var(--felt-h, 500)) / 1000);
   position: absolute;
   left: 50%;
   bottom: 4px;
@@ -36,6 +36,11 @@
   transform: translateZ(calc(1px + var(--k) * 0.8px));
   animation-name: bj-deal-3d;
   animation-duration: 0.5s;
+}
+
+/* The tall table is deep already; tipped back as far, its far end would be a sliver. */
+:root[data-table3d='on'] .bj-felt[data-shape='tall'] {
+  --tilt: 16deg;
 }
 
 /* Out of the shoe, up over the felt, and down where it lands. */
@@ -63,7 +68,7 @@
 }
 
 :root[data-table3d='on'] .bj-stack__chip {
-  translate: 0 0 calc(var(--i) * 2.3 * var(--u));
+  translate: 0 0 calc(var(--i) * 2.3 * var(--c));
 }
 
 :root[data-table3d='on'] :is(.bj-badge, .bj-plate) {
@@ -74,7 +79,7 @@
  * Speech bubbles and your result float just off the felt. (Stood up, they'd
  * cut through the rail, and half of them would sink into it.)
  */
-:root[data-table3d='on'] :is(.bj-talk--seat, .bj-burst) {
+:root[data-table3d='on'] :is(.bj-talk--seat, .bj-talk--table, .bj-burst) {
   translate: 0 0 6px;
 }
 

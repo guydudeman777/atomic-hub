@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, type RefObject, createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Card } from '../../../core/cards'
 import { PlayingCard } from '../../../components/PlayingCard'
 import { useMediaQuery } from '../../../components/useMediaQuery'
@@ -26,23 +26,7 @@ import {
 import { ACTION_LABEL, basicStrategy, describeHand, describeUp, runningCount, trueCount } from '../strategy'
 import { ChipStack, Chip } from './Chip'
 import { Felt } from './Felt'
-import {
-  CARD_H,
-  CARD_W,
-  CIRCLE_Y,
-  DISCARD,
-  type Place,
-  SHOE,
-  SPOT_INDEXES,
-  TRAY,
-  cardInHand,
-  dealerCard,
-  handScale,
-  handX,
-  inSpot,
-  plateOf,
-} from './layout'
-import { NeonSign } from './NeonSign'
+import { type Layout, type Place, SPOT_INDEXES, WIDE_LAYOUT, tallLayout } from './layout'
 import { RulesText } from './Rules'
 import { type Occupant, type Remark, canBet, useSession, yourStake } from './session'
 
@@ -52,6 +36,28 @@ import { type Occupant, type Remark, canBet, useSession, yourStake } from './ses
  * behind a Menu button.
  */
 const COMPACT_TABLE = '(max-width: 900px), (max-height: 520px)'
+
+/** Held upright, a phone gets the tall table (layout.ts). Keep in step with blackjack.css. */
+const TALL_TABLE = '(max-width: 900px) and (orientation: portrait)'
+
+/** The table's shape and where everything sits on it, for every piece on the felt. */
+const LayoutContext = createContext<Layout>(WIDE_LAYOUT)
+const useLayout = () => useContext(LayoutContext)
+
+/** An element's height over its width, kept up to date as it resizes. */
+function useAspect(ref: RefObject<HTMLElement | null>): number {
+  const [aspect, setAspect] = useState(1)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => el.clientWidth > 0 && setAspect(el.clientHeight / el.clientWidth)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref])
+  return aspect
+}
 
 /** How long the dealer and the regulars take over each step, in ms. */
 function pace(state: TableState): number {
@@ -135,19 +141,30 @@ function TableView() {
   })
 
   const occupied = SPOT_INDEXES.map((spot) => spot === YOUR_SPOT || !!seats[spot])
+  // The tall table is as deep as the stage is tall for its width. Tilted, it
+  // looks shallower, so it can go a little deeper.
+  const stageRef = useRef<HTMLDivElement>(null)
+  const aspect = useAspect(stageRef)
+  const table3d = useSave((st) => st.settings.table3d)
+  const tall = useMediaQuery(TALL_TABLE)
+  const layout = tall ? tallLayout(aspect * 1000 * (table3d ? 1.06 : 1)) : WIDE_LAYOUT
+  const { shape } = layout
 
   return (
     <div className="bj-game">
       <div className="bj-board">
-        {/* On a phone held upright, the wall above the table, where the sign hangs. */}
-        <div className="bj-wall" aria-hidden="true">
-          <NeonSign as="div" />
-        </div>
         <DealerBar name={stakes!.dealer.name} call={call} limits={`${stakes!.limits.min} to ${stakes!.limits.max} caps`} table={stakes!.name} />
 
-        <div className="bj-stage">
-          <div className="bj-felt" role="region" aria-label="Blackjack table">
-            <Felt seats={occupied} />
+        <div className="bj-stage" ref={stageRef}>
+          <div
+            className="bj-felt"
+            role="region"
+            aria-label="Blackjack table"
+            data-shape={shape.name}
+            style={{ '--felt-h': shape.h, '--scale': layout.scale } as CSSProperties}
+          >
+            <LayoutContext.Provider value={layout}>
+            <Felt seats={occupied} layout={layout} />
             <Shoe state={s} />
             <DealerHand state={s} />
             {SPOT_INDEXES.map((spot) => (
@@ -161,10 +178,21 @@ function TableView() {
                 activeHand={actor(s) === spot && s.phase === 'playing' ? (s.turn?.hand ?? null) : null}
                 acting={actor(s) === spot}
                 caps={caps}
-                talk={talk?.spot === spot ? talk : null}
+                talk={talk?.spot === spot && !shape.talk ? talk : null}
               />
             ))}
+            {/* On the tall table the regulars' remarks go in the open felt, with the speaker's name. */}
+            {shape.talk && (
+              <SpeechBubble
+                name={talk && talk.spot !== 'dealer' ? (seats[talk.spot]?.regular.name ?? '') : ''}
+                remark={talk}
+                className="bj-talk--table"
+                style={at(shape.talk)}
+                named
+              />
+            )}
             {result && betting && <ResultBurst staked={result.staked} returned={result.returned} key={s.round} />}
+            </LayoutContext.Provider>
           </div>
         </div>
 
@@ -209,6 +237,7 @@ function DealerBar({ name, call, limits, table }: { name: string; call: Remark |
 function DealerHand({ state }: { state: TableState }) {
   const cards = state.dealer
   const showing = dealerShowing(state)
+  const { dealerCard, shape, scale } = useLayout()
   const pos = dealerCard(0, cards.length)
   return (
     <>
@@ -216,7 +245,7 @@ function DealerHand({ state }: { state: TableState }) {
         <TableCard key={card.id} card={card} place={dealerCard(k, cards.length)} depth={k} faceDown={k === 1 && !state.holeRevealed} />
       ))}
       {cards.length > 0 && (
-        <Badge place={{ x: pos.x - CARD_W / 2 - 24, y: pos.y + 14, rot: 0 }} tone={state.holeRevealed && showing.total > 21 ? 'bad' : undefined}>
+        <Badge place={{ x: pos.x - shape.cardW / 2 - 24 * scale, y: pos.y + 14 * scale, rot: 0 }} tone={state.holeRevealed && showing.total > 21 ? 'bad' : undefined}>
           {state.holeRevealed && dealerHasBlackjack(state) ? 'BJ' : showing.total}
         </Badge>
       )}
@@ -226,16 +255,17 @@ function DealerHand({ state }: { state: TableState }) {
 
 /** The shoe on the dealer's left and the discard tray on their right. */
 function Shoe({ state }: { state: TableState }) {
+  const { shape } = useLayout()
   const left = cardsLeft(state)
   const used = discards(state)
   return (
     <>
-      <div className="bj-shoe" style={at(SHOE)} title={`${left} cards left in the shoe`}>
+      <div className="bj-shoe" style={at(shape.shoe)} title={`${left} cards left in the shoe`}>
         <div className="bj-shoe__card">
           <PlayingCard faceDown set={SHOE_SET} />
         </div>
       </div>
-      <div className="bj-discards" style={{ ...at(DISCARD), '--n': Math.min(24, Math.ceil(used / 6)) } as CSSProperties} title={`${used} cards in the discard tray`}>
+      <div className="bj-discards" style={{ ...at(shape.discard), '--n': Math.min(24, Math.ceil(used / 6)) } as CSSProperties} title={`${used} cards in the discard tray`}>
         {used > 0 && (
           <div className="bj-discards__stack">
             <PlayingCard faceDown set={SHOE_SET} />
@@ -272,6 +302,7 @@ function SpotView({ spot, state, occupant, you, pendingBet, activeHand, acting, 
   const insuranceLost = !!insurance && !dealerBlackjack && ['playing', 'dealer', 'settled'].includes(state.phase)
   const name = you ? 'You' : (occupant?.regular.name ?? '')
   const stack = you ? caps : (occupant?.stack ?? 0)
+  const { plateOf, inSpot, shape, scale } = useLayout()
   const plate = plateOf(spot)
 
   return (
@@ -280,11 +311,11 @@ function SpotView({ spot, state, occupant, you, pendingBet, activeHand, acting, 
         <HandView key={h} spot={spot} hand={hand} h={h} n={n} active={activeHand === h} you={you} />
       ))}
       {/* Between rounds your chips wait in the circle, ready for the next deal. */}
-      {betting && you && pendingBet > 0 && <Stack amount={pendingBet} place={inSpot(spot, 0, CIRCLE_Y)} />}
+      {betting && you && pendingBet > 0 && <Stack amount={pendingBet} place={inSpot(spot, 0, shape.circleY)} />}
       {!!insurance && (
         <>
-          <Stack amount={insurance} place={inSpot(spot, -60, -6)} taken={insuranceLost} from="player" />
-          {insurancePaid && <Stack amount={insurance * 2} place={inSpot(spot, -60, 26)} from="tray" />}
+          <Stack amount={insurance} place={inSpot(spot, -60 * scale, -6 * scale)} taken={insuranceLost} from="player" />
+          {insurancePaid && <Stack amount={insurance * 2} place={inSpot(spot, -60 * scale, 26 * scale)} from="tray" />}
         </>
       )}
       {seated && (
@@ -313,6 +344,7 @@ const OUTCOME_LABEL: Record<NonNullable<Hand['outcome']>, string> = {
 }
 
 function HandView({ spot, hand, h, n, active, you }: { spot: number; hand: Hand; h: number; n: number; active: boolean; you: boolean }) {
+  const { handScale, handX, cardInHand, inSpot, shape, scale } = useLayout()
   const s = handScale(n)
   const hx = handX(h, n)
   const { total, soft } = handTotal(hand.cards)
@@ -329,13 +361,13 @@ function HandView({ spot, hand, h, n, active, you }: { spot: number; hand: Hand;
         <TableCard key={card.id} card={card} place={cardInHand(spot, h, n, k)} depth={k} scale={s} />
       ))}
       {/* Your first bet is already in the circle; everyone else's, and every split and double, gets pushed out from the rail. */}
-      <Stack amount={base} place={inSpot(spot, hx, CIRCLE_Y)} taken={lost} from={you && h === 0 ? undefined : 'player'} />
+      <Stack amount={base} place={inSpot(spot, hx, shape.circleY)} taken={lost} from={you && h === 0 ? undefined : 'player'} />
       {/* A double goes down beside the bet; winnings are paid just in front of it. */}
-      {hand.doubled && <Stack amount={base} place={inSpot(spot, hx + 24 * s, CIRCLE_Y - 6)} taken={lost} from="player" />}
-      {winnings > 0 && <Stack amount={winnings} place={inSpot(spot, hx - 6 * s, CIRCLE_Y + 30)} from="tray" />}
+      {hand.doubled && <Stack amount={base} place={inSpot(spot, hx + 24 * s * scale, shape.circleY - 6 * scale)} taken={lost} from="player" />}
+      {winnings > 0 && <Stack amount={winnings} place={inSpot(spot, hx - 6 * s * scale, shape.circleY + 30 * scale)} from="tray" />}
       {hand.cards.length >= 2 && (
         <Badge
-          place={inSpot(spot, hx - (CARD_W / 2) * s - 6, (CARD_H / 2) * s - 8)}
+          place={inSpot(spot, hx - (shape.cardW / 2) * s - 6 * scale, shape.cardW * 0.7 * s - 8 * scale)}
           tone={outcome === 'blackjack' || hand.outcome === 'win' ? 'good' : lost ? 'bad' : undefined}
         >
           {outcome ? OUTCOME_LABEL[outcome] : soft && total < 21 ? `${total - 10}/${total}` : total}
@@ -359,11 +391,12 @@ const from = (p: { x: number; y: number }, origin: { x: number; y: number }): CS
  * the hole card stays face down, with no face in the page, until it's turned.
  */
 function TableCard({ card, place, depth, scale = 1, faceDown = false }: { card: Card; place: Place; depth: number; scale?: number; faceDown?: boolean }) {
+  const { shoe } = useLayout().shape
   return (
     <div
       className="bj-card"
       data-down={faceDown || undefined}
-      style={{ ...at(place), ...from(place, SHOE), '--k': depth, '--s': scale } as CSSProperties}
+      style={{ ...at(place), ...from(place, shoe), '--k': depth, '--s': scale } as CSSProperties}
     >
       <div className="bj-flip">
         <div className="bj-flip__face">{faceDown ? null : <PlayingCard card={card} />}</div>
@@ -382,12 +415,14 @@ function TableCard({ card, place, depth, scale = 1, faceDown = false }: { card: 
 function Stack({ amount, place, from: origin, taken = false }: { amount: number; place: Place; from?: 'player' | 'tray'; taken?: boolean }) {
   // The player's rail is straight back from the chips, down the spot's own frame.
   const turn = (place.rot * Math.PI) / 180
-  const start = origin === 'tray' ? TRAY : { x: place.x - 120 * Math.sin(turn), y: place.y + 120 * Math.cos(turn) }
+  const { shape, scale } = useLayout()
+  const rail = 120 * scale
+  const start = origin === 'tray' ? shape.tray : { x: place.x - rail * Math.sin(turn), y: place.y + rail * Math.cos(turn) }
   return (
     <ChipStack
       amount={amount}
       className={`bj-felt-stack${origin ? ` is-from-${origin}` : ''}${taken ? ' is-taken' : ''}`}
-      style={{ ...at(place), ...from(place, taken ? TRAY : start) }}
+      style={{ ...at(place), ...from(place, taken ? shape.tray : start) }}
     />
   )
 }
@@ -403,7 +438,8 @@ function Badge({ place, tone, children }: { place: Place; tone?: 'good' | 'bad';
 /** Your result for the round, rising off your cards. */
 function ResultBurst({ staked, returned }: { staked: number; returned: number }) {
   const net = returned - staked
-  const place = inSpot(YOUR_SPOT, 0, -20)
+  const { inSpot, scale } = useLayout()
+  const place = inSpot(YOUR_SPOT, 0, -20 * scale)
   return (
     <div className={`bj-burst${net > 0 ? ' is-up' : net < 0 ? ' is-down' : ''}`} style={at(place)} aria-hidden="true">
       {net > 0 ? `+${net}` : net < 0 ? `−${-net}` : 'Push'}
@@ -416,8 +452,17 @@ function ResultBurst({ staked, returned }: { staked: number; returned: number })
 /** Long enough to read the line twice at a relaxed pace. */
 const readingTime = (text: string) => Math.min(6000, Math.max(2400, 1500 + text.length * 55))
 
+interface BubbleProps {
+  name: string
+  remark: Remark | null
+  className: string
+  style?: CSSProperties
+  /** Show who's talking, for a bubble that isn't beside them. */
+  named?: boolean
+}
+
 /** The latest remark, shown once the cards land and faded after a while. A newer one replaces it. */
-function SpeechBubble({ name, remark, className, style }: { name: string; remark: Remark | null; className: string; style?: CSSProperties }) {
+function SpeechBubble({ name, remark, className, style, named = false }: BubbleProps) {
   const [shown, setShown] = useState<number | null>(null)
   useEffect(() => {
     if (!remark) return
@@ -434,7 +479,14 @@ function SpeechBubble({ name, remark, className, style }: { name: string; remark
     <div className={`bj-talk ${className}`} style={style} aria-live="polite">
       {visible && (
         <p key={remark.id} className="bj-talk__bubble" style={{ '--hold': `${readingTime(remark.text)}ms` } as CSSProperties}>
-          <span className="visually-hidden">{name} says: </span>
+          {named ? (
+            <>
+              <strong className="bj-talk__name">{name}</strong>
+              <span className="visually-hidden"> says:</span>{' '}
+            </>
+          ) : (
+            <span className="visually-hidden">{name} says: </span>
+          )}
           {remark.text}
         </p>
       )}

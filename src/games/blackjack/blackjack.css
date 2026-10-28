@@ -7,7 +7,9 @@
  * flatten 3D for everything inside (the table's shadow is in its SVG).
  *
  * Everything on the felt is placed in felt units (--u, a thousandth of the
- * table's width) from positions worked out in ui/layout.ts.
+ * table's width) from positions worked out in ui/layout.ts. The table is
+ * --felt-h units tall, and --scale says how much bigger its cards are than
+ * the wide table's: both come from the layout's shape.
  */
 
 .bj {
@@ -671,10 +673,10 @@
 }
 
 .bj-felt {
-  --u: calc(min(100cqw, 200cqh) / 1000);
+  --u: calc(min(100cqw, 100cqh * 1000 / var(--felt-h, 500)) / 1000);
   position: relative;
   width: calc(1000 * var(--u));
-  height: calc(500 * var(--u));
+  height: calc(var(--felt-h, 500) * var(--u));
 }
 
 .bj-felt__art {
@@ -698,10 +700,7 @@
   pointer-events: auto;
 }
 
-/* Only on a phone held upright: see the end of this file. */
-.bj-wall {
-  display: none;
-}
+
 
 /* Everything on the felt is placed by layout.ts, in felt units. */
 .bj-card,
@@ -709,6 +708,7 @@
 .bj-badge,
 .bj-plate,
 .bj-talk--seat,
+.bj-talk--table,
 .bj-shoe,
 .bj-discards,
 .bj-glow,
@@ -729,7 +729,7 @@
 /* Cards */
 
 .bj-card {
-  --w: calc(66 * var(--u) * var(--s, 1) * var(--card-scale, 1));
+  --w: calc(66 * var(--scale, 1) * var(--u) * var(--s, 1) * var(--card-scale, 1));
   width: var(--w);
   height: calc(var(--w) * 1.4);
   margin: calc(var(--w) * -0.7) 0 0 calc(var(--w) * -0.5);
@@ -795,9 +795,10 @@
 
 /* The hand you're playing, lit from below. */
 .bj-glow {
-  width: calc(150 * var(--u) * var(--s, 1));
-  height: calc(170 * var(--u) * var(--s, 1));
-  margin: calc(-110 * var(--u) * var(--s, 1)) 0 0 calc(-60 * var(--u) * var(--s, 1));
+  --g: calc(var(--u) * var(--s, 1) * var(--scale, 1));
+  width: calc(150 * var(--g));
+  height: calc(170 * var(--g));
+  margin: calc(-110 * var(--g)) 0 0 calc(-60 * var(--g));
   border-radius: 50%;
   background: radial-gradient(closest-side, rgba(70, 233, 255, 0.32), rgba(70, 233, 255, 0.1) 60%, transparent);
   z-index: 5;
@@ -821,7 +822,7 @@
 
 /* --c is a chip's unit: the felt's, grown on small tables so chips stay readable. */
 .bj-felt-stack {
-  --c: calc(var(--u) * var(--chip-scale, 1));
+  --c: calc(var(--u) * var(--chip-scale, 1) * var(--scale, 1));
   width: calc(40 * var(--c));
   height: calc(40 * var(--c));
   margin: calc(-20 * var(--c)) 0 0 calc(-20 * var(--c));
@@ -870,13 +871,13 @@
 
 .bj-badge {
   z-index: 40;
-  padding: calc(4 * var(--u)) calc(8 * var(--u)) calc(3 * var(--u));
+  padding: calc(4 * var(--u) * var(--scale, 1)) calc(8 * var(--u) * var(--scale, 1)) calc(3 * var(--u) * var(--scale, 1));
   border: 1px solid rgba(227, 194, 106, 0.6);
   border-radius: 999px;
   background: rgba(10, 16, 40, 0.88);
   color: var(--cream);
   font-family: var(--font-deco);
-  font-size: max(11px, calc(16 * var(--u)));
+  font-size: max(11px, calc(16 * var(--u) * var(--scale, 1)));
   line-height: 1;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -899,7 +900,7 @@
 .bj-burst {
   z-index: 60;
   font-family: var(--font-deco);
-  font-size: calc(46 * var(--u));
+  font-size: calc(46 * var(--u) * var(--scale, 1));
   line-height: 1;
   color: var(--cream);
   white-space: nowrap;
@@ -1166,6 +1167,29 @@
   left: 100%;
   border-left: 9px solid #fbf4e2;
   border-right-width: 0;
+}
+
+/* On the tall table the regulars' remarks hang in the open felt, under the printing, with who said them. */
+.bj-talk--table {
+  width: 0;
+  height: 0;
+  rotate: 0deg;
+}
+
+.bj-talk--table .bj-talk__bubble {
+  translate: -50% 0;
+  width: max-content;
+  min-width: 120px;
+  max-width: calc(400 * var(--u));
+  transform-origin: 50% 0;
+  text-align: center;
+}
+
+.bj-talk__name {
+  display: block;
+  font-family: var(--font-deco);
+  font-weight: 400;
+  color: #6a1219;
 }
 
 @keyframes talk-in {
@@ -1454,9 +1478,9 @@
 /* ---- The table on phones and small windows ------------------------------------
  * Keep these queries in step with COMPACT_TABLE in Table.tsx.
  *
- * Upright, the dealer, the felt, your rail and the HUD stack. The felt is as
- * wide as the screen, and its cards and chips grow against it so they stay
- * readable. Sideways (the next block), the HUD takes a column on the right.
+ * Upright, the dealer, the felt, your rail and the HUD stack, and the felt
+ * is the tall table. Sideways, the HUD takes a column on the right, and the
+ * wide table's cards and chips grow against the felt so they stay readable.
  */
 
 @media (max-width: 900px), (max-height: 520px) {
@@ -1604,27 +1628,15 @@
 }
 
 /*
- * Upright, the table sits low, near your thumbs, and the sign hangs on the
- * wall above it. The stage is exactly as tall as the felt.
+ * Upright, the table is the tall one (layout.ts) and fills the room between
+ * the dealer and your rail. Its cards are already big, so they don't grow
+ * the way the compact wide table's do. Keep the query in step with
+ * TALL_TABLE in Table.tsx.
  */
 @media (max-width: 900px) and (orientation: portrait) {
-  .bj-board {
-    grid-template-rows: minmax(0, 1fr) auto auto auto;
-  }
-
-  .bj-wall {
-    display: grid;
-    place-items: center;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .bj-wall .bj-sign {
-    font-size: clamp(var(--step-2), 11vw, var(--step-4));
-  }
-
-  .bj-stage {
-    height: calc((100vw - var(--safe-left) - var(--safe-right) - 16px) * 0.5 + 6px);
+  .bj-felt[data-shape='tall'] {
+    --card-scale: 1;
+    --chip-scale: 1;
   }
 }
 

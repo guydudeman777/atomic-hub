@@ -7,6 +7,8 @@
  *
  * Nothing runs on its own clock. The caller asks for everything up to a
  * point in time with scheduleUntil(), which also lets it render offline.
+ * If it asks late, the band picks up on the next bar instead of rushing to
+ * play everything it missed.
  */
 
 import type { Rng } from '../rng'
@@ -28,17 +30,21 @@ import {
 import { SILENT, amp, filter, hz, noise, osc, strike } from './synth'
 
 const TUNING_SECONDS = 1.6
+/** The least notice a bar needs to start on time, in seconds. */
+const NOTICE = 0.05
 
 export class Radio {
   private readonly m: Mixer
   private readonly rng: Rng
   private readonly ctx: BaseAudioContext
+  /** The volume knob: the radio's whole output, so switching it off fades everything at once. */
+  private readonly out: GainNode
   /** The speaker: everything the band plays goes in here. */
   private readonly speaker: GainNode
   private readonly keys: GainNode
   private readonly persistent: AudioScheduledSourceNode[] = []
   private readonly strings = new Map<number, AudioBuffer>()
-  private readonly bank = new SampleBank()
+  private readonly bank: SampleBank
 
   private song: number
   private chart: Chart
@@ -52,21 +58,28 @@ export class Radio {
   private melody: Note[][] = []
   private lead: Lead | null = null
 
-  constructor(m: Mixer, rng: Rng, startAt: number) {
+  /** Pass the same bank to the next radio to keep its recordings: every song plays the same instruments. */
+  constructor(m: Mixer, rng: Rng, startAt: number, bank = new SampleBank()) {
     this.m = m
     this.rng = rng
     this.ctx = m.ctx
+    this.bank = bank
     const ctx = this.ctx
+    this.out = amp(ctx, 1)
+    this.out.connect(m.music)
 
     // The old speaker: no deep lows, no sparkling highs, a bit of warm grit.
+    // The shaper only takes ±1, so the band goes in at half level into a
+    // curve twice as wide: the loudest chords saturate instead of clipping.
     this.speaker = amp(ctx, 1)
     const shaper = ctx.createWaveShaper()
-    shaper.curve = saturation(1.6)
+    shaper.curve = saturation(1.6, HEADROOM)
     this.speaker
       .connect(filter(ctx, 'highpass', 75))
       .connect(filter(ctx, 'lowpass', 7000))
+      .connect(amp(ctx, 1 / HEADROOM))
       .connect(shaper)
-      .connect(m.music)
+      .connect(this.out)
 
     // Electric piano through a slow tremolo.
     this.keys = amp(ctx, 0.85)
@@ -79,10 +92,11 @@ export class Radio {
 
     // Vinyl crackle, underneath it all.
     const crackle = ctx.createBufferSource()
-    crackle.buffer = crackleBuffer(ctx)
+    const surface = crackleBuffer(ctx)
+    crackle.buffer = surface
     crackle.loop = true
-    crackle.connect(amp(ctx, 0.5)).connect(m.music)
-    crackle.start(startAt)
+    crackle.connect(amp(ctx, 0.5)).connect(this.out)
+    crackle.start(startAt, Math.random() * surface.duration)
     this.persistent.push(crackle)
 
     this.song = Math.floor(rng() * SONGS.length)
@@ -94,14 +108,20 @@ export class Radio {
     this.startChorus()
   }
 
-  /** Schedule every bar that starts before `time`. */
-  scheduleUntil(time: number) {
+  /**
+   * Schedule every bar that starts before `time`. If the next bar should
+   * have started by `now` (the page was too busy to ask in time), it starts
+   * now instead: a pause in the music, not a pile-up of every note it missed.
+   */
+  scheduleUntil(time: number, now: number) {
+    if (this.barAt < now + NOTICE) this.barAt = now + NOTICE
     while (this.barAt < time) this.playBar()
   }
 
-  /** Stop the dial and the crackle once everything already scheduled has played. */
+  /** Turn the radio off: fade it all out from `at`, notes already scheduled included. */
   stop(at: number) {
-    for (const node of this.persistent) node.stop(at)
+    this.out.gain.setTargetAtTime(0, at, 0.1)
+    for (const node of this.persistent) node.stop(at + 1)
   }
 
   private get beat(): number {
@@ -169,9 +189,8 @@ export class Radio {
 
   private nextSong(at: number) {
     this.tuning(at, TUNING_SECONDS)
-    // A new key and tempo: last song's recordings won't be needed again for a while.
-    this.bank.clear()
-    this.strings.clear()
+    // The recordings stay: the next song plays the same instruments over
+    // much the same notes.
     this.song = (this.song + 1) % SONGS.length
     this.chart = chartOf(SONGS[this.song])
     this.tune = makeTune(this.chart, this.rng)
@@ -200,7 +219,7 @@ export class Radio {
   }
 
   private piano(t: number, midi: number, length: number, velocity: number) {
-    this.play(`piano:${midi}`, 2.2, piano(hz(midi)), t, velocity, t + Math.max(0.3, length), 0.12, this.keys)
+    this.play(`piano:${midi}`, 2.5, piano(hz(midi)), t, velocity, t + Math.max(0.3, length), 0.12, this.keys)
   }
 
   private playLead(t: number, midi: number, length: number, velocity: number) {
@@ -223,6 +242,7 @@ export class Radio {
     env.gain.setTargetAtTime(0, t + length + 0.05, 0.1)
     src.connect(env).connect(this.speaker)
     src.start(t)
+    // A note held longer than the string rings plays out its fade (see pluckBuffer).
     src.stop(t + Math.min(length + 0.6, src.buffer.duration))
   }
 
@@ -316,8 +336,8 @@ const bass =
 const piano =
   (f: number): Render =>
   (ctx, out, t) => {
-    const carrier = osc(ctx, 'sine', f, t, 2.2)
-    const modulator = osc(ctx, 'sine', f, t, 2.2)
+    const carrier = osc(ctx, 'sine', f, t, 2.5)
+    const modulator = osc(ctx, 'sine', f, t, 2.5)
     const index = amp(ctx)
     index.gain.setValueAtTime(f * 1.4, t)
     index.gain.exponentialRampToValueAtTime(f * 0.15, t + 0.5)
@@ -326,7 +346,9 @@ const piano =
     env.gain.setValueAtTime(0, t)
     env.gain.linearRampToValueAtTime(0.07, t + 0.006)
     env.gain.exponentialRampToValueAtTime(0.035, t + 0.3)
-    env.gain.setTargetAtTime(SILENT, t + 0.3, 0.6)
+    // Rings away, then lets go before the oscillators stop, so a long chord ends without a click.
+    env.gain.exponentialRampToValueAtTime(0.0015, t + 2.2)
+    env.gain.linearRampToValueAtTime(0, t + 2.45)
     carrier.connect(env).connect(out)
   }
 
@@ -337,10 +359,14 @@ const vibes =
     const env = amp(ctx)
     strike(env.gain, t, 0.13, 2.4, 0.004)
     osc(ctx, 'sine', f, t, 2.5).connect(env)
-    osc(ctx, 'sine', f * 4, t, 0.5).connect(amp(ctx, 0.12)).connect(env)
+    // The strike's bright overtone dies away on its own, well before its oscillator stops.
+    const ring = amp(ctx)
+    strike(ring.gain, t, 0.016, 1, 0.004)
+    osc(ctx, 'sine', f * 4, t, 1.1).connect(ring)
     const wobble = amp(ctx, 0.85)
     osc(ctx, 'sine', 5.2, t, 2.5).connect(amp(ctx, 0.25)).connect(wobble.gain)
     env.connect(wobble).connect(out)
+    ring.connect(wobble)
   }
 
 /** Whistling: a pure tone, a breath of air, and a vibrato that blooms as the note holds. */
@@ -412,39 +438,60 @@ const kick: Render = (ctx, out, t) => {
   o.connect(env).connect(out)
 }
 
-/** A gentle tanh curve: rounds off peaks the way an old valve amp does. */
-function saturation(drive: number): Float32Array<ArrayBuffer> {
-  const n = 1024
+/** How far past ±1 the speaker's input can go before it clips. */
+const HEADROOM = 2
+
+/**
+ * A gentle tanh curve: rounds off peaks the way an old valve amp does. It
+ * spans ±`headroom`, for an input scaled down by as much to fit the shaper.
+ */
+function saturation(drive: number, headroom: number): Float32Array<ArrayBuffer> {
+  const n = 2049
   const curve = new Float32Array(n)
   for (let i = 0; i < n; i++) {
-    const x = (i / (n - 1)) * 2 - 1
+    const x = ((i / (n - 1)) * 2 - 1) * headroom
     curve[i] = Math.tanh(drive * x) / Math.tanh(drive)
   }
   return curve
 }
 
-/** A record's surface noise: sparse clicks and pops over a faint hiss. */
-function crackleBuffer(ctx: BaseAudioContext, seconds = 5): AudioBuffer {
+/**
+ * A record's surface noise: a faint hiss with a soft tick now and then.
+ * Ticks are rounded, not sharp edges, so they sit under the band instead of
+ * sounding like the speakers glitching; the loop is long and starts
+ * anywhere, so they don't fall into a pattern.
+ */
+function crackleBuffer(ctx: BaseAudioContext, seconds = 11): AudioBuffer {
   const rate = ctx.sampleRate
-  const buffer = ctx.createBuffer(1, Math.floor(rate * seconds), rate)
-  const data = buffer.getChannelData(0)
+  const length = Math.floor(rate * seconds)
+  // A little extra, folded back over the start so the loop has no seam.
+  const seam = Math.floor(rate * 0.05)
+  const raw = new Float32Array(length + seam)
   let smooth = 0
-  for (let i = 0; i < data.length; i++) {
+  for (let i = 0; i < raw.length; i++) {
     smooth += 0.08 * (Math.random() * 2 - 1 - smooth)
-    data[i] = smooth * 0.012
+    raw[i] = smooth * 0.012
   }
-  const pops = Math.floor(seconds * 9)
-  for (let p = 0; p < pops; p++) {
-    const at = Math.floor(Math.random() * (data.length - 200))
-    const size = Math.random() ** 3 * 0.25 + 0.01
-    const width = 4 + Math.floor(Math.random() * 40)
-    for (let k = 0; k < width; k++) data[at + k] += size * (Math.random() * 2 - 1) * (1 - k / width)
+  const ticks = Math.floor(seconds * 4)
+  for (let p = 0; p < ticks; p++) {
+    const width = 6 + Math.floor(Math.random() * 30)
+    const at = Math.floor(Math.random() * (raw.length - width))
+    const size = (Math.random() ** 4 * 0.05 + 0.004) * (Math.random() < 0.5 ? -1 : 1)
+    for (let k = 0; k < width; k++) raw[at + k] += size * Math.sin((2 * Math.PI * k) / width) * Math.sin((Math.PI * k) / width)
   }
+  const buffer = ctx.createBuffer(1, length, rate)
+  const data = buffer.getChannelData(0)
+  data.set(raw.subarray(0, length))
+  for (let i = 0; i < seam; i++) data[i] = raw[i] * (i / seam) + raw[length + i] * (1 - i / seam)
   return buffer
 }
 
-/** Karplus–Strong: a burst of noise fed around a short, damped delay line. */
-function pluckBuffer(ctx: BaseAudioContext, freq: number, seconds = 1.8): AudioBuffer {
+/**
+ * Karplus–Strong: a burst of noise fed around a short, damped delay line.
+ * Low strings are still ringing when the buffer runs out, so its last
+ * moments fade to silence rather than stopping dead.
+ */
+function pluckBuffer(ctx: BaseAudioContext, freq: number, seconds = 2.4): AudioBuffer {
   const rate = ctx.sampleRate
   const buffer = ctx.createBuffer(1, Math.floor(rate * seconds), rate)
   const y = buffer.getChannelData(0)
@@ -466,5 +513,7 @@ function pluckBuffer(ctx: BaseAudioContext, freq: number, seconds = 1.8): AudioB
     const before = y[i0 - 1] + (y[i0] - y[i0 - 1]) * fr
     y[i] = 0.996 * 0.5 * (now + before)
   }
+  const fade = Math.floor(rate * 0.3)
+  for (let k = 0; k < fade; k++) y[y.length - 1 - k] *= Math.sin(((k / fade) * Math.PI) / 2) ** 2
   return buffer
 }

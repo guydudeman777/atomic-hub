@@ -47,6 +47,8 @@ interface Table {
 
 type Utterance = 'talk' | 'laugh' | 'woo' | 'aww'
 
+const ignore = () => {}
+
 /** Something said once and recorded for reuse, and who said it. */
 interface Take {
   kind: Recorded
@@ -65,6 +67,19 @@ type Recorded = 'talk' | 'laugh'
  */
 const TAKES: Record<Recorded, number> = { talk: 10, laugh: 3 }
 
+/** A round of applause is a hundred and sixty claps: worth recording a couple and reusing them. */
+const APPLAUSE_TAKES = 2
+const APPLAUSE_SECONDS = 2.8
+
+/**
+ * Everything the crowd has recorded. Pass the same one to the next crowd so
+ * that sitting down at another table doesn't mean recording the room again.
+ */
+export class CrowdTakes {
+  readonly voices: Take[] = []
+  readonly applause: AudioBuffer[] = []
+}
+
 export type CrowdReaction = 'cheer' | 'groan' | 'laugh'
 
 export class Crowd {
@@ -74,14 +89,14 @@ export class Crowd {
   private readonly out: GainNode
   private readonly tables: Table[] = []
   private readonly bed: AudioScheduledSourceNode[] = []
-  private readonly takes: Take[] = []
-  private recording = 0
+  private readonly takes: CrowdTakes
   private nextClinkAt: number
 
-  constructor(m: Mixer, rng: Rng, startAt: number) {
+  constructor(m: Mixer, rng: Rng, startAt: number, takes = new CrowdTakes()) {
     this.m = m
     this.rng = rng
     this.ctx = m.ctx
+    this.takes = takes
     const ctx = this.ctx
     // Distance: the room soaks up the highs before anyone's voice reaches you,
     // and the low rumble of voices would only muddy the band's bass.
@@ -95,6 +110,8 @@ export class Crowd {
       this.tables.push({ speakers, nextAt: startAt + rng() * 2.5, last: null })
     }
     this.nextClinkAt = startAt + 2 + rng() * 6
+    // Ready for the first cheer, recorded while nobody's clapping yet.
+    if (!takes.applause.length) this.recordApplause()
 
     // The room itself: a low murmur of everyone further off.
     const fadeIn = amp(ctx)
@@ -116,9 +133,14 @@ export class Crowd {
     }
   }
 
-  /** Schedule everyone's talking up to `time`. */
-  scheduleUntil(time: number) {
+  /**
+   * Schedule everyone's talking up to `time`. Anyone who should have spoken
+   * before `now` (the page was too busy to ask in time) speaks up now
+   * instead, rather than everyone at once.
+   */
+  scheduleUntil(time: number, now: number) {
     for (const table of this.tables) {
+      if (table.nextAt < now) table.nextAt = now + this.rng() * 0.5
       while (table.nextAt < time) {
         const others = table.speakers.filter((s) => s !== table.last)
         const speaker = others[Math.floor(this.rng() * others.length)]
@@ -133,6 +155,7 @@ export class Crowd {
         table.nextAt = end + (this.rng() < 0.75 ? 0.15 + this.rng() * 0.7 : 2 + this.rng() * 5)
       }
     }
+    if (this.nextClinkAt < now) this.nextClinkAt = now + this.rng() * 2
     while (this.nextClinkAt < time) {
       this.clink(this.nextClinkAt)
       this.nextClinkAt += 5 + this.rng() * 14
@@ -144,7 +167,7 @@ export class Crowd {
     const everyone = this.tables.flatMap((table) => table.speakers)
     const some = (n: number) => [...everyone].sort(() => this.rng() - 0.5).slice(0, n)
     if (kind === 'cheer') {
-      this.applause(t, 2.8)
+      this.applause(t)
       for (const s of some(3)) this.speak(s, t + 0.1 + this.rng() * 0.7, this.rng() < 0.6 ? 'woo' : 'laugh')
     } else if (kind === 'laugh') {
       // Someone at the next table caught that.
@@ -154,8 +177,10 @@ export class Crowd {
     }
   }
 
+  /** Everyone fades out from `at`, including what they were about to say. */
   stop(at: number) {
-    for (const node of this.bed) node.stop(at)
+    this.out.gain.setTargetAtTime(0, at, 0.3)
+    for (const node of this.bed) node.stop(at + 2)
   }
 
   private person(pan: number, level: number, woman = this.rng() < 0.45): Speaker {
@@ -170,7 +195,7 @@ export class Crowd {
 
   /** Someone at a table says something: a recording once there are enough, otherwise live. */
   private say(s: Speaker, t: number, kind: Recorded): number {
-    const takes = this.takes.filter((take) => take.kind === kind && take.woman === s.woman)
+    const takes = this.takes.voices.filter((take) => take.kind === kind && take.woman === s.woman)
     if (takes.length >= TAKES[kind]) {
       const take = takes[Math.floor(this.rng() * takes.length)]
       const src = this.ctx.createBufferSource()
@@ -179,7 +204,7 @@ export class Crowd {
       src.start(t)
       return t + take.length
     }
-    if (this.recording < 2) this.recordTake(kind, s.woman)
+    this.recordTake(kind, s.woman)
     return this.speak(s, t, kind)
   }
 
@@ -190,19 +215,13 @@ export class Crowd {
     const recording = record(4, rate, (ctx, out, t) => {
       length = this.utter(ctx, out, voice, t, kind)
     })
-    if (!recording) return
-    this.recording++
-    recording.then(
-      (full) => {
-        this.recording--
-        // Keep only what was said and its tail, not the silence after.
-        const frames = Math.min(full.length, Math.ceil((length + 0.35) * rate))
-        const buffer = this.ctx.createBuffer(1, frames, rate)
-        buffer.copyToChannel(full.getChannelData(0).subarray(0, frames), 0)
-        this.takes.push({ kind, woman, buffer, length })
-      },
-      () => this.recording--,
-    )
+    recording?.then((full) => {
+      // Keep only what was said and its tail, not the silence after.
+      const frames = Math.min(full.length, Math.ceil((length + 0.35) * rate))
+      const buffer = this.ctx.createBuffer(1, frames, rate)
+      buffer.copyToChannel(full.getChannelData(0).subarray(0, frames), 0)
+      this.takes.voices.push({ kind, woman, buffer, length })
+    }, ignore)
   }
 
   /** Someone says something live, from where they sit. */
@@ -303,19 +322,39 @@ export class Crowd {
     return at
   }
 
+  /** A round of applause: from a recording once there is one, otherwise live. */
+  private applause(t: number) {
+    const { applause } = this.takes
+    if (applause.length < APPLAUSE_TAKES) this.recordApplause()
+    if (!applause.length) {
+      this.clapping(this.ctx, this.out, t)
+      return
+    }
+    const src = this.ctx.createBufferSource()
+    src.buffer = applause[Math.floor(this.rng() * applause.length)]
+    src.connect(this.out)
+    src.start(t)
+  }
+
+  private recordApplause() {
+    const recording = record(APPLAUSE_SECONDS + 0.3, this.ctx.sampleRate, (ctx, out, t) => this.clapping(ctx, out, t), 2)
+    recording?.then((buffer) => this.takes.applause.push(buffer), ignore)
+  }
+
   /** Hands clapping all over the room, quickly building and slowly thinning out. */
-  private applause(t: number, length: number) {
-    const { ctx, rng } = this
+  private clapping(ctx: BaseAudioContext, out: AudioNode, t: number) {
+    const { rng } = this
+    const length = APPLAUSE_SECONDS
     for (let i = 0; i < 160; i++) {
       const at = t + 0.05 + length * rng() ** 1.7
       const fade = 1 - (at - t) / (length + 0.3)
       const env = amp(ctx)
       strike(env.gain, at, (0.25 + rng() * 0.35) * fade, 0.03 + rng() * 0.03, 0.001)
-      noise(this.m, at, 0.07)
+      noise({ ...this.m, ctx }, at, 0.07)
         .connect(filter(ctx, 'bandpass', 700 + rng() * 1500, 1.2 + rng()))
         .connect(env)
         .connect(panner(ctx, rng() * 1.8 - 0.9))
-        .connect(this.out)
+        .connect(out)
     }
   }
 

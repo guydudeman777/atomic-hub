@@ -25,7 +25,7 @@
   --font-deco: 'Limelight', 'Georgia', serif;
 
   color: var(--cream);
-  min-height: 100vh;
+  min-height: var(--app-height);
   font-family: var(--font-body);
 }
 
@@ -37,6 +37,13 @@
     radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0, 0, 0, 0.7) 100%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84' viewBox='0 0 84 84'%3E%3Cpath d='M42 27l2.6 12.4L57 42l-12.4 2.6L42 57l-2.6-12.4L27 42l12.4-2.6z' fill='%23e3c26a' fill-opacity='.11'/%3E%3Cg fill='none' stroke='%2346e9ff' stroke-opacity='.08' stroke-width='1.6'%3E%3Ccircle r='10'/%3E%3Ccircle cx='84' r='10'/%3E%3Ccircle cy='84' r='10'/%3E%3Ccircle cx='84' cy='84' r='10'/%3E%3C/g%3E%3Cpath d='M8 70q12-14 24 0M52 14q12 14 24 0' fill='none' stroke='%23ff4fa3' stroke-opacity='.09' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
   background-attachment: fixed;
+}
+
+/* Phones don't keep fixed backgrounds still, and repaint them on every scroll. */
+@media (hover: none) {
+  .bj-room {
+    background-attachment: scroll;
+  }
 }
 
 .bj-ink-dim {
@@ -104,9 +111,11 @@
     box-shadow 0.15s ease-out;
 }
 
-.bj-button:hover:not(:disabled) {
-  border-color: var(--gold);
-  background: linear-gradient(180deg, #343b66, #1e2340);
+@media (hover: hover) {
+  .bj-button:hover:not(:disabled) {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, #343b66, #1e2340);
+  }
 }
 
 .bj-button:active:not(:disabled) {
@@ -121,8 +130,10 @@
   border-color: var(--gold);
 }
 
-.bj-button--primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #d84249, #a0232b);
+@media (hover: hover) {
+  .bj-button--primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #d84249, #a0232b);
+  }
 }
 
 .bj-button--big {
@@ -191,9 +202,11 @@
   font-size: var(--step--1);
 }
 
-.bj-back:hover,
-.bj-caps:hover {
-  color: var(--cream);
+@media (hover: hover) {
+  .bj-back:hover,
+  .bj-caps:hover {
+    color: var(--cream);
+  }
 }
 
 .bj-caps {
@@ -255,6 +268,7 @@
 
 .bj-nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -265,8 +279,10 @@
   text-decoration: none;
 }
 
-.bj-nav__link:hover {
-  color: var(--cream);
+@media (hover: hover) {
+  .bj-nav__link:hover {
+    color: var(--cream);
+  }
 }
 
 .bj-nav__link[aria-current='page'] {
@@ -322,8 +338,10 @@
   background: rgba(255, 255, 255, 0.025);
 }
 
-.bj-mode:hover {
-  border-color: rgba(227, 194, 106, 0.5);
+@media (hover: hover) {
+  .bj-mode:hover {
+    border-color: rgba(227, 194, 106, 0.5);
+  }
 }
 
 .bj-mode[aria-checked='true'] {
@@ -401,8 +419,10 @@
   font-size: var(--step--1);
 }
 
-.bj-stake:hover .bj-stake__sign {
-  border-color: var(--gold-deep);
+@media (hover: hover) {
+  .bj-stake:hover .bj-stake__sign {
+    border-color: var(--gold-deep);
+  }
 }
 
 .bj-stake[aria-checked='true'] .bj-stake__sign {
@@ -570,7 +590,7 @@
 .bj-game {
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(260px, 22vw, 340px);
-  height: 100vh;
+  height: var(--app-height);
   overflow: hidden;
 }
 
@@ -665,6 +685,24 @@
   display: block;
 }
 
+/*
+ * Nothing on the felt takes a click or a tap (only the shoe and tray show
+ * their counts on hover), so a table drawn over the rail never gets in the way.
+ */
+.bj-felt {
+  pointer-events: none;
+}
+
+.bj-shoe,
+.bj-discards {
+  pointer-events: auto;
+}
+
+/* Only on a phone held upright: see the end of this file. */
+.bj-wall {
+  display: none;
+}
+
 /* Everything on the felt is placed by layout.ts, in felt units. */
 .bj-card,
 .bj-felt-stack,
@@ -691,7 +729,7 @@
 /* Cards */
 
 .bj-card {
-  --w: calc(66 * var(--u) * var(--s, 1));
+  --w: calc(66 * var(--u) * var(--s, 1) * var(--card-scale, 1));
   width: var(--w);
   height: calc(var(--w) * 1.4);
   margin: calc(var(--w) * -0.7) 0 0 calc(var(--w) * -0.5);
@@ -781,18 +819,20 @@
   height: 100%;
 }
 
+/* --c is a chip's unit: the felt's, grown on small tables so chips stay readable. */
 .bj-felt-stack {
-  width: calc(40 * var(--u));
-  height: calc(40 * var(--u));
-  margin: calc(-20 * var(--u)) 0 0 calc(-20 * var(--u));
+  --c: calc(var(--u) * var(--chip-scale, 1));
+  width: calc(40 * var(--c));
+  height: calc(40 * var(--c));
+  margin: calc(-20 * var(--c)) 0 0 calc(-20 * var(--c));
   z-index: 30;
 }
 
 .bj-stack__chip {
   position: absolute;
   inset: 0;
-  translate: 0 calc(var(--i) * -3.4 * var(--u));
-  filter: drop-shadow(0 calc(1.5 * var(--u)) 0 rgba(0, 0, 0, 0.55));
+  translate: 0 calc(var(--i) * -3.4 * var(--c));
+  filter: drop-shadow(0 calc(1.5 * var(--c)) 0 rgba(0, 0, 0, 0.55));
 }
 
 .bj-felt-stack.is-from-player,
@@ -1188,8 +1228,10 @@
   transition: translate 0.1s ease-out;
 }
 
-.bj-rack__chip:hover:not(:disabled) {
-  translate: 0 -4px;
+@media (hover: hover) {
+  .bj-rack__chip:hover:not(:disabled) {
+    translate: 0 -4px;
+  }
 }
 
 .bj-rack__chip:active:not(:disabled) {
@@ -1338,7 +1380,36 @@
   font-size: var(--step-0);
 }
 
-/* ---- Narrow screens -------------------------------------------------------- */
+/* ---- The table menu on phones ----------------------------------------------- */
+
+.bj-menu.screen {
+  width: min(100%, 460px);
+  max-height: min(560px, calc(var(--app-height) - 40px));
+  padding: 14px 16px 16px;
+  gap: 12px;
+  border-radius: 12px;
+  color: var(--ph);
+  font-size: var(--step--1);
+}
+
+.bj-menu .bj-hud__log {
+  min-height: 4.5em;
+  margin: 0;
+  padding: 0 0 8px;
+  border-top: 0;
+  border-bottom: 2px solid var(--ph-faint);
+}
+
+.bj-menu .term-button {
+  font-size: var(--step-0);
+  padding: 6px 12px;
+}
+
+.bj-menu > .term-button--primary {
+  align-self: flex-start;
+}
+
+/* ---- Pages on narrow screens ------------------------------------------------- */
 
 @media (max-width: 900px) {
   .bj-modes,
@@ -1350,36 +1421,253 @@
   .bj-sign {
     font-size: var(--step-3);
   }
+}
+
+/* The strategy chart squeezes its cells, and scrolls sideways rather than widen the page. */
+.bj-strategy__charts {
+  overflow-x: auto;
+}
+
+@media (max-width: 640px) {
+  .bj-chart {
+    border-spacing: 1px;
+    font-size: 12px;
+  }
+
+  .bj-chart th {
+    padding: 2px 3px;
+  }
+
+  .bj-chart td {
+    min-width: 1.9em;
+    padding: 3px 1px;
+  }
+}
+
+/* No keys to press on a touch screen. */
+@media (hover: none) and (pointer: coarse) {
+  .bj-key {
+    display: none;
+  }
+}
+
+/* ---- The table on phones and small windows ------------------------------------
+ * Keep these queries in step with COMPACT_TABLE in Table.tsx.
+ *
+ * Upright, the dealer, the felt, your rail and the HUD stack. The felt is as
+ * wide as the screen, and its cards and chips grow against it so they stay
+ * readable. Sideways (the next block), the HUD takes a column on the right.
+ */
+
+@media (max-width: 900px), (max-height: 520px) {
+  .bj-game {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .bj-board {
+    gap: 4px;
+    padding: max(6px, var(--safe-top)) max(8px, var(--safe-right)) 4px max(8px, var(--safe-left));
+  }
+
+  .bj-felt {
+    --card-scale: 1.35;
+    --chip-scale: 1.25;
+  }
 
   .bj-dealer-bar {
     justify-content: space-between;
+    min-height: 40px;
+    padding: 0 2px;
   }
 
   .bj-placard {
     position: static;
     translate: none;
+    padding: 3px 8px;
   }
 
-  .bj-game {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) auto;
-  }
-
-  .bj-hud.screen {
-    margin: 0 8px 8px;
-    max-height: 30vh;
-  }
-
-  .bj-hud__log {
+  .bj-placard__table {
     display: none;
   }
 
+  .bj-portrait--dealer {
+    width: 30px;
+    height: 30px;
+    font-size: var(--step-0);
+  }
+
+  .bj-dealer-bar__name {
+    font-size: var(--step-1);
+  }
+
+  .bj-talk__bubble {
+    max-width: min(320px, calc(100vw - 140px));
+  }
+
+  .bj-controls {
+    min-height: 0;
+    gap: 8px 14px;
+    padding: 8px 10px;
+    border-radius: 10px;
+  }
+
+  .bj-rack {
+    gap: 6px;
+  }
+
   .bj-rack__chip {
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
+  }
+
+  .bj-bet {
+    min-width: 64px;
+  }
+
+  .bj-bet__amount {
+    font-size: var(--step-2);
+  }
+
+  .bj-button {
+    font-size: var(--step-0);
+    padding: 9px 14px 8px;
+  }
+
+  .bj-controls__buttons--play {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+    gap: 8px;
   }
 
   .bj-button--play {
     min-width: 0;
+    padding-inline: 4px;
+  }
+
+  .bj-controls__ask {
+    font-size: var(--step--1);
+  }
+
+  /* The HUD: status and stake, the hint and the Menu, then the count. */
+  .bj-hud.screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'status stake'
+      'help menu'
+      'count count';
+    align-content: start;
+    gap: 4px 10px;
+    margin: 0 max(8px, var(--safe-right)) max(8px, var(--safe-bottom)) max(8px, var(--safe-left));
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .bj-hud__head {
+    display: contents;
+  }
+
+  .bj-hud__head > .term-dim {
+    display: none;
+  }
+
+  .bj-hud__stake {
+    grid-area: stake;
+    align-self: center;
+  }
+
+  .bj-hud__status {
+    grid-area: status;
+    font-size: var(--step-1);
+  }
+
+  .bj-hud__help {
+    grid-area: help;
+    min-height: 2.8em;
+    line-height: 1.4;
+  }
+
+  .bj-hud__count {
+    grid-area: count;
+  }
+
+  .bj-hud__menu {
+    grid-area: menu;
+    align-self: end;
+  }
+
+  .bj-hud .term-button {
+    padding: 6px 12px;
+  }
+}
+
+/*
+ * Upright, the table sits low, near your thumbs, and the sign hangs on the
+ * wall above it. The stage is exactly as tall as the felt.
+ */
+@media (max-width: 900px) and (orientation: portrait) {
+  .bj-board {
+    grid-template-rows: minmax(0, 1fr) auto auto auto;
+  }
+
+  .bj-wall {
+    display: grid;
+    place-items: center;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .bj-wall .bj-sign {
+    font-size: clamp(var(--step-2), 11vw, var(--step-4));
+  }
+
+  .bj-stage {
+    height: calc((100vw - var(--safe-left) - var(--safe-right) - 16px) * 0.5 + 6px);
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .bj-game {
+    --hud-w: clamp(200px, 28vw, 260px);
+    grid-template-columns: minmax(0, 1fr) var(--hud-w);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .bj-board {
+    padding: max(4px, var(--safe-top)) 6px max(6px, var(--safe-bottom)) max(8px, var(--safe-left));
+  }
+
+  .bj-dealer-bar {
+    min-height: 34px;
+  }
+
+  .bj-controls {
+    padding: 6px 8px;
+  }
+
+  .bj-rack__chip {
+    width: 36px;
+    height: 36px;
+  }
+
+  .bj-button {
+    padding: 7px 12px 6px;
+  }
+
+  /* A column of its own on the right: status, stake, hint, count, then the Menu. */
+  .bj-hud.screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'status' 'stake' 'help' 'count' 'menu';
+    margin: max(6px, var(--safe-top)) max(8px, var(--safe-right)) max(6px, var(--safe-bottom)) 0;
+  }
+
+  .bj-hud__stake {
+    align-self: start;
+  }
+
+  .bj-hud__menu {
+    justify-self: start;
   }
 }

@@ -34,10 +34,11 @@ npm run dev          # http://localhost:5173
 - **Rules are plain TypeScript.** Each game’s engine (`engine.ts`) has no React in it: create a game, list legal moves, apply a move. The UI and the AI both drive games through that interface, which is what makes the rules testable.
 - **Seeded randomness** (`src/core/rng.ts`) so any game can be replayed from its seed.
 - **3D tables** are CSS 3D transforms, not WebGL. Caravan's play area tilts away from you in perspective, and cards land from the player's side and turn over as they're dealt and played (`src/games/caravan/caravan-3d.css`). The Blackjack felt tilts the same way, with chip stacks that rise off it (`src/games/blackjack/blackjack-3d.css`). It's on by default; switch to the flat view in Settings or with *3D view* at the table.
-- **Phones** get their own layouts rather than a shrunken desktop. Caravan's table has a compact layout for phones and small windows (`caravan.css`, under *The table on phones and small windows*):
+- **Phones** get their own layouts rather than a shrunken desktop. Each table has a compact layout for phones and small windows (in Caravan's, `caravan.css`, under *The table on phones and small windows*):
   - Held upright, the opponent, board and HUD stack. Held sideways, the board fills the left and the opponent and HUD share a column on the right, with your hand hanging off the bottom edge.
   - Cards are sized from the screen so three caravans fit across and both rows have room to grow. When your hand doesn't fit, its cards overlap and you tap the strip you can see.
   - The move log, rules, 3D switch and *Leave table* sit behind a *Menu* button.
+  - At the Blackjack table, cards and chips grow against the felt so they stay readable. Held upright, the table sits low, near your thumbs, with the neon sign on the wall above it; held sideways, the HUD takes a column on the right. The log and table controls go behind *Menu* there too (`blackjack.css`, under *The table on phones and small windows*).
   - The hub menu opens a game with a second tap. Hover effects only apply where there's a mouse, so nothing sticks after a tap, and layouts keep clear of notches and the home indicator.
   - Added to a home screen, the hub opens full screen (`public/manifest.webmanifest`).
 - **Screen transitions** are CSS animations driven by `src/navigation.ts`. Entering a game powers the terminal off and lights the table's lamp; leaving reverses it. They can be turned off in Settings and are skipped when the system asks for reduced motion.

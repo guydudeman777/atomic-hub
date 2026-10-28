@@ -1,6 +1,7 @@
 import { Link } from '../../../router'
 import { useSave } from '../../../store/save'
 import { Lobby } from './Lobby'
+import { NeonSign } from './NeonSign'
 import { RulesText, StrategyChart } from './Rules'
 import { Table } from './Table'
 import '@fontsource/limelight/latin-400.css'
@@ -33,12 +34,7 @@ export default function BlackjackApp({ path }: { path: string }) {
         <Link to="/" className="bj-back">
           Back to the hub
         </Link>
-        <h1 className="bj-sign">
-          <svg className="bj-sign__star" viewBox="-10 -10 20 20" aria-hidden="true">
-            <path d="M0-10L1.6-1.6 10 0 1.6 1.6 0 10-1.6 1.6-10 0-1.6-1.6Z" />
-          </svg>
-          Blackjack
-        </h1>
+        <NeonSign />
         <nav className="bj-nav" aria-label="Blackjack">
           {SECTIONS.map((s) => (
             <Link key={s.path} to={s.path} className="bj-nav__link" aria-current={path === s.path ? 'page' : undefined}>

@@ -1,5 +1,5 @@
 import { type Locator, type Page, expect, test } from '@playwright/test'
-import { skipBoot, watchErrors } from './helpers.ts'
+import { finishBlackjackRound, skipBoot, watchErrors } from './helpers.ts'
 
 // Runs in the "phone" project (playwright.config.ts): a touch phone held upright, unless a test turns it.
 
@@ -54,6 +54,9 @@ test.describe('on the narrowest phones', () => {
       ['/caravan/decks', page.getByRole('button', { name: 'Save deck' })],
       ['/caravan/trader', page.getByRole('heading', { name: 'The Trader' })],
       ['/caravan/rules', page.getByRole('heading', { name: 'How to play Caravan' })],
+      ['/blackjack', page.getByRole('button', { name: 'Take a seat' })],
+      ['/blackjack/strategy', page.getByRole('heading', { name: 'Basic strategy' })],
+      ['/blackjack/rules', page.getByRole('heading', { name: 'How to play' })],
     ]
     for (const [path, landmark] of screens) {
       await page.goto(`/#${path}`)
@@ -127,6 +130,65 @@ test.describe('held sideways', () => {
     expect(hudBox!.x).toBeGreaterThanOrEqual(feltBox!.x + feltBox!.width)
 
     await playOpening(page)
+    expect(errors).toEqual([])
+  })
+})
+
+/** Sit down at a full Blackjack table and deal the first round. */
+async function sitAndDeal(page: Page) {
+  await page.goto('/#/blackjack')
+  await page.getByRole('button', { name: 'Take a seat' }).tap()
+  const deal = page.getByRole('button', { name: /^Deal/ })
+  await deal.tap()
+  await expect(deal).toBeHidden()
+}
+
+for (const view of ['3D', 'flat'] as const) {
+  test(`the Blackjack table fits a phone held upright and plays by tap (${view} view)`, async ({ page }) => {
+    const errors = watchErrors(page)
+    if (view === 'flat') {
+      await page.goto('/#/settings')
+      await page.getByLabel('3D tables').uncheck()
+    }
+    await sitAndDeal(page)
+
+    // Your plate, the dealer, your rail and the HUD are all on screen.
+    await expectOnScreen(page, page.locator('.bj-plate.is-you'))
+    await expectOnScreen(page, page.locator('.bj-dealer-bar'))
+    await expectOnScreen(page, page.locator('.bj-controls'))
+    await expectOnScreen(page, page.locator('.bj-hud'))
+    await finishBlackjackRound(page, { tap: true })
+
+    // The log and table controls wait behind the Menu.
+    await expect(page.getByRole('list', { name: 'Table log' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Menu' }).tap()
+    const menu = page.getByRole('dialog', { name: 'Table menu' })
+    await expect(menu.getByRole('list', { name: 'Table log' }).getByText(/^(You win|Blackjack! You win|You lose|Push)/)).toHaveCount(1)
+    await expect(menu.getByRole('button', { name: '3D view' })).toHaveAttribute('aria-pressed', view === '3D' ? 'true' : 'false')
+    await menu.getByRole('button', { name: 'Back to the game' }).tap()
+    await expect(menu).toHaveCount(0)
+    expect(errors).toEqual([])
+  })
+}
+
+test.describe('at the Blackjack table held sideways', () => {
+  test.use({ viewport: { width: 863, height: 360 } })
+
+  test('the felt sits beside the HUD, clear of your rail, and a round plays by tap', async ({ page }) => {
+    const errors = watchErrors(page)
+    await sitAndDeal(page)
+    const plate = page.locator('.bj-plate.is-you')
+    const controls = page.locator('.bj-controls')
+    const hud = page.locator('.bj-hud')
+    await expectOnScreen(page, plate)
+    await expectOnScreen(page, controls)
+    await expectOnScreen(page, hud)
+    const plateBox = await plate.boundingBox()
+    const controlsBox = await controls.boundingBox()
+    const hudBox = await hud.boundingBox()
+    expect(plateBox!.y + plateBox!.height).toBeLessThanOrEqual(controlsBox!.y + 1)
+    expect(hudBox!.x).toBeGreaterThanOrEqual(controlsBox!.x + controlsBox!.width)
+    await finishBlackjackRound(page, { tap: true })
     expect(errors).toEqual([])
   })
 })

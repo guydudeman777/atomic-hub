@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useRef, useState } from 'react'
 import type { Card } from '../../../core/cards'
 import { PlayingCard } from '../../../components/PlayingCard'
+import { useMediaQuery } from '../../../components/useMediaQuery'
 import { playSfx } from '../../../core/audio/sfx'
 import { navigate } from '../../../navigation'
 import { useSave } from '../../../store/save'
@@ -41,8 +42,16 @@ import {
   inSpot,
   plateOf,
 } from './layout'
+import { NeonSign } from './NeonSign'
 import { RulesText } from './Rules'
 import { type Occupant, type Remark, canBet, useSession, yourStake } from './session'
+
+/**
+ * Phones and small windows get the compact table in blackjack.css, whose
+ * media queries match this one: the HUD keeps its log and table controls
+ * behind a Menu button.
+ */
+const COMPACT_TABLE = '(max-width: 900px), (max-height: 520px)'
 
 /** How long the dealer and the regulars take over each step, in ms. */
 function pace(state: TableState): number {
@@ -130,6 +139,10 @@ function TableView() {
   return (
     <div className="bj-game">
       <div className="bj-board">
+        {/* On a phone held upright, the wall above the table, where the sign hangs. */}
+        <div className="bj-wall" aria-hidden="true">
+          <NeonSign as="div" />
+        </div>
         <DealerBar name={stakes!.dealer.name} call={call} limits={`${stakes!.limits.min} to ${stakes!.limits.max} caps`} table={stakes!.name} />
 
         <div className="bj-stage">
@@ -579,10 +592,24 @@ function Hud({ advice, hand }: { advice: PlayerAction | null; hand: Hand | null 
   const caps = useSave((s) => s.wallet.caps)
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [showRules, setShowRules] = useState(false)
+  const compact = useMediaQuery(COMPACT_TABLE)
+  const [menuOpen, setMenuOpen] = useState(false)
+  // The menu belongs to the compact layout. Turning a tablet can leave it, and it stays closed.
+  if (menuOpen && !compact) setMenuOpen(false)
+  const closeMenu = () => {
+    setMenuOpen(false)
+    setConfirmLeave(false)
+  }
   const logRef = useRef<HTMLOListElement>(null)
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight })
-  }, [log])
+  }, [log, menuOpen])
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeMenu()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
   const s = state!
   const onTable = yourStake(s)
   const up = upCard(s)
@@ -591,12 +618,57 @@ function Hud({ advice, hand }: { advice: PlayerAction | null; hand: Hand | null 
   if (coach && advice && hand && up) help = `The book says ${ACTION_LABEL[advice].toLowerCase()} on ${describeHand(hand.cards)} against ${describeUp(up)}.`
   else if (coach && s.phase === 'insurance' && actor(s) === YOUR_SPOT) help = 'The book never takes insurance.'
   else if (canBet(s) && caps < stakes!.limits.min) help = 'You’re out of caps for this table.'
-  else if (canBet(s)) help = 'Click chips to bet, then deal. Your bet stays up for the next round.'
+  else if (canBet(s)) help = `${compact ? 'Tap' : 'Click'} chips to bet, then deal. Your bet stays up for the next round.`
 
   const decks = cardsLeft(s) / 52
   const tc = trueCount(s)
 
   const getUp = () => void navigate('/blackjack', { during: leave })
+
+  const tableLog = (
+    <ol className="bj-hud__log" ref={logRef} aria-label="Table log">
+      {log.map((e) => (
+        <li key={e.id} data-mine={e.mine || undefined}>
+          {e.text}
+        </li>
+      ))}
+    </ol>
+  )
+  const tableControls = (
+    <div className="bj-hud__foot">
+      <button
+        className="term-button"
+        onClick={() => {
+          closeMenu()
+          setShowRules(true)
+        }}
+      >
+        Rules
+      </button>
+      <button className="term-button" aria-pressed={coach} onClick={() => updateBlackjack({ coach: !coach })}>
+        <span aria-hidden="true">{coach ? '[x]' : '[ ]'}</span> Coach
+      </button>
+      <button className="term-button" aria-pressed={count} onClick={() => updateBlackjack({ count: !count })}>
+        <span aria-hidden="true">{count ? '[x]' : '[ ]'}</span> Count
+      </button>
+      <button className="term-button" aria-pressed={table3d} onClick={() => updateSettings({ table3d: !table3d })}>
+        <span aria-hidden="true">{table3d ? '[x]' : '[ ]'}</span> 3D view
+      </button>
+      {onTable === 0 ? (
+        <button className="term-button" onClick={getUp}>
+          Leave table
+        </button>
+      ) : confirmLeave ? (
+        <button className="term-button" onClick={getUp}>
+          Forfeit {onTable} caps
+        </button>
+      ) : (
+        <button className="term-button" onClick={() => setConfirmLeave(true)}>
+          Leave table
+        </button>
+      )}
+    </div>
+  )
 
   return (
     <aside className="bj-hud screen" aria-label="Game status">
@@ -615,40 +687,24 @@ function Hud({ advice, hand }: { advice: PlayerAction | null; hand: Hand | null 
           Running {formatCount(runningCount(s))}, true {formatCount(Math.round(tc * 10) / 10)}, {decks.toFixed(1)} decks left
         </p>
       )}
-      <ol className="bj-hud__log" ref={logRef} aria-label="Table log">
-        {log.map((e) => (
-          <li key={e.id} data-mine={e.mine || undefined}>
-            {e.text}
-          </li>
-        ))}
-      </ol>
-      <div className="bj-hud__foot">
-        <button className="term-button" onClick={() => setShowRules(true)}>
-          Rules
+      {compact && (
+        <button className="term-button bj-hud__menu" aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
+          Menu
         </button>
-        <button className="term-button" aria-pressed={coach} onClick={() => updateBlackjack({ coach: !coach })}>
-          <span aria-hidden="true">{coach ? '[x]' : '[ ]'}</span> Coach
-        </button>
-        <button className="term-button" aria-pressed={count} onClick={() => updateBlackjack({ count: !count })}>
-          <span aria-hidden="true">{count ? '[x]' : '[ ]'}</span> Count
-        </button>
-        <button className="term-button" aria-pressed={table3d} onClick={() => updateSettings({ table3d: !table3d })}>
-          <span aria-hidden="true">{table3d ? '[x]' : '[ ]'}</span> 3D view
-        </button>
-        {onTable === 0 ? (
-          <button className="term-button" onClick={getUp}>
-            Leave table
-          </button>
-        ) : confirmLeave ? (
-          <button className="term-button" onClick={getUp}>
-            Forfeit {onTable} caps
-          </button>
-        ) : (
-          <button className="term-button" onClick={() => setConfirmLeave(true)}>
-            Leave table
-          </button>
-        )}
-      </div>
+      )}
+      {!compact && tableLog}
+      {!compact && tableControls}
+      {menuOpen && (
+        <div className="bj-overlay" role="dialog" aria-modal="true" aria-label="Table menu" onClick={closeMenu}>
+          <div className="bj-menu screen" onClick={(e) => e.stopPropagation()}>
+            {tableLog}
+            {tableControls}
+            <button className="term-button term-button--primary" autoFocus onClick={closeMenu}>
+              Back to the game
+            </button>
+          </div>
+        </div>
+      )}
       {showRules && (
         <div className="bj-overlay" role="dialog" aria-modal="true" aria-label="Blackjack rules" onClick={() => setShowRules(false)}>
           <div className="bj-panel bj-rules-modal" onClick={(e) => e.stopPropagation()}>

@@ -12,17 +12,24 @@
 :root[data-table3d='on'] .bj-stage {
   perspective: 1500px;
   perspective-origin: 50% -20%;
-  align-items: end;
 }
 
+/*
+ * Tilted back from its near edge, which stays put at the bottom of the
+ * stage. (Grid alignment would let a felt taller than the stage hang down
+ * over your rail instead.)
+ */
 :root[data-table3d='on'] .bj-felt {
   --tilt: 27deg;
   /* The far edge, the widest part of the table, shrinks into the distance; so does its height. */
   --u: calc(min(104cqw, 230cqh) / 1000);
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  translate: -50% 0;
   transform-origin: 50% 100%;
   transform: rotateX(var(--tilt));
   transform-style: preserve-3d;
-  margin-bottom: 4px;
 }
 
 :root[data-table3d='on'] .bj-card {

@@ -1,5 +1,5 @@
 import { type Page, expect, test } from '@playwright/test'
-import { skipBoot, watchErrors } from './helpers.ts'
+import { finishBlackjackRound, skipBoot, watchErrors } from './helpers.ts'
 
 test.beforeEach(async ({ page }) => {
   await skipBoot(page)
@@ -148,19 +148,7 @@ async function playRound(page: Page) {
   await expect(deal).toBeEnabled()
   await deal.click()
   await expect(deal).toBeHidden()
-  await finishRound(page)
-}
-
-/** Stand and decline until the round is paid and the Deal button is back. */
-async function finishRound(page: Page) {
-  const deal = page.getByRole('button', { name: /^Deal/ })
-  const stand = page.getByRole('button', { name: /^Stand/ })
-  const decline = page.getByRole('button', { name: /^(No insurance|Play it out)/ })
-  await expect(async () => {
-    if (await decline.isEnabled({ timeout: 100 }).catch(() => false)) await decline.click({ timeout: 500 }).catch(() => {})
-    else if (await stand.isEnabled({ timeout: 100 }).catch(() => false)) await stand.click({ timeout: 500 }).catch(() => {})
-    await expect(deal).toBeVisible({ timeout: 300 })
-  }).toPass({ timeout: 30_000 })
+  await finishBlackjackRound(page)
 }
 
 for (const view of ['3D', 'flat'] as const) {
@@ -209,7 +197,7 @@ test('one on one with the dealer, with the coach pointing at a play', async ({ p
   const advised = page.locator('.bj-button.is-advised')
   await expect(advised.or(deal)).toBeVisible({ timeout: 15_000 })
   if (await advised.isVisible()) await expect(page.locator('.bj-hud__help')).toContainText(/The book (says|never)/)
-  await finishRound(page)
+  await finishBlackjackRound(page)
   expect(errors).toEqual([])
 })
 

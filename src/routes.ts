@@ -48,6 +48,9 @@ export const GAME_SCREENS: readonly GameScreen[] = [
   gameScreen('/draw', () => import('./games/draw/ui/DrawApp')),
   gameScreen('/craps', () => import('./games/craps/ui/CrapsApp')),
   gameScreen('/reversi', () => import('./games/reversi/ui/ReversiApp')),
+  gameScreen('/connect4', () => import('./games/connect4/ui/Connect4App')),
+  gameScreen('/tictactoe', () => import('./games/tictactoe/ui/TicTacToeApp')),
+  gameScreen('/roulette', () => import('./games/roulette/ui/RouletteApp')),
 ]
 
 export function screenFor(path: string): GameScreen | undefined {

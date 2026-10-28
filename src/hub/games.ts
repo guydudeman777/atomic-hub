@@ -57,9 +57,9 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'Jacks or Better on a full-pay table. Hold, draw, collect.',
   },
   {
-    id: 'roulette', name: 'Roulette', category: 'casino', ready: false, path: '/roulette', icon: 'wheel',
-    modes: 'Against the house',
-    blurb: 'Single-zero wheel with every inside and outside bet.',
+    id: 'roulette', name: 'Roulette', category: 'casino', ready: true, path: '/roulette', icon: 'wheel',
+    modes: 'Against the house, with regulars at the table, or online with friends',
+    blurb: 'A European, French or American wheel with every inside and outside bet, in a gilded salon on the Riviera.',
   },
   {
     id: 'craps', name: 'Craps', category: 'casino', ready: true, path: '/craps', icon: 'dice',
@@ -72,9 +72,9 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'Three reels of wasteland junk with a published paytable.',
   },
   {
-    id: 'connect4', name: 'Connect Four', category: 'board', ready: false, path: '/connect4', icon: 'connect4',
-    modes: 'Against the AI or hot-seat',
-    blurb: 'Drop discs, line up four.',
+    id: 'connect4', name: 'Connect Four', category: 'board', ready: true, path: '/connect4', icon: 'connect4',
+    modes: 'Four opponents on a ladder, hot-seat, or online',
+    blurb: 'Drop checkers, line up four. In the big blue rack at the end of the boardwalk midway.',
   },
   {
     id: 'checkers', name: 'Checkers', category: 'board', ready: false, path: '/checkers', icon: 'grid',
@@ -92,8 +92,8 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'Hide your fleet, then hunt theirs.',
   },
   {
-    id: 'tictactoe', name: 'Tic-Tac-Toe', category: 'board', ready: false, path: '/tictactoe', icon: 'xo',
-    modes: 'Against the AI or hot-seat',
-    blurb: 'Classic 3×3, or Ultimate on a 9×9 board.',
+    id: 'tictactoe', name: 'Tic-Tac-Toe', category: 'board', ready: true, path: '/tictactoe', icon: 'xo',
+    modes: 'Four opponents on a ladder, hot-seat, or online',
+    blurb: 'Classic 3×3, or Ultimate on a 9×9 board, in grease pencil on a placemat at the Starlite Diner.',
   },
 ]

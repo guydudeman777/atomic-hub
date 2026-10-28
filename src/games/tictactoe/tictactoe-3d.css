@@ -1,0 +1,113 @@
+/*
+ * The 3D table, on while Settings → 3D tables is (html[data-table3d='on']).
+ * Plain CSS 3D transforms, as at the other tables:
+ *
+ * - The Formica, the placemat and everything on them are one plane tilted
+ *   away from you by --tilt, seen from the booth through the stage's
+ *   perspective. Its near edge stays put at the bottom of the stage.
+ * - The cup and the pie stand up off the table a little, and the tabletop
+ *   has a chrome front edge you can see.
+ * - The placemat lies flat on the Formica, its squares a hair above it.
+ *
+ * filter, opacity below 1 and overflow flatten 3D for everything inside, so
+ * keep them off the chain from the plane down to the squares.
+ */
+
+:root[data-table3d='on'] .tt-stage {
+  perspective: 1400px;
+  /* Seen from above the top of the stage: the far edge shrinks toward it but never past it. */
+  perspective-origin: 50% 0;
+}
+
+:root[data-table3d='on'] .tt-plane {
+  --tilt: 30deg;
+  /*
+   * Tilted back, the placemat stands cos(tilt) as tall as it's deep, so it
+   * can be that much deeper than the stage is tall. It leaves room at the
+   * top for the far edge of the table, and the booth behind it.
+   */
+  --mat: min(100cqw - 48px, (100cqh - 110px) / cos(var(--tilt)));
+  position: absolute;
+  left: 50%;
+  bottom: 34px;
+  translate: -50% 0;
+  transform-origin: 50% 100%;
+  transform: rotateX(var(--tilt));
+  transform-style: preserve-3d;
+}
+
+:root[data-table3d='on'] .tt-formica {
+  transform: translateZ(-1px);
+}
+
+/* Flat, the table is seen from straight above and fills the view; the neon only shows over the booth in 3D. */
+:root:not([data-table3d='on']) .tt-stage__neon {
+  display: none;
+}
+
+/* The table's front edge: ribbed chrome, hanging down from the near side. */
+:root[data-table3d='on'] .tt-formica::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--mat) * 0.045);
+  transform-origin: 50% 100%;
+  transform: rotateX(90deg);
+  border-radius: 0 0 calc(var(--mat) * 0.06) calc(var(--mat) * 0.06);
+  background:
+    repeating-linear-gradient(180deg, #f2f4f6 0 2px, #9aa1a8 2px 4px),
+    var(--chrome);
+}
+
+/* The cup and the pie sit up off the Formica, casting their shadows on it. */
+:root[data-table3d='on'] .tt-cup {
+  transform: translateZ(calc(var(--mat) * 0.02));
+}
+
+:root[data-table3d='on'] .tt-pie {
+  transform: translateZ(calc(var(--mat) * 0.012));
+}
+
+/*
+ * Each layer sits half a pixel above the one below it. Browsers can't order
+ * hits between elements in the same plane, so without this, taps on a
+ * square could land on the placemat instead.
+ */
+:root[data-table3d='on'] :is(.tt-mat, .tt-board, .tt-grids, .tt-grid, .tt-cells) {
+  transform-style: preserve-3d;
+}
+
+:root[data-table3d='on'] .tt-mat {
+  transform: translateZ(0.5px);
+}
+
+:root[data-table3d='on'] .tt-board {
+  transform: translateZ(0.5px);
+}
+
+:root[data-table3d='on'] .tt-cells {
+  transform: translateZ(0.5px);
+}
+
+:root[data-table3d='on'] .tt-strike {
+  transform: translateZ(1.5px);
+}
+
+/* Held upright on a phone, the placemat is already deep; tipped back as far, its far edge would be a sliver. */
+@media (max-width: 900px) and (orientation: portrait) {
+  :root[data-table3d='on'] .tt-plane {
+    --tilt: 16deg;
+    --mat: min(100cqw - 10px, (100cqh - 18px) / cos(var(--tilt)));
+    bottom: 12px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  :root[data-table3d='on'] .tt-plane {
+    --tilt: 22deg;
+    --mat: min(100cqw - 24px, (100cqh - 22px) / cos(var(--tilt)));
+    bottom: 16px;
+  }
+}

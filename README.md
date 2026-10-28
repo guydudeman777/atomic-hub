@@ -7,9 +7,12 @@ A retro-futurist game hub for the browser: a phosphor-green terminal menu leadin
 - Blackjack at a blue-felt Vegas table, with a full table of regulars or one on one with the dealer, and a basic strategy coach.
 - Five-Card Draw in a saloon’s back room, fixed limit, heads up or against up to five regulars who bluff.
 - Craps on a green felt Vegas layout, with the dice in your hand, every standard bet, and regulars betting along at the rail.
+- Roulette in a gilded Riviera salon, on a European, French or American wheel, with every inside and outside bet and three regulars playing their systems.
 - Reversi on a walnut board in an atomic-age den, against a ladder of four opponents or a friend in hot-seat mode.
+- Connect Four at a booth on a boardwalk midway, against a ladder of four carnival folks or a friend in hot-seat mode.
+- Tic-Tac-Toe in a booth at the Starlite Diner, Classic or Ultimate, against a ladder of four regulars or a friend in hot-seat mode.
 
-**On the way:** Texas Hold’em, Solitaire, Video Poker, Roulette, Slots, Connect Four, Checkers, Battleship and Tic-Tac-Toe. See [docs/PLAN.md](docs/PLAN.md).
+**On the way:** Texas Hold’em, Solitaire, Video Poker, Slots, Checkers and Battleship. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Running it
 
@@ -35,12 +38,13 @@ npm run dev          # http://localhost:5173
 
 Every game has an **Online** tab in its lobby. One player hosts a table and gets a six-character code (K7Q-X2M) and an invite link (`#/reversi/join/K7QX2M`); the others type the code in or follow the link. Your name at the table is set there too, and saved.
 
-- **Reversi and Caravan:** two players. Reversi's host picks the colors, which swap every game; in Caravan each of you brings your own active deck. Getting up mid-game resigns. If a player's connection drops, the game waits for them to come back to their seat. These don't use caps or go on your record.
+- **Reversi, Connect Four, Tic-Tac-Toe and Caravan:** two players. In Reversi and Connect Four the host picks the colors, which swap every game. In Tic-Tac-Toe the host picks Classic or Ultimate and who plays X, and X and O swap every game. In Caravan each of you brings your own active deck. Getting up mid-game resigns. If a player's connection drops, the game waits for them to come back to their seat. These don't use caps or go on your record.
 - **Blackjack:** up to five players, each in their own spot, with regulars in the empty ones if the host wants. The deal goes out once everyone has bet (or sat out), or when the host deals without the stragglers.
 - **Five-Card Draw:** up to six, plus as many regulars as the host picks. Everyone sees the table from their own chair, with only their own cards face up. A hand is dealt once everyone has asked in.
 - **Craps:** up to four at the rail, betting on the same dice. The shooter keeps the dice until they seven out, then they go round the table.
+- **Roulette:** up to five at one wheel, each betting their own caps in their own chip color. The croupier spins once everyone has said they're done, or when the host spins without the stragglers. The host's browser picks the pocket and sends it with the spin, so nobody can read the next number off a seed. The regulars stay home online: every browser would seat different ones, and their chips sit on the layout.
 
-At the card tables and in Craps everyone plays their own caps, and the hands go on their own record. Friends can join between rounds and leave at any time.
+At the card tables, in Craps and at Roulette everyone plays their own caps, and the hands go on their own record. Friends can join between rounds and leave at any time.
 
 **How it works** (`src/net/`):
 
@@ -50,25 +54,25 @@ At the card tables and in Craps everyone plays their own caps, and the hands go 
 - **Catching up:** anyone joining late, or coming back after a reload, gets the setup and every input so far, and plays them through quietly, without touching their caps.
 - **Checksums:** guests send the host a checksum of their table after each input, and a guest whose table has drifted is told to rejoin.
 - **Limits:** every browser holds the whole seeded game, so someone poking around in devtools could see hidden cards. That's fine among friends, but it isn't cheat-proof. A few strict networks (some offices and mobile carriers) can't connect two browsers directly without a TURN relay, which the hub doesn't run.
-- **Testing:** `?net=local` in the address swaps the relays for a BroadcastChannel between tabs of one browser. The end-to-end tests use it to seat two or three tabs at one table (`e2e/online.spec.ts`), and it's handy for trying a table out alone.
+- **Testing:** `?net=local` in the address swaps the relays for a BroadcastChannel between tabs of one browser. The end-to-end tests use it to seat two or three tabs at one table (`e2e/online.spec.ts`, and the Connect Four, Tic-Tac-Toe and Roulette specs), and it's handy for trying a table out alone.
 
 ## How it’s built
 
 - **Vite + React + TypeScript**, Zustand for the saved state, a tiny hash router, Vitest and Playwright.
 - **Rules are plain TypeScript.** Each game’s engine (`engine.ts`) has no React in it: create a game, list legal moves, apply a move. The UI and the AI both drive games through that interface, which is what makes the rules testable.
 - **Seeded randomness** (`src/core/rng.ts`) so any game can be replayed from its seed.
-- **3D tables** are CSS 3D transforms, not WebGL. Caravan's play area tilts away from you in perspective, and cards land from the player's side and turn over as they're dealt and played (`src/games/caravan/caravan-3d.css`). The Blackjack and Five-Card Draw felts tilt the same way, with chip stacks that rise off them (`blackjack-3d.css`, `draw-3d.css`). The Craps dice are 3D cubes thrown from your rail: they hit the rubber-pyramid wall in time with their sound and tumble onto the seeded result (`craps.css`, `craps-3d.css`). Reversi's discs drop onto the felt, and the ones they flank roll over in 3D, ring by ring outward from the move, lifting as they turn; in the flat view they flip in place (`reversi.css`). It's on by default; switch to the flat view in Settings or with *3D view* at the table.
+- **3D tables** are CSS 3D transforms, not WebGL. Caravan's play area tilts away from you in perspective, and cards land from the player's side and turn over as they're dealt and played (`src/games/caravan/caravan-3d.css`). The Blackjack and Five-Card Draw felts tilt the same way, with chip stacks that rise off them (`blackjack-3d.css`, `draw-3d.css`). The Craps dice are 3D cubes thrown from your rail: they hit the rubber-pyramid wall in time with their sound and tumble onto the seeded result (`craps.css`, `craps-3d.css`). Reversi's discs drop onto the felt, and the ones they flank roll over in 3D, ring by ring outward from the move, lifting as they turn; in the flat view they flip in place (`reversi.css`). The Connect Four rack stands upright on the booth's counter with its front and back faces apart, and checkers fall between them under gravity and bounce as they land (`connect4-3d.css`). The roulette wheel and its felt share one tilted plane: the wheel turns one way and the ball the other, slowing until it drops, clatters off the deflectors and settles in the pocket the spin chose (`roulette.css`). Tic-Tac-Toe's placemat lies on the diner table in perspective, beside a cup and a slice of pie that stand up off the Formica, and every grid line and mark draws itself in grease pencil (`tictactoe.css`). It's on by default; switch to the flat view in Settings or with *3D view* at the table.
 - **Phones** get their own layouts rather than a shrunken desktop. Each table has a compact layout for phones and small windows (in Caravan's, `caravan.css`, under *The table on phones and small windows*):
   - Held upright, the opponent, board and HUD stack. Held sideways, the board fills the left and the opponent and HUD share a column on the right, with your hand hanging off the bottom edge.
   - Cards are sized from the screen so three caravans fit across and both rows have room to grow. When your hand doesn't fit, its cards overlap and you tap the strip you can see.
   - The move log, rules, 3D switch and *Leave table* sit behind a *Menu* button.
   - Held upright, the Blackjack table becomes a deep half ellipse that fills the screen, with the spots down its sides and cards about 1.7 times the size. Its depth fits the phone (`tallShape` in `src/games/blackjack/ui/layout.ts`). Held sideways, it's the usual half circle with its cards and chips grown against the felt, and the HUD takes a column on the right. The log and table controls go behind *Menu* there too (`blackjack.css`, under *The table on phones and small windows*).
-  - The Five-Card Draw felt becomes a tall oval held upright (`tallShape` in `src/games/draw/ui/layout.ts`), and the wide Craps layout re-lays into a tall column with bets big enough to tap (`tallShape` in `src/games/craps/ui/layout.ts`). The Reversi board stays square and as big as fits, either way up.
+  - The Five-Card Draw felt becomes a tall oval held upright (`tallShape` in `src/games/draw/ui/layout.ts`), and the wide Craps layout re-lays into a tall column with bets big enough to tap (`tallShape` in `src/games/craps/ui/layout.ts`). Held upright, the roulette layout turns to run down the screen beside the wheel, as you'd see it from the end of the table (`src/games/roulette/ui/layout.ts`), and tapping a number offers every bet on it, so splits and corners don't need a fingertip on a line. The Reversi board, the Connect Four rack and the Tic-Tac-Toe placemat stay as big as fits, either way up, with the wall above them taking any room left over when the phone's upright.
   - The hub menu opens a game with a second tap. Hover effects only apply where there's a mouse, so nothing sticks after a tap, and layouts keep clear of notches and the home indicator.
   - Added to a home screen, the hub opens full screen (`public/manifest.webmanifest`).
 - **Screen transitions** are CSS animations driven by `src/navigation.ts`. Entering a game powers the terminal off and lights the table's lamp; leaving reverses it. They can be turned off in Settings and are skipped when the system asks for reduced motion.
-- **Everything is drawn in code.** Cards, chips and the Blackjack felt are SVG, all audio is synthesized with Web Audio, and fonts (VT323 and Share Tech Mono for the terminal; Limelight for the casino, Monoton for its craps marquee, Rye for the saloon and Righteous for the den) are bundled from Fontsource. There are no third-party image or audio assets. The PNG app icons in `public/` are rendered from `favicon.svg` by `scripts/render-icons.mjs`.
-- **Sound** (`src/core/audio/`): warm card whooshes and landings, clay chips clacking, dice skipping down the felt and cracking off the wall, board discs set down and turned over, a small radio band playing generative swing, waltz and blues tunes (`score.ts` holds the music theory, and is unit tested), and saloon chatter from formant-synthesized voices. The terminal hears the saloon through a wall; at a table you're in the room. Repeated notes, phrases and applause are recorded once and replayed for the rest of the visit, which keeps the CPU cost low; at most two recordings are made at a time, so making them never starves the speakers. Music and chatter are scheduled three seconds ahead, so a busy moment (a hard opponent thinking on a phone) doesn't leave a gap, and if the page falls further behind the band picks up on the next bar rather than playing everything it missed at once.
+- **Everything is drawn in code.** Cards, chips and the Blackjack felt are SVG, all audio is synthesized with Web Audio, and fonts (VT323 and Share Tech Mono for the terminal; Limelight for the casino, Monoton for its craps marquee, Rye for the saloon, Righteous for the den, Poiret One for the salon, Bungee for the midway and Pacifico for the diner) are bundled from Fontsource. There are no third-party image or audio assets. The PNG app icons in `public/` are rendered from `favicon.svg` by `scripts/render-icons.mjs`.
+- **Sound** (`src/core/audio/`): warm card whooshes and landings, clay chips clacking, dice skipping down the felt and cracking off the wall, a roulette ball whirring round the track and rattling into its pocket, board discs set down and turned over, plastic checkers clacking into the rack and clattering out of it, grease pencil scratching a placemat, a small radio band playing generative swing, waltz and blues tunes (`score.ts` holds the music theory, and is unit tested), and saloon chatter from formant-synthesized voices. The terminal hears the saloon through a wall; at a table you're in the room. Repeated notes, phrases and applause are recorded once and replayed for the rest of the visit, which keeps the CPU cost low; at most two recordings are made at a time, so making them never starves the speakers. Music and chatter are scheduled three seconds ahead, so a busy moment (a hard opponent thinking on a phone) doesn't leave a gap, and if the page falls further behind the band picks up on the next bar rather than playing everything it missed at once.
 
 ```
 src/
@@ -82,7 +86,10 @@ src/
   games/blackjack/ engine.ts, strategy.ts, bots.ts, banter.ts, content.ts (tables, regulars), ui/
   games/draw/      engine.ts, strategy.ts, ai.ts, banter.ts, content.ts (tables, regulars), ui/
   games/craps/     engine.ts, odds.ts (exact house edges), calls.ts (the stickman), rail.ts (the regulars), content.ts (tables, bet guide), ui/
+  games/roulette/  engine.ts, odds.ts (exact house edges), calls.ts (the croupier), regulars.ts (systems and talk), content.ts (wheels, tables, bet guide), ui/
   games/reversi/   bits.ts, engine.ts, ai.ts, banter.ts, content.ts (opponents), ui/
+  games/connect4/  engine.ts, ai.ts, banter.ts, content.ts (opponents), ui/
+  games/tictactoe/ engine.ts, ai.ts, banter.ts, content.ts (opponents), ui/
 e2e/               Playwright smoke tests: smoke.spec.ts and <game>.spec.ts on a desktop, phone.spec.ts and <game>.phone.spec.ts on a phone
 scripts/           render-icons.mjs: the PNG app icons from favicon.svg
 ```
@@ -144,6 +151,18 @@ Every gambling game shares one caps balance. You start with 500. If you drop bel
 - **Guide:** says what any bet pays and its house edge as you point at or tap it, and lights up the pass line, then full odds behind it.
 - **The stickman and the rail:** the stickman calls every roll (“Yo-leven!”, “Six the hard way”, “Seven out, line away”). Three of five regulars play beside you (`rail.ts`), each betting their own caps on your dice through the same engine: Doc takes full odds, Lou bets the don’t, Rosa places the 6 and 8, Spike plays the hardways and Bea plays the field. They talk about points made, seven-outs, long hands and hardways, and when one goes broke someone else steps up. The crowd cheers a point made and groans at a seven-out.
 
+### Roulette
+
+- **Rules:** three wheels. The European wheel has 37 pockets and a single zero. The French wheel is the same wheel with la partage: when the ball finds zero, even-money bets lose only half, so they go down in twos and the half is whole caps. The American wheel has 38 pockets, with a double zero. Winning bets are paid and stay up; losing ones are swept. Any bet can come down until the spin. The full text is under *How to play*, and in the header of `src/games/roulette/engine.ts`.
+- **Bets:**
+  - Straight up 35 to 1, split 17, street 11, corner 8, six line 5, dozens and columns 2 to 1, and even money on red or black, odd or even, 1 to 18 or 19 to 36.
+  - Around the zero on a single-zero layout: the 0/1, 0/2 and 0/3 splits, the trios 0/1/2 and 0/2/3, and the first four at 8 to 1. On the American layout: the 0/00, 0/1, 0/2, 00/2 and 00/3 splits, the trios 0/1/2, 0/00/2 and 00/2/3, and the top line at 6 to 1.
+  - A mouse can click the lines between numbers. On a touch screen, tapping a number offers every bet on it; right-click or Shift+Enter does the same on a desktop.
+- **House edges:** worked out exactly in `odds.ts` by playing each bet through the engine against every pocket, and tested against the published figures. Every European bet costs 2.70%. On the French wheel the even chances cost 1.35% and the rest 2.70%. On the American wheel every bet costs 5.26%, and the top line 7.89%. The *Bets and odds* page shows the same numbers.
+- **Tables:** the Salon (inside bets 1 to 25 a number, outside 5 to 250), the Grand Salon (5 to 100, and 25 to 1,000) or the Salon Privé (25 to 500, and 100 to 5,000), each with its own croupier and chips. An inside bet takes the straight-up maximum for each number it covers. Caps go on the layout when you bet, and getting up hands everything back. Every spin you had bets on goes on the record, with its net caps.
+- **Guide:** says what any bet pays and its house edge as you point at or tap it. At the French wheel it lights up the even chances.
+- **The croupier and the regulars:** the croupier calls each number with its even chances (“Seventeen, black, odd, low”), and at the French wheel calls the game in French (“Dix-sept, noir, impair et manque”, “Rien ne va plus”). Three of six regulars sit in, each with their own caps and chip color (`regulars.ts`): Monsieur Duval doubles up on red after every loss, Contessa Lucia bets 7, 11 and 23 straight up, Professor Kranz climbs the Fibonacci sequence on black, Mr. Sterling plays the Bond spread, Mimi Laurent bets the last three numbers, and Colonel Ashby takes the two dozens the last number missed. They talk about their numbers, zeros, repeats and streaks. One who goes broke leaves, and someone else sits down a few spins later. The crowd cheers a straight-up hit.
+
 ### Reversi
 
 - **Rules:** tournament rules on an 8×8 board. White starts on d4 and e5, Black on d5 and e4, and Black moves first. A move must flank at least one line, and every flanked line turns, in all eight directions. You pass only when you have no move. The game ends when neither side can move, and any empty squares go to the winner. The full text is under *How to play*, and in the header of `src/games/reversi/engine.ts`.
@@ -155,6 +174,30 @@ Every gambling game shares one caps balance. You start with 500. If you drop bel
 - **Hot-seat:** two named players at one board. Nothing in Reversi is hidden, so there’s no handoff screen. Against the AI you choose your color, and the game goes on your record; leaving early counts as a loss. Hot-seat games don’t.
 - **On the board:** *Show moves* marks the squares you can play, and the last disc played wears an orange pip. A pass is announced over the board, and the AI waits until you’ve read it. Arrow keys and Enter play, or type a square’s name, such as D then 3.
 - **Table talk:** each opponent has lines for a corner taken, a pass, a sweep of six or more discs, and now and then an ordinary move. Nobody talks two moves running. `banter.ts` decides when they speak; their lines are in `content.ts`.
+
+### Connect Four
+
+- **Rules:** a 7×6 rack standing upright, with 21 checkers each. Red drops first, and a checker falls to the lowest empty hole in its column. Four in a row across, up or on a diagonal wins at once, and a full rack with no four is a draw. The full text is under *How to play*, and in the header of `src/games/connect4/engine.ts`.
+- **The AI:** negamax with alpha-beta on bitboards, in Pascal Pons's 49-bit layout kept as two 32-bit halves.
+  - In every position it takes a win if there is one, blocks if it must, and never drops just under a hole the other side wins with.
+  - Positions are judged by each side's threats. A threat on the rows a player wants for the endgame (odd rows for Red, even for Yellow) counts double, and checkers near the middle count a little.
+  - A transposition table carries over from move to move. The search deepens until its time budget runs out, and a search that reaches a full rack is an exact solve, checked against brute force in the tests.
+- **Opponents:** four of them, each unlocked by beating the one before. Skeeter Malone from the ring toss looks two moves ahead and often drops at random. Mabel Pruitt from the cotton-candy cart looks four ahead, and Vic Sharpe, the guess-your-weight pitchman, eight. Madame Zora the fortune teller searches as deep as 350 ms allows (13 plies from the opening on a desktop) and solves the last 24 holes. Self-play, all 49 two-move openings, each played from both colors:
+  - Mabel beats Skeeter 86.2% of the time.
+  - Vic beats Mabel 85.7% of the time.
+  - Madame Zora beats Vic 89.3% of the time.
+- **On the rack:** a checker waits over the column you point at. Click or tap a column, use ← → and Enter (or ↓), or press 1–7. The winning four light up and the bulbs along the awning chase. *Threats* marks every hole that would make four, in the color of whoever it's for. At *Play again* the slider is pulled and the last game's checkers fall out of the bottom. Against the AI the game goes on your record, and leaving early counts as a loss. Hot-seat games don't.
+- **Table talk:** each opponent has lines for a win blocked, a new threat, the middle of the bottom row, and now and then an ordinary drop. Nobody talks two moves running. `banter.ts` decides when they speak; their lines are in `content.ts`.
+
+### Tic-Tac-Toe
+
+- **Rules:** Classic is the 3×3: three in a row wins, and a full grid with no line is a cat’s game. Ultimate is nine small grids in a big 3×3. The square you mark sends your opponent to the matching grid; if that grid is won or full, they may play in any open grid instead. Three in a row wins a small grid, a full one counts for nobody, and three small grids in a row wins the game. X always moves first. The full text is under *How to play*, and in the header of `src/games/tictactoe/engine.ts`.
+- **Opponents:** four regulars, each unlocked by beating the one before at either game: Skip Dawson the paperboy, Bev Kowalski the waitress, Gus Petrakis the short-order cook, and Ambrose Whitlock at the end of the counter.
+  - Classic is solved exactly (`ai.ts`). Whitlock plays it perfectly, and among the moves that draw he picks the one that leaves you the most ways to go wrong, so nobody beats him there. The others miss wins or blocks now and then, or play without looking.
+  - Ultimate is played by Monte Carlo tree search, from 150 random playouts a move (Skip) to 30,000 smarter ones (Whitlock), capped at a second and a half. It thinks in short slices, so the table keeps moving.
+  - Self-play, half the games from each side. Classic, 2,000 games each: Bev beats Skip 68% of the time and loses 8%; Gus beats Bev 24% and draws 71%; Whitlock never loses, and draws 92% against Gus. Ultimate, 100 games each: Bev beats Skip 91% of the time, Gus beats Bev 90%, and Whitlock beats Gus 81%, with 15 draws.
+- **On the table:** the grid draws itself on the placemat at the start of each game, then every mark, with a waxy scratch. The winning three is struck through in the winner's pencil, and a won small grid gets one big mark. In Ultimate the grid you're sent to is run over with a highlighter. Keys 1–9 play as on a number pad (7 is the top left); in Ultimate a key picks the square in the grid you're sent to, or the grid and then the square when you're free. Arrow keys and Enter work too. The plates keep score for the sitting. Against the AI you keep your mark from game to game, and each game goes on your record; at hot-seat, X and O swap.
+- **Table talk:** each regular has lines for a fork, a block, a threat, a small grid won and being sent anywhere. Nobody talks two moves running. `banter.ts` decides when they speak; their lines are in `content.ts`.
 
 ## Credits
 

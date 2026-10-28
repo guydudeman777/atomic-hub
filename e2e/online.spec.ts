@@ -1,38 +1,10 @@
-import { type Browser, type Page, expect, test } from '@playwright/test'
-import { finishBlackjackRound, finishDrawHand, watchErrors } from './helpers.ts'
+import { type Page, expect, test } from '@playwright/test'
+import { finishBlackjackRound, finishDrawHand, hostTable, joinTable, twoPlayers, watchErrors } from './helpers.ts'
 
 /**
  * Online tables, with two tabs of one browser talking over a
  * BroadcastChannel (`?net=local`) instead of the Nostr relays.
  */
-
-async function twoPlayers(browser: Browser) {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
-  await context.addInitScript(() => sessionStorage.setItem('atomic-hub:booted', '1'))
-  const host = await context.newPage()
-  const guest = await context.newPage()
-  return { context, host, guest, errors: [watchErrors(host), watchErrors(guest)] }
-}
-
-/** Open the game's Online tab, set a name and host a table. Returns the code. */
-export async function hostTable(page: Page, game: string, name: string) {
-  await page.goto(`/?net=local#/${game}`)
-  await page.getByRole('tab', { name: 'Online' }).click()
-  await page.getByLabel('Your name at the table').fill(name)
-  await page.getByRole('button', { name: 'Host a table' }).click()
-  const code = (await page.locator('.net-code__value').textContent())!.replace('-', '')
-  expect(code).toMatch(/^[2-9A-Z]{6}$/)
-  return code
-}
-
-/** Follow the invite link, with a name set first. */
-export async function joinTable(page: Page, game: string, code: string, name: string) {
-  await page.goto(`/?net=local#/${game}`)
-  await page.getByRole('tab', { name: 'Online' }).click()
-  await page.getByLabel('Your name at the table').fill(name)
-  await page.goto(`/?net=local#/${game}/join/${code}`)
-  await expect(page.getByText(/Waiting for .+ to start/)).toBeVisible({ timeout: 10_000 })
-}
 
 test('two players play Reversi online, and a resignation ends it', async ({ browser }) => {
   const { context, host, guest, errors } = await twoPlayers(browser)

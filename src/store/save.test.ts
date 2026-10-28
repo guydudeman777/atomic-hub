@@ -73,13 +73,26 @@ describe('save store', () => {
     useSave.getState().updateDraw({ hints: false })
     useSave.getState().updateCraps({ guide: false })
     useSave.getState().updateReversi({ showMoves: false })
-    const { draw, craps, reversi, ...old } = snapshot(useSave.getState())
-    expect({ draw, craps, reversi }).toEqual({ draw: { hints: false }, craps: { guide: false }, reversi: { showMoves: false, beaten: {} } })
+    useSave.getState().updateConnect4({ threats: true })
+    useSave.getState().updateTicTacToe({ variant: 'ultimate' })
+    useSave.getState().updateRoulette({ guide: false })
+    const { draw, craps, reversi, connect4, tictactoe, roulette, ...old } = snapshot(useSave.getState())
+    expect({ draw, craps, reversi, connect4, tictactoe, roulette }).toEqual({
+      draw: { hints: false },
+      craps: { guide: false },
+      reversi: { showMoves: false, beaten: {} },
+      connect4: { threats: true, beaten: {} },
+      tictactoe: { variant: 'ultimate', beaten: {} },
+      roulette: { guide: false },
+    })
     expect(useSave.getState().importSave(JSON.stringify(old))).toEqual({ ok: true })
     const fresh = newSave()
     expect(useSave.getState().draw).toEqual(fresh.draw)
     expect(useSave.getState().craps).toEqual(fresh.craps)
     expect(useSave.getState().reversi).toEqual(fresh.reversi)
+    expect(useSave.getState().connect4).toEqual(fresh.connect4)
+    expect(useSave.getState().tictactoe).toEqual(fresh.tictactoe)
+    expect(useSave.getState().roulette).toEqual(fresh.roulette)
   })
 
   it('rejects files that are not saves', () => {

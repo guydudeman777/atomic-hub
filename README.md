@@ -54,7 +54,7 @@ At the card tables, in Craps and at Roulette everyone plays their own caps, and 
 - **Catching up:** anyone joining late, or coming back after a reload, gets the setup and every input so far, and plays them through quietly, without touching their caps.
 - **Checksums:** guests send the host a checksum of their table after each input, and a guest whose table has drifted is told to rejoin.
 - **Limits:** every browser holds the whole seeded game, so someone poking around in devtools could see hidden cards. That's fine among friends, but it isn't cheat-proof. A few strict networks (some offices and mobile carriers) can't connect two browsers directly without a TURN relay, which the hub doesn't run.
-- **Testing:** `?net=local` in the address swaps the relays for a BroadcastChannel between tabs of one browser. The end-to-end tests use it to seat two or three tabs at one table (`e2e/online.spec.ts`), and it's handy for trying a table out alone.
+- **Testing:** `?net=local` in the address swaps the relays for a BroadcastChannel between tabs of one browser. The end-to-end tests use it to seat two or three tabs at one table (`e2e/online.spec.ts`, and the Connect Four, Tic-Tac-Toe and Roulette specs), and it's handy for trying a table out alone.
 
 ## How it’s built
 

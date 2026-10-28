@@ -39,6 +39,9 @@ export type Sfx =
   | 'coin'
   | 'win'
   | 'lose'
+  // Connect Four
+  | 'checker'
+  | 'release'
 
 export interface SfxOptions {
   /** Stereo position, -1 (left) to 1 (right). */
@@ -175,6 +178,9 @@ const ACETATE = [1, 1.72, 2.67, 3.4]
 
 /** Partials of a board game disc: a thick wooden counter, low and dry. */
 const COUNTER = [1, 2.03, 3.1]
+
+/** Partials of a Connect Four checker: thin, hollow plastic, brighter than wood. */
+const PLASTIC = [1, 1.89, 3.05, 4.2]
 
 /** One die striking the table: a click on the felt with a little thump under it. */
 function knock(m: Mixer, out: AudioNode, t: number, level: number, pitch: number) {
@@ -425,5 +431,27 @@ const EFFECTS: Record<Sfx, Effect> = {
       mute.frequency.linearRampToValueAtTime(600, start + length)
       horn.connect(mute).connect(env).connect(out)
     })
+  },
+
+  checker: (m, out, t) => {
+    // A plastic checker hitting the one below it in the rack: a hollow clack,
+    // a little bounce, and a rattle as it settles between the faces.
+    metal(m, out, t, vary(1650, 0.08), 0.2, PLASTIC, 0.05)
+    land(m, out, t, vary(0.42, 0.12), 0.3)
+    metal(m, out, t + vary(0.085, 0.15), vary(1900, 0.1), 0.07, PLASTIC, 0.035)
+    slide(m, out, t + 0.1, 0.06, 2600, 1400, 0.03)
+  },
+
+  release: (m, out, t) => {
+    // The slider pulled from under the rack: a plastic scrape, then every
+    // checker clattering out onto the counter, column by column.
+    slide(m, out, t, 0.22, 900, 2200, 0.16)
+    metal(m, out, t + 0.2, vary(1200, 0.05), 0.12, PLASTIC, 0.04)
+    let at = t + 0.26
+    for (let i = 0; i < 16; i++) {
+      metal(m, out, at, vary(1500, 0.18), vary(0.13, 0.3) * (1 - i / 22), PLASTIC, 0.04)
+      if (i % 3 === 0) land(m, out, at + 0.01, vary(0.32, 0.25), 0.25)
+      at += vary(0.045, 0.45) * (i < 10 ? 1 : 1.5)
+    }
   },
 }

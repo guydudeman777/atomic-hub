@@ -1,6 +1,6 @@
 /**
- * The persistent save: caps, settings, stats, the Caravan collection and
- * Blackjack's table preferences.
+ * The persistent save: caps, settings, stats, the Caravan collection, and
+ * each table's preferences.
  * Stored in localStorage and exportable as a JSON file.
  */
 
@@ -63,6 +63,21 @@ export interface BlackjackSave {
   count: boolean
 }
 
+export interface DrawSave {
+  /** Mark the cards the book would keep before the draw. */
+  hints: boolean
+}
+
+export interface CrapsSave {
+  /** What each bet pays, and its house edge, shown as you point at it. */
+  guide: boolean
+}
+
+export interface ReversiSave {
+  /** Mark the squares you can play. */
+  showMoves: boolean
+}
+
 export interface SaveData {
   version: 1
   wallet: WalletState
@@ -70,6 +85,9 @@ export interface SaveData {
   stats: Record<string, GameStats>
   caravan: CaravanSave
   blackjack: BlackjackSave
+  draw: DrawSave
+  craps: CrapsSave
+  reversi: ReversiSave
 }
 
 export type GameResult = 'win' | 'loss' | 'draw'
@@ -88,6 +106,9 @@ interface SaveActions {
   setActiveCaravanDeck: (id: string) => void
   markBeaten: (opponentId: string) => void
   updateBlackjack: (patch: Partial<BlackjackSave>) => void
+  updateDraw: (patch: Partial<DrawSave>) => void
+  updateCraps: (patch: Partial<CrapsSave>) => void
+  updateReversi: (patch: Partial<ReversiSave>) => void
   importSave: (json: string) => { ok: true } | { ok: false; error: string }
   resetSave: () => void
 }
@@ -116,12 +137,15 @@ export const newSave = (): SaveData => ({
     beaten: {},
   },
   blackjack: { coach: true, count: false },
+  draw: { hints: true },
+  craps: { guide: true },
+  reversi: { showMoves: true },
 })
 
 /** Just the data fields, for export. */
 export function snapshot(state: SaveData): SaveData {
-  const { version, wallet, settings, stats, caravan, blackjack } = state
-  return { version, wallet, settings, stats, caravan, blackjack }
+  const { version, wallet, settings, stats, caravan, blackjack, draw, craps, reversi } = state
+  return { version, wallet, settings, stats, caravan, blackjack, draw, craps, reversi }
 }
 
 function isSaveData(value: unknown): value is SaveData {
@@ -209,6 +233,12 @@ export const useSave = create<SaveData & SaveActions>()(
 
       updateBlackjack: (patch) => set((s) => ({ blackjack: { ...s.blackjack, ...patch } })),
 
+      updateDraw: (patch) => set((s) => ({ draw: { ...s.draw, ...patch } })),
+
+      updateCraps: (patch) => set((s) => ({ craps: { ...s.craps, ...patch } })),
+
+      updateReversi: (patch) => set((s) => ({ reversi: { ...s.reversi, ...patch } })),
+
       importSave: (json) => {
         let parsed: unknown
         try {
@@ -218,7 +248,14 @@ export const useSave = create<SaveData & SaveActions>()(
         }
         if (!isSaveData(parsed)) return { ok: false, error: 'That file isn’t an Atomic Hub save.' }
         const base = newSave()
-        set({ ...parsed, settings: { ...base.settings, ...parsed.settings }, blackjack: { ...base.blackjack, ...parsed.blackjack } })
+        set({
+          ...parsed,
+          settings: { ...base.settings, ...parsed.settings },
+          blackjack: { ...base.blackjack, ...parsed.blackjack },
+          draw: { ...base.draw, ...parsed.draw },
+          craps: { ...base.craps, ...parsed.craps },
+          reversi: { ...base.reversi, ...parsed.reversi },
+        })
         return { ok: true }
       },
 
@@ -243,6 +280,9 @@ export const useSave = create<SaveData & SaveActions>()(
           stats: { ...current.stats, ...p.stats },
           caravan: { ...caravan, beaten: { ...caravan.beaten } },
           blackjack: { ...current.blackjack, ...p.blackjack },
+          draw: { ...current.draw, ...p.draw },
+          craps: { ...current.craps, ...p.craps },
+          reversi: { ...current.reversi, ...p.reversi },
         }
       },
     },

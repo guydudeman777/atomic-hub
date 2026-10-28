@@ -42,9 +42,9 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'No-limit Hold’em with blinds and side pots against bots with their own personalities.',
   },
   {
-    id: 'draw', name: 'Five-Card Draw', category: 'cards', ready: false, path: '/draw', icon: 'draw',
-    modes: '2–6 seats, AI or hot-seat',
-    blurb: 'Ante up, draw up to three, and bet it all on what you kept.',
+    id: 'draw', name: 'Five-Card Draw', category: 'cards', ready: true, path: '/draw', icon: 'draw',
+    modes: 'Up to five card sharps at a saloon table',
+    blurb: 'Ante up, draw up to three, and bet it all on what you kept. Fixed limit, in a back room where the regulars bluff.',
   },
   {
     id: 'solitaire', name: 'Solitaire', category: 'cards', ready: false, path: '/solitaire', icon: 'solitaire',
@@ -62,9 +62,9 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'Single-zero wheel with every inside and outside bet.',
   },
   {
-    id: 'craps', name: 'Craps', category: 'casino', ready: false, path: '/craps', icon: 'dice',
-    modes: 'Against the house',
-    blurb: 'Pass line, come bets, odds and the field.',
+    id: 'craps', name: 'Craps', category: 'casino', ready: true, path: '/craps', icon: 'dice',
+    modes: 'Against the house, with the dice in your hand',
+    blurb: 'Pass line, come bets, odds, place bets and the field, on a green felt layout under the marquee lights.',
   },
   {
     id: 'slots', name: 'Slots', category: 'casino', ready: false, path: '/slots', icon: 'slots',
@@ -82,9 +82,9 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'American rules: forced captures, multi-jumps and kings.',
   },
   {
-    id: 'reversi', name: 'Reversi', category: 'board', ready: false, path: '/reversi', icon: 'reversi',
+    id: 'reversi', name: 'Reversi', category: 'board', ready: true, path: '/reversi', icon: 'reversi',
     modes: 'Against the AI or hot-seat',
-    blurb: 'Flank and flip. Corners win games.',
+    blurb: 'Flank and flip. Corners win games. On a walnut board in an atomic-age den.',
   },
   {
     id: 'battleship', name: 'Battleship', category: 'board', ready: false, path: '/battleship', icon: 'ships',

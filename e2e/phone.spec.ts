@@ -18,6 +18,14 @@ async function expectOnScreen(page: Page, locator: Locator) {
   expect(box.y + box.height).toBeLessThanOrEqual(screen.height + 1)
 }
 
+/** `upper` ends where `lower` starts or above it, so neither is drawn over the other. */
+async function expectAbove(upper: Locator, lower: Locator) {
+  const a = await upper.boundingBox()
+  const b = await lower.boundingBox()
+  if (!a || !b) throw new Error('Nothing to measure')
+  expect(a.y + a.height).toBeLessThanOrEqual(b.y + 1)
+}
+
 async function dealAgainstTheAi(page: Page) {
   await page.goto('/#/caravan')
   await page.getByRole('button', { name: 'Deal' }).tap()
@@ -176,6 +184,29 @@ for (const view of ['3D', 'flat'] as const) {
     expect(errors).toEqual([])
   })
 }
+
+test('the Blackjack table stays between the dealer and your rail on any phone, either way up', async ({ page }) => {
+  await page.goto('/#/blackjack')
+  await page.getByRole('button', { name: 'Take a seat' }).tap()
+  await expect(page.getByRole('button', { name: /^Deal/ })).toBeVisible()
+  const dealer = page.locator('.bj-dealer-bar')
+  const felt = page.locator('.bj-felt')
+  const rail = page.locator('.bj-controls')
+  for (const view of ['3D', 'flat']) {
+    if (view === 'flat') {
+      await page.getByRole('button', { name: 'Menu' }).tap()
+      await page.getByRole('button', { name: '3D view' }).tap()
+      await page.getByRole('button', { name: 'Back to the game' }).tap()
+    }
+    for (const [width, height] of [[320, 568], [360, 640], [390, 664], [390, 844], [430, 932], [768, 1024], [740, 360], [863, 360]]) {
+      await page.setViewportSize({ width, height })
+      await expect(async () => {
+        await expectAbove(dealer, felt)
+        await expectAbove(felt, rail)
+      }, `${view} at ${width}×${height}`).toPass({ timeout: 2000 })
+    }
+  }
+})
 
 test.describe('at the Blackjack table held sideways', () => {
   test.use({ viewport: { width: 863, height: 360 } })

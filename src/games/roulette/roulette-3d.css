@@ -1,0 +1,116 @@
+/*
+ * The 3D table, on while Settings → 3D tables is (html[data-table3d='on']).
+ * Plain CSS 3D transforms, as at the other tables:
+ *
+ * - The wheel, the felt and the seats are one plane tilted away from you by
+ *   --tilt, seen from your chair through the stage's perspective. Its near
+ *   edge stays at the bottom of the stage.
+ * - The wheel sits in the table with its bowl's rim standing proud, and the
+ *   ball and its shadow ride the rotor. Chips stand off the felt in stacks.
+ * - Speech bubbles and the board of numbers stand up off the plane to face
+ *   you.
+ *
+ * filter, opacity below 1 and overflow flatten 3D for everything inside, so
+ * keep them off the chain from the plane down to the chips.
+ */
+
+:root[data-table3d='on'] .rl-stage {
+  perspective: 1600px;
+  perspective-origin: 50% 0;
+}
+
+:root[data-table3d='on'] .rl-plane {
+  --tilt: 24deg;
+  transform-origin: 50% 100%;
+  transform: rotateX(var(--tilt));
+  transform-style: preserve-3d;
+}
+
+:root[data-table3d='on'] :is(.rl-felt-spot, .rl-felt, .rl-wheel-spot, .rl-wheel, .rl-rotor, .rl-ball-orbit, .rl-stack) {
+  transform-style: preserve-3d;
+}
+
+/*
+ * Each layer sits a little above the one below it. Browsers can't order
+ * hits between elements in the same plane, so without this a click on a
+ * line could land on a number.
+ */
+:root[data-table3d='on'] :is(.rl-cell, .rl-box) {
+  transform: translateZ(0.5px);
+}
+
+:root[data-table3d='on'] .rl-zone {
+  transform: translateZ(1px);
+}
+
+/* Chips stack up off the felt rather than up the screen. */
+:root[data-table3d='on'] .rl-stack {
+  transform: translateZ(2px);
+}
+
+:root[data-table3d='on'] .rl-chip {
+  translate: none;
+  transform: translateZ(calc(var(--i) * 0.07 * var(--u)));
+}
+
+:root[data-table3d='on'] .rl-stack:not(.is-paid, .is-taken, .is-back) .rl-chip:last-child {
+  animation-name: rl-chip-drop-3d;
+}
+
+@keyframes rl-chip-drop-3d {
+  from {
+    transform: translateZ(calc((var(--i) * 0.07 + 0.5) * var(--u)));
+    opacity: 0;
+  }
+}
+
+/* The dolly stands up on its number. */
+:root[data-table3d='on'] .rl-dolly {
+  transform-origin: 50% 85%;
+  transform: translateZ(2px) rotateX(calc(var(--tilt) * -1));
+}
+
+/* Your result and the speech bubbles face you. */
+:root[data-table3d='on'] .rl-burst {
+  transform: translateZ(30px) rotateX(calc(var(--tilt) * -1));
+}
+
+:root[data-table3d='on'] .rl-side {
+  transform-origin: 50% 100%;
+  transform: translateZ(1px) rotateX(calc(var(--tilt) * -0.7));
+}
+
+/* The regulars' remarks hang in the air in front of everything on the table, the wheel included. */
+:root[data-table3d='on'] :is(.rl-side, .rl-seats, .rl-plate) {
+  transform-style: preserve-3d;
+}
+
+:root[data-table3d='on'] .rl-talk--seat {
+  transform: translateZ(60px);
+}
+
+/* The bowl stands proud of the table: its rim's wooden side shows below it. */
+:root[data-table3d='on'] .rl-wheel {
+  transform: translateZ(calc(var(--wheel) * 0.03));
+  box-shadow:
+    0 calc(var(--wheel) * 0.03) 0 #2a0e06,
+    0 calc(var(--wheel) * 0.05) calc(var(--wheel) * 0.08) rgba(0, 0, 0, 0.6);
+}
+
+/* The ball rolls on the rotor, a little above it. */
+:root[data-table3d='on'] .rl-ball {
+  transform: translateZ(calc(var(--wheel) * 0.01));
+}
+
+/* Held upright on a phone, the layout is already deep; tipped back as far, its far end would be a sliver. */
+@media (max-width: 900px) and (orientation: portrait) {
+  :root[data-table3d='on'] .rl-plane {
+    --tilt: 14deg;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  :root[data-table3d='on'] .rl-plane {
+    --tilt: 18deg;
+  }
+}

@@ -1,0 +1,2536 @@
+/*
+ * Roulette: a gilded salon on the Riviera. Black lacquer walls with gold
+ * deco fans, a chandelier's glow from above, and a deep burgundy felt with
+ * the layout printed in gold beside a mahogany-and-brass wheel. The
+ * lettering is Poiret One, a thin deco face. The in-game HUD reuses the
+ * hub's terminal screen. The 3D view is in roulette-3d.css.
+ *
+ * The felt is placed in layout units (--u, the side of one number's box)
+ * from positions worked out in ui/layout.ts; --fw and --fh are the
+ * layout's size in those units. The wheel is a size container, and its
+ * ball moves in cqw.
+ *
+ * No filter on .rl-plane or anything between it and the wheel: filters
+ * flatten 3D for everything inside.
+ */
+
+.rl {
+  --gold: #d8b25a;
+  --gold-bright: #f4dc96;
+  --gold-deep: #8a6420;
+  --ivory: #f2e9d6;
+  --ivory-dim: #bdb29a;
+  --lacquer: #120d0e;
+  --lacquer-hi: #241819;
+  --lacquer-deep: #070505;
+  --felt: #5c1222;
+  --felt-deep: #350914;
+  --felt-light: #7a1d30;
+  --pocket-red: #c3242f;
+  --pocket-black: #161213;
+  --pocket-green: #1b7a48;
+  --mint: #7fe0aa;
+  --rose: #ff9aa2;
+  --font-salon: 'Poiret One', 'Didot', 'Bodoni 72', 'Georgia', serif;
+  /* Numbers on the felt want more weight than Poiret One has: a classic Didone. */
+  --font-numerals: 'Didot', 'Bodoni 72', 'Bodoni MT', 'Georgia', serif;
+
+  color: var(--ivory);
+  min-height: var(--app-height);
+  font-family: var(--font-body);
+}
+
+/*
+ * The salon: black lacquer with gold deco fans, the chandelier's warm pool
+ * from above and the corners dark.
+ */
+.rl-salon {
+  background-color: #0d090a;
+  background-image:
+    radial-gradient(ellipse 55% 45% at 50% 0%, rgba(255, 214, 140, 0.22), transparent 70%),
+    radial-gradient(ellipse at 50% 55%, transparent 45%, rgba(0, 0, 0, 0.75) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23d8b25a' stroke-opacity='.11' stroke-width='1.2'%3E%3Cpath d='M0 48a48 48 0 0 1 96 0M12 48a36 36 0 0 1 72 0M24 48a24 24 0 0 1 48 0M36 48a12 12 0 0 1 24 0'/%3E%3Cpath d='M48 48V0M48 48L14 14M48 48L82 14M48 48L0 30M48 48L96 30'/%3E%3Cpath d='M-48 96a48 48 0 0 1 96 0M48 96a48 48 0 0 1 96 0' /%3E%3C/g%3E%3C/svg%3E");
+  background-attachment: fixed;
+}
+
+/* Phones don't keep fixed backgrounds still, and repaint them on every scroll. */
+@media (hover: none) {
+  .rl-salon {
+    background-attachment: scroll;
+  }
+}
+
+.rl-ink-dim {
+  color: var(--ivory-dim);
+}
+
+/* ---- Panels, buttons, fields ---------------------------------------------- */
+
+/* Black lacquer framed in a double gold rule, stepped at the corners. */
+.rl-panel {
+  position: relative;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(216, 178, 90, 0.08), transparent 60%),
+    linear-gradient(180deg, var(--lacquer-hi), var(--lacquer) 30%, var(--lacquer-deep));
+  border: 1px solid rgba(216, 178, 90, 0.55);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 0 0 4px var(--lacquer),
+    inset 0 0 0 5px rgba(216, 178, 90, 0.3),
+    0 18px 40px rgba(0, 0, 0, 0.55);
+  padding: clamp(18px, 2.2vw, 30px);
+}
+
+.rl-panel h2,
+.rl-panel h3 {
+  font-family: var(--font-salon);
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--gold-bright);
+  margin: 0 0 12px;
+  letter-spacing: 0.04em;
+}
+
+.rl-panel h2 {
+  font-size: var(--step-2);
+}
+
+.rl-panel h3 {
+  font-size: var(--step-1);
+  margin-top: 20px;
+  color: var(--gold);
+}
+
+.rl-panel p {
+  margin: 0 0 10px;
+}
+
+.rl-panel a {
+  color: var(--gold-bright);
+}
+
+.rl-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 9px 22px 8px;
+  border: 1px solid var(--gold);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #2a1d1e, #120c0d);
+  color: var(--ivory);
+  font-family: var(--font-salon);
+  font-size: var(--step-1);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  /* Poiret One is a hairline face; a touch of stroke keeps it legible on lacquer. */
+  -webkit-text-stroke: 0.025em currentColor;
+  text-decoration: none;
+  box-shadow:
+    inset 0 0 0 2px var(--lacquer),
+    inset 0 0 0 3px rgba(216, 178, 90, 0.35),
+    0 6px 14px rgba(0, 0, 0, 0.45);
+  transition:
+    translate 0.08s ease-out,
+    background-color 0.15s ease-out;
+}
+
+@media (hover: hover) {
+  .rl-button:hover:not(:disabled) {
+    background: linear-gradient(180deg, #3a2829, #1a1112);
+    border-color: var(--gold-bright);
+  }
+}
+
+.rl-button:active:not(:disabled) {
+  translate: 0 1px;
+}
+
+/* Gold leaf. */
+.rl-button--primary {
+  background: linear-gradient(180deg, #f6dd98, #d3a94e 48%, #a87a2c);
+  border-color: #fbe9b5;
+  color: #1a1208;
+  -webkit-text-stroke: 0.03em currentColor;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 245, 210, 0.35),
+    inset 0 -2px 0 rgba(90, 60, 10, 0.4),
+    0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+@media (hover: hover) {
+  .rl-button--primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #fbe6ad, #ddb45a 48%, #b4862f);
+  }
+}
+
+.rl-button--big {
+  font-size: var(--step-2);
+  padding: 13px 38px 12px;
+}
+
+.rl-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rl-key {
+  font-family: var(--font-body);
+  font-size: var(--step--1);
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  opacity: 0.6;
+  -webkit-text-stroke: 0;
+}
+
+.rl-field {
+  display: grid;
+  gap: 4px;
+}
+
+.rl-field > span {
+  font-size: var(--step--1);
+  color: var(--ivory-dim);
+}
+
+.rl-field input,
+.rl-field select {
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(216, 178, 90, 0.6);
+  border-radius: 2px;
+  background: #0a0707;
+  color: var(--ivory);
+}
+
+.rl :focus-visible {
+  box-shadow: 0 0 0 2px var(--lacquer-deep), 0 0 0 4px var(--gold-bright);
+}
+
+/* ---- Pages: lobby, bets and odds, rules -------------------------------------- */
+
+.rl-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.rl-header {
+  --gutter: clamp(16px, 3vw, 40px);
+  display: flex;
+  align-items: center;
+  gap: 10px clamp(14px, 2.4vw, 32px);
+  flex-wrap: wrap;
+  padding: max(14px, var(--safe-top)) max(var(--gutter), var(--safe-right)) 12px max(var(--gutter), var(--safe-left));
+  border-bottom: 1px solid rgba(216, 178, 90, 0.4);
+  box-shadow: 0 4px 0 -3px rgba(216, 178, 90, 0.25);
+  background: linear-gradient(180deg, rgba(5, 3, 3, 0.9), rgba(5, 3, 3, 0.45));
+}
+
+.rl-back,
+.rl-caps {
+  color: var(--ivory-dim);
+  text-decoration: none;
+  font-size: var(--step--1);
+}
+
+@media (hover: hover) {
+  .rl-back:hover,
+  .rl-caps:hover {
+    color: var(--ivory);
+  }
+}
+
+.rl-caps {
+  margin-left: auto;
+  font-family: var(--font-salon);
+  font-size: var(--step-1);
+  color: var(--gold-bright);
+  -webkit-text-stroke: 0.02em currentColor;
+}
+
+/* The sign over the salon door: gold capitals under a sunburst fan. */
+.rl-sign {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  margin: 0;
+  font-family: var(--font-salon);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.rl-sign__fan {
+  width: 1.9em;
+  height: auto;
+  margin-bottom: -0.1em;
+  font-size: var(--step-3);
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  overflow: visible;
+}
+
+.rl-sign__text {
+  font-size: var(--step-3);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  margin-right: -0.22em;
+  color: var(--gold-bright);
+  -webkit-text-stroke: 0.02em currentColor;
+  text-shadow:
+    0 0 18px rgba(244, 220, 150, 0.35),
+    0 2px 0 #5a3e10;
+}
+
+.rl-nav {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.rl-nav__link {
+  padding: 7px 14px 6px;
+  color: var(--ivory);
+  text-decoration: none;
+  font-family: var(--font-salon);
+  font-size: var(--step-1);
+  line-height: 1;
+  letter-spacing: 0.05em;
+  -webkit-text-stroke: 0.02em currentColor;
+  border-bottom: 1px solid transparent;
+}
+
+@media (hover: hover) {
+  .rl-nav__link:hover {
+    color: var(--gold-bright);
+  }
+}
+
+.rl-nav__link[aria-current='page'] {
+  color: var(--gold-bright);
+  border-bottom-color: var(--gold);
+}
+
+.rl-main {
+  --gutter: clamp(16px, 3vw, 40px);
+  flex: 1;
+  padding: clamp(16px, 2.6vw, 34px) max(var(--gutter), var(--safe-right)) max(40px, var(--safe-bottom)) max(var(--gutter), var(--safe-left));
+}
+
+.rl-page-panel {
+  max-width: 86ch;
+  margin: 0 auto;
+}
+
+.rl-lobby {
+  display: grid;
+  gap: 22px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.rl-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.rl-tab {
+  padding: 8px 18px 7px;
+  border: 1px solid rgba(216, 178, 90, 0.45);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--ivory);
+  font-family: var(--font-salon);
+  font-size: var(--step-1);
+  line-height: 1;
+  -webkit-text-stroke: 0.02em currentColor;
+}
+
+.rl-tab[aria-selected='true'] {
+  background: linear-gradient(180deg, #f6dd98, #c99d45);
+  border-color: #fbe9b5;
+  color: #1a1208;
+}
+
+.rl-resume {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+}
+
+.rl-resume p {
+  margin: 0;
+}
+
+/* The wheels: three cards, each with its wheel. */
+.rl-wheels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.rl-wheel-pick {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-areas:
+    'glyph name'
+    'glyph blurb'
+    'edge edge';
+  gap: 4px 14px;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid rgba(216, 178, 90, 0.3);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ivory);
+  text-align: left;
+}
+
+@media (hover: hover) {
+  .rl-wheel-pick:hover {
+    border-color: rgba(216, 178, 90, 0.7);
+  }
+}
+
+.rl-wheel-pick[aria-checked='true'] {
+  border-color: var(--gold-bright);
+  background: radial-gradient(ellipse at 30% 0%, rgba(216, 178, 90, 0.16), transparent 70%), rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(244, 220, 150, 0.5);
+}
+
+.rl-glyph {
+  grid-area: glyph;
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.6));
+}
+
+.rl-wheel-pick[aria-checked='true'] .rl-glyph {
+  animation: rl-glyph-turn 1.4s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@keyframes rl-glyph-turn {
+  from {
+    rotate: -120deg;
+  }
+}
+
+.rl-wheel-pick__name {
+  grid-area: name;
+  font-family: var(--font-salon);
+  font-size: var(--step-2);
+  line-height: 1;
+  color: var(--gold-bright);
+  -webkit-text-stroke: 0.02em currentColor;
+}
+
+.rl-wheel-pick__blurb {
+  grid-area: blurb;
+  font-size: var(--step--1);
+  color: var(--ivory-dim);
+  line-height: 1.4;
+}
+
+.rl-wheel-pick__edge {
+  grid-area: edge;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(216, 178, 90, 0.2);
+  font-size: var(--step--1);
+  color: var(--ivory);
+}
+
+/* The tables: limits signs in brass frames. */
+.rl-stakes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.rl-stake {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 14px 16px;
+  border: 1px solid rgba(216, 178, 90, 0.3);
+  border-radius: 2px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(122, 29, 48, 0.55), transparent 70%),
+    linear-gradient(180deg, #3d0c18, #22060d);
+  color: var(--ivory);
+  text-align: left;
+}
+
+@media (hover: hover) {
+  .rl-stake:hover {
+    border-color: rgba(216, 178, 90, 0.7);
+  }
+}
+
+.rl-stake[aria-checked='true'] {
+  border-color: var(--gold-bright);
+  box-shadow: inset 0 0 0 1px rgba(244, 220, 150, 0.5), 0 0 18px rgba(216, 178, 90, 0.2);
+}
+
+.rl-stake.is-short {
+  opacity: 0.6;
+}
+
+.rl-stake__name {
+  font-family: var(--font-salon);
+  font-size: var(--step-2);
+  line-height: 1;
+  color: var(--gold-bright);
+  -webkit-text-stroke: 0.02em currentColor;
+}
+
+.rl-stake__limits {
+  display: grid;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+}
+
+.rl-stake__blurb {
+  font-size: var(--step--1);
+  color: var(--ivory-dim);
+  line-height: 1.4;
+}
+
+.rl-stake__croupier {
+  font-size: var(--step--1);
+  font-style: italic;
+}
+
+.rl-lobby__go {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.rl-lobby__go p {
+  margin: 0;
+  max-width: 60ch;
+}
+
+.rl-regulars ul,
+.rl-primer ol {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 26px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rl-regulars li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: var(--step--1);
+  line-height: 1.45;
+}
+
+.rl-regulars strong,
+.rl-primer strong {
+  color: var(--gold-bright);
+  font-weight: 400;
+}
+
+.rl-primer ol {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  counter-reset: step;
+}
+
+.rl-primer li {
+  counter-increment: step;
+  font-size: var(--step--1);
+  line-height: 1.45;
+}
+
+.rl-primer li::before {
+  content: counter(step);
+  display: block;
+  font-family: var(--font-salon);
+  font-size: var(--step-3);
+  line-height: 1;
+  color: var(--gold);
+}
+
+.rl-room-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 4px 0 12px;
+}
+
+/* Rules and the odds table */
+
+.rl-rules ul {
+  margin: 0 0 10px;
+  padding-left: 1.2em;
+}
+
+.rl-rules li {
+  margin-bottom: 6px;
+}
+
+.rl-rules strong {
+  color: var(--gold-bright);
+  font-weight: 400;
+}
+
+.rl-rules__keys {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.rl-rules__keys dt {
+  color: var(--gold);
+}
+
+.rl-rules__keys dd {
+  margin: 0;
+}
+
+.rl-bets__scroll {
+  /* Positioned, so the table's visually hidden header scrolls inside it rather than widening the page. */
+  position: relative;
+  margin: 16px 0 4px;
+  overflow-x: auto;
+}
+
+.rl-odds {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.rl-odds th,
+.rl-odds td {
+  padding: 6px 12px 6px 0;
+  text-align: left;
+  border-bottom: 1px solid rgba(216, 178, 90, 0.15);
+  vertical-align: baseline;
+}
+
+.rl-odds thead th {
+  font-weight: 400;
+  color: var(--ivory-dim);
+  font-size: var(--step--1);
+}
+
+.rl-odds tbody th {
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.rl-odds__note {
+  color: var(--ivory-dim);
+  font-size: var(--step--1);
+}
+
+.rl-odds td:not(.rl-odds__note) {
+  white-space: nowrap;
+}
+
+.rl-odds [data-edge='low'] {
+  color: var(--mint);
+}
+
+.rl-odds [data-edge='mid'] {
+  color: var(--gold-bright);
+}
+
+.rl-odds [data-edge='high'] {
+  color: var(--rose);
+}
+
+/* ---- The table ------------------------------------------------------------- */
+
+.rl-game {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 22vw, 340px);
+  height: var(--app-height);
+  /* Clip rather than hide, so nothing can scroll the table out of place. */
+  overflow: hidden;
+  overflow: clip;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* No pull-to-refresh or rubber-banding mid-game. */
+:root:has(.rl-game) {
+  overscroll-behavior: none;
+}
+
+.rl-board {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  min-height: 0;
+  padding: max(10px, var(--safe-top)) clamp(10px, 1.6vw, 24px) max(12px, var(--safe-bottom)) max(clamp(10px, 1.6vw, 24px), var(--safe-left));
+}
+
+/* The croupier stands at the wheel; the table's sign sits off to the side. */
+.rl-croupier-bar {
+  position: relative;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 2px 6px;
+}
+
+.rl-croupier-bar__who {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rl-portrait {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--gold);
+  background: radial-gradient(circle at 40% 35%, #7a1d30, #2c0710);
+  color: var(--gold-bright);
+  box-shadow: inset 0 0 0 3px #120d0e;
+}
+
+.rl-portrait svg {
+  width: 60%;
+  height: 60%;
+}
+
+.rl-croupier-bar__name {
+  font-family: var(--font-salon);
+  font-size: var(--step-2);
+  line-height: 1;
+  color: var(--ivory);
+  -webkit-text-stroke: 0.02em currentColor;
+}
+
+/* On the left, so the croupier's calls have the room to the right. */
+.rl-placard {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  justify-items: start;
+  padding: 5px 12px 4px;
+  border: 1px solid var(--gold-deep);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #3d0c18, #22060d);
+  box-shadow: inset 0 0 0 2px #1a0509, inset 0 0 0 3px rgba(216, 178, 90, 0.3);
+  line-height: 1.2;
+}
+
+.rl-placard__table {
+  font-size: var(--step--1);
+  color: var(--ivory-dim);
+}
+
+.rl-placard__limits {
+  font-family: var(--font-salon);
+  color: var(--gold-bright);
+  font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 0.02em currentColor;
+}
+
+.rl-placard__sep {
+  color: var(--gold-deep);
+}
+
+/*
+ * The stage holds the wheel, the felt and the seats, as big as fits. Its
+ * own stacking order keeps the felt's z-indexes inside it, under the HUD and
+ * its menus.
+ *
+ * Wide, the felt takes the stage's width and up to 56% of its height; the
+ * wheel takes the rest of the height, at the top on the left, with the
+ * board of numbers and the seats beside it.
+ */
+.rl-stage {
+  position: relative;
+  z-index: 0;
+  min-height: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+}
+
+.rl-plane {
+  --gap: clamp(8px, 1.4cqw, 18px);
+  --u: min(100cqw / var(--fw), (100cqh - var(--gap)) * 0.56 / var(--fh));
+  --felt-w: calc(var(--fw) * var(--u));
+  --felt-h: calc(var(--fh) * var(--u));
+  --wheel: min(100cqh - var(--felt-h) - var(--gap), 46cqw);
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--wheel) minmax(0, calc(var(--felt-w) - var(--wheel) - var(--gap)));
+  grid-template-rows: var(--wheel) var(--felt-h);
+  grid-template-areas:
+    'wheel side'
+    'felt felt';
+  gap: var(--gap);
+}
+
+.rl-wheel-spot {
+  grid-area: wheel;
+  position: relative;
+}
+
+.rl-felt-spot {
+  grid-area: felt;
+  display: grid;
+  place-items: center;
+}
+
+.rl-side {
+  grid-area: side;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: clamp(10px, 2cqh, 22px);
+}
+
+/* ---- The wheel ------------------------------------------------------------------ */
+
+.rl-wheel {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  border-radius: 50%;
+  box-shadow:
+    0 calc(var(--wheel) * 0.04) calc(var(--wheel) * 0.08) rgba(0, 0, 0, 0.65),
+    0 0 0 calc(var(--wheel) * 0.012) #1a0d08;
+}
+
+.rl-wheel__bowl,
+.rl-rotor,
+.rl-rotor__art,
+.rl-wheel__shine {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+/* The rotor turns clockwise and slows: the easing is ROTOR_EASE in ui/spin.ts. */
+.rl-rotor {
+  rotate: var(--rotor-to);
+}
+
+.rl-rotor[data-moving] {
+  animation: rl-rotor var(--rotor-ms) cubic-bezier(0.25, 0.55, 0.4, 1) both;
+}
+
+@keyframes rl-rotor {
+  from {
+    rotate: var(--rotor-from);
+  }
+  to {
+    rotate: var(--rotor-to);
+  }
+}
+
+.rl-rotor__number {
+  fill: #f4ecdb;
+  font-family: var(--font-numerals);
+  font-weight: 700;
+  dominant-baseline: central;
+}
+
+/* The ball rides the rotor: round it the other way, then into its pocket. BALL_EASE in ui/spin.ts. */
+.rl-ball-orbit {
+  position: absolute;
+  inset: 0;
+  rotate: var(--ball-to);
+  pointer-events: none;
+}
+
+.rl-ball-orbit[data-moving] {
+  animation: rl-orbit var(--spin-ms) cubic-bezier(0.18, 0.62, 0.32, 1) both;
+}
+
+@keyframes rl-orbit {
+  from {
+    rotate: var(--ball-from);
+  }
+  to {
+    rotate: var(--ball-to);
+  }
+}
+
+/* An ivory ball: 8.8 of the wheel's 200 units across, so its center runs 90.5 out on the track and 56.5 in a pocket. */
+.rl-ball {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4.4cqw;
+  height: 4.4cqw;
+  margin: -2.2cqw 0 0 -2.2cqw;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #f1eadc 42%, #b8ad97 92%);
+  box-shadow: 0 0.5cqw 0.7cqw rgba(0, 0, 0, 0.6);
+  translate: 0 -28.25cqw;
+}
+
+/*
+ * Out from the wheel's middle, in cqw: on the track, down the apron to a
+ * deflector, a hop back up, onto the number ring, a hop, into a pocket, a
+ * rattle, and still. The hits at 70%, 80%, 89%, 93% and 97% are in step
+ * with the `ball-drop` sound.
+ */
+.rl-ball[data-moving] {
+  animation: rl-ball-fall var(--spin-ms) linear both;
+}
+
+@keyframes rl-ball-fall {
+  0% {
+    translate: 0 -45.25cqw;
+  }
+  56% {
+    translate: 0 -45cqw;
+    animation-timing-function: ease-in;
+  }
+  70% {
+    translate: 0 -39cqw;
+    animation-timing-function: ease-out;
+  }
+  74% {
+    translate: 0 -41.4cqw;
+    animation-timing-function: ease-in;
+  }
+  80% {
+    translate: 0 -35cqw;
+    animation-timing-function: ease-out;
+  }
+  84% {
+    translate: 0 -36.8cqw;
+    animation-timing-function: ease-in;
+  }
+  89% {
+    translate: 0 -29.4cqw;
+    animation-timing-function: ease-out;
+  }
+  93% {
+    translate: 0 -30.8cqw;
+    animation-timing-function: ease-in;
+  }
+  97% {
+    translate: 0 -28.5cqw;
+  }
+  100% {
+    translate: 0 -28.25cqw;
+  }
+}
+
+/* The chandelier in the polish. */
+.rl-wheel__shine {
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 50% 22% at 42% 18%, rgba(255, 244, 220, 0.22), transparent 70%),
+    radial-gradient(circle at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.25) 100%);
+}
+
+/* ---- The board of numbers -------------------------------------------------------- */
+
+.rl-numbers {
+  display: grid;
+  gap: 8px;
+  min-height: 5.6em;
+  align-content: start;
+  padding: 10px 12px 12px;
+  border: 1px solid rgba(216, 178, 90, 0.5);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #0b0808, #040303);
+  box-shadow: inset 0 0 0 3px #120d0e, inset 0 0 0 4px rgba(216, 178, 90, 0.22), 0 10px 22px rgba(0, 0, 0, 0.5);
+}
+
+.rl-numbers p {
+  margin: 0;
+}
+
+.rl-numbers__title {
+  font-family: var(--font-salon);
+  font-size: var(--step-0);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  -webkit-text-stroke: 0.02em currentColor;
+}
+
+.rl-numbers__empty {
+  color: var(--ivory-dim);
+  font-size: var(--step--1);
+}
+
+.rl-numbers__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Lit numbers: the latest bigger, and each in its color. */
+.rl-numbers__list li {
+  display: grid;
+  place-items: center;
+  min-width: 2.1em;
+  height: 2.1em;
+  padding: 0 3px;
+  border-radius: 2px;
+  font-family: var(--font-numerals);
+  font-weight: 700;
+  font-size: var(--step-1);
+  line-height: 1;
+  color: #f8f0dd;
+  font-variant-numeric: tabular-nums;
+}
+
+.rl-numbers__list li[data-color='red'] {
+  background: var(--pocket-red);
+  box-shadow: 0 0 8px rgba(195, 36, 47, 0.45);
+}
+
+.rl-numbers__list li[data-color='black'] {
+  background: #272022;
+  box-shadow: inset 0 0 0 1px rgba(242, 233, 214, 0.25);
+}
+
+.rl-numbers__list li[data-color='green'] {
+  background: var(--pocket-green);
+  box-shadow: 0 0 8px rgba(27, 122, 72, 0.5);
+}
+
+.rl-numbers__list li:first-child {
+  font-size: var(--step-2);
+  outline: 1px solid var(--gold-bright);
+  outline-offset: 2px;
+  animation: rl-light 0.6s ease-out backwards;
+}
+
+@keyframes rl-light {
+  from {
+    opacity: 0;
+    scale: 1.5;
+  }
+}
+
+/* ---- The seats ------------------------------------------------------------------- */
+
+.rl-seats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* Brass-edged lacquer, with the player's wheel chip. */
+.rl-plate {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'chip name'
+    'chip stack';
+  column-gap: 8px;
+  align-items: center;
+  min-height: 46px;
+  padding: 5px 10px;
+  border: 1px solid rgba(216, 178, 90, 0.45);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #1d1415, #0b0808);
+  line-height: 1.15;
+  animation: rl-sit 0.4s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+}
+
+@keyframes rl-sit {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+.rl-plate.is-you {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 12px rgba(216, 178, 90, 0.25);
+}
+
+.rl-plate.is-empty {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'name';
+  border-style: dashed;
+  border-color: rgba(216, 178, 90, 0.2);
+  background: none;
+  color: var(--ivory-dim);
+  animation: none;
+}
+
+.rl-plate.is-done {
+  border-color: var(--mint);
+}
+
+.rl-plate__chip {
+  grid-area: chip;
+  display: inline-block;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--c) 0 46%, rgba(0, 0, 0, 0.3) 47% 51%, transparent 52%),
+    repeating-conic-gradient(from 11deg, #f7f0e2 0 9deg, var(--c) 9deg 45deg);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.rl-plate__name {
+  grid-area: name;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-salon);
+  font-size: var(--step-0);
+  -webkit-text-stroke: 0.02em currentColor;
+}
+
+.rl-plate__short {
+  display: none;
+}
+
+.rl-plate__stack {
+  grid-area: stack;
+  color: var(--gold-bright);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--step--1);
+}
+
+/* ---- Talk: the croupier's calls, and the regulars' remarks ------------------------- */
+
+.rl-talk {
+  pointer-events: none;
+  z-index: 70;
+}
+
+.rl-talk--croupier {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%;
+}
+
+.rl-talk__bubble {
+  position: absolute;
+  width: max-content;
+  max-width: min(360px, 32vw);
+  margin: 0;
+  padding: 7px 13px 8px;
+  border-radius: 2px;
+  translate: 0 -50%;
+  transform-origin: 0 50%;
+  background: linear-gradient(180deg, #fbf5e6, var(--ivory));
+  color: #1d1612;
+  font-size: var(--step--1);
+  line-height: 1.35;
+  box-shadow:
+    inset 0 0 0 1px rgba(138, 100, 32, 0.5),
+    0 6px 14px rgba(0, 0, 0, 0.5);
+  animation:
+    rl-talk-in 0.24s cubic-bezier(0.3, 1.5, 0.5, 1) backwards,
+    rl-talk-out 0.3s ease-in var(--hold) forwards;
+}
+
+.rl-talk__bubble::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  margin-top: -6px;
+  border: 6px solid transparent;
+  border-right: 9px solid var(--ivory);
+  border-left-width: 0;
+}
+
+/* A regular's remark rises from their plate, pointing down at it. */
+.rl-talk--seat {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  width: 0;
+  height: 0;
+}
+
+.rl-talk--seat .rl-talk__bubble {
+  bottom: 0;
+  translate: -50% 0;
+  min-width: 120px;
+  max-width: min(300px, 40cqw, 80vw);
+  transform-origin: 50% 100%;
+}
+
+.rl-talk--seat .rl-talk__bubble::before {
+  right: auto;
+  left: 50%;
+  top: 100%;
+  margin: 0 0 0 -6px;
+  border: 6px solid transparent;
+  border-top: 9px solid var(--ivory);
+  border-bottom-width: 0;
+}
+
+/* The end seats' bubbles lean in, clear of the wheel and the screen's edge. */
+.rl-plate:first-child .rl-talk--seat {
+  left: 0;
+}
+
+.rl-plate:first-child .rl-talk--seat .rl-talk__bubble {
+  translate: 0 0;
+  transform-origin: 20px 100%;
+}
+
+.rl-plate:first-child .rl-talk--seat .rl-talk__bubble::before {
+  left: 20px;
+}
+
+.rl-plate:last-child .rl-talk--seat {
+  left: 100%;
+}
+
+.rl-plate:last-child .rl-talk--seat .rl-talk__bubble {
+  translate: -100% 0;
+  transform-origin: calc(100% - 20px) 100%;
+}
+
+.rl-plate:last-child .rl-talk--seat .rl-talk__bubble::before {
+  left: auto;
+  right: 14px;
+}
+
+@keyframes rl-talk-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@keyframes rl-talk-out {
+  to {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+
+/* ---- The felt and its layout --------------------------------------------------------- */
+
+.rl-felt {
+  --d: 0.62;
+  position: relative;
+  width: calc(var(--fw) * var(--u));
+  height: calc(var(--fh) * var(--u));
+  border-radius: calc(0.22 * var(--u));
+  /* Burgundy baize: a fine nap, lighter where the chandelier falls. */
+  background:
+    radial-gradient(ellipse 70% 90% at 45% 20%, rgba(255, 190, 170, 0.1), transparent 70%),
+    repeating-linear-gradient(115deg, rgba(0, 0, 0, 0.06) 0 2px, transparent 2px 5px),
+    linear-gradient(160deg, var(--felt-light), var(--felt) 45%, var(--felt-deep));
+  box-shadow:
+    inset 0 0 calc(0.6 * var(--u)) rgba(0, 0, 0, 0.55),
+    0 0 0 calc(0.08 * var(--u)) #2a140b,
+    0 0 0 calc(0.12 * var(--u)) var(--gold-deep),
+    0 calc(0.2 * var(--u)) calc(0.5 * var(--u)) rgba(0, 0, 0, 0.6);
+}
+
+.rl-felt__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+.rl-art__cell,
+.rl-art__box {
+  stroke: var(--gold);
+  stroke-width: 0.035;
+}
+
+.rl-art__cell[data-color='red'] {
+  fill: var(--pocket-red);
+}
+
+.rl-art__cell[data-color='black'] {
+  fill: var(--pocket-black);
+}
+
+.rl-art__cell[data-color='green'] {
+  fill: var(--pocket-green);
+}
+
+.rl-art__box {
+  fill: rgba(0, 0, 0, 0.12);
+}
+
+.rl-art__number {
+  fill: #f6eedc;
+  font-family: var(--font-numerals);
+  font-weight: 700;
+  font-size: 0.44px;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.rl-art__label {
+  fill: var(--gold-bright);
+  font-family: var(--font-salon);
+  font-size: 0.36px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  letter-spacing: 0.02px;
+  text-transform: uppercase;
+  stroke: var(--gold-bright);
+  stroke-width: 0.008px;
+}
+
+.rl-art__label.is-column {
+  font-size: 0.3px;
+  text-transform: none;
+}
+
+.rl-art__diamond[data-color='red'] {
+  fill: var(--pocket-red);
+  stroke: var(--gold);
+  stroke-width: 0.03;
+}
+
+.rl-art__diamond[data-color='black'] {
+  fill: var(--pocket-black);
+  stroke: var(--gold);
+  stroke-width: 0.03;
+}
+
+.rl-art__emblem {
+  fill: none;
+  stroke: var(--gold);
+  stroke-opacity: 0.6;
+  stroke-width: 0.03;
+  stroke-linecap: round;
+}
+
+.rl-art__emblem text {
+  fill: var(--gold);
+  fill-opacity: 0.7;
+  stroke: none;
+  font-family: var(--font-salon);
+  font-size: 0.34px;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.rl-art__frame {
+  fill: none;
+  stroke: var(--gold-deep);
+  stroke-width: 0.03;
+}
+
+/* Everything on the felt is placed by layout.ts, in layout units. */
+.rl-cell,
+.rl-box,
+.rl-zone,
+.rl-stack,
+.rl-dolly,
+.rl-burst {
+  position: absolute;
+  left: calc(var(--x) * var(--u));
+  top: calc(var(--y) * var(--u));
+}
+
+.rl-cell,
+.rl-box,
+.rl-zone {
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--h) * var(--u));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  transition:
+    background-color 0.15s ease-out,
+    box-shadow 0.15s ease-out;
+}
+
+.rl-cell,
+.rl-box {
+  z-index: 2;
+}
+
+/* The lines between numbers: above the boxes, so a click on a line is the line's. */
+.rl-zone {
+  z-index: 3;
+  border-radius: calc(0.06 * var(--u));
+}
+
+.rl-cell[aria-disabled='true'],
+.rl-box[aria-disabled='true'],
+.rl-zone[aria-disabled='true'] {
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .rl-cell:not([aria-disabled='true']):hover,
+  .rl-box:not([aria-disabled='true']):hover {
+    background: rgba(244, 220, 150, 0.14);
+    box-shadow: inset 0 0 0 calc(0.04 * var(--u)) var(--gold-bright);
+  }
+
+  /* A line or corner shows a ring where the chip would go. */
+  .rl-zone:not([aria-disabled='true']):hover {
+    background: radial-gradient(circle, rgba(244, 220, 150, 0.6) 0 30%, transparent 32%);
+  }
+}
+
+/* What the bet you're pointing at covers. */
+.rl-cell.is-lit {
+  background: rgba(244, 220, 150, 0.22);
+  box-shadow: inset 0 0 0 calc(0.05 * var(--u)) var(--gold-bright), 0 0 calc(0.2 * var(--u)) rgba(244, 220, 150, 0.4);
+}
+
+/* The guide's pick: at the French wheel, the even chances. */
+.rl-box.is-advised {
+  box-shadow: inset 0 0 0 calc(0.04 * var(--u)) rgba(127, 224, 170, 0.7), inset 0 0 calc(0.4 * var(--u)) rgba(127, 224, 170, 0.25);
+}
+
+/* Taking bets down: everything of yours is ringed in rose. */
+.rl-game.is-taking-down .rl-stack.is-mine {
+  outline: calc(0.04 * var(--u)) dashed var(--rose);
+  outline-offset: calc(0.05 * var(--u));
+  border-radius: 50%;
+}
+
+/* ---- Chips -------------------------------------------------------------------------- */
+
+.rl-stack {
+  z-index: 5;
+  width: calc(var(--d) * var(--u));
+  height: calc(var(--d) * var(--u));
+  margin: calc(var(--d) * var(--u) / -2) 0 0 calc(var(--d) * var(--u) / -2);
+  pointer-events: none;
+}
+
+/* A wheel chip: the player's color, with ivory inserts round the edge and a plain inlay. */
+.rl-chip {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  translate: 0 calc(var(--i) * -0.075 * var(--u));
+  background:
+    radial-gradient(circle, var(--c) 0 50%, rgba(0, 0, 0, 0.28) 51% 55%, transparent 56%),
+    repeating-conic-gradient(from 11deg, #f7f0e2 0 9deg, var(--c) 9deg 45deg);
+  box-shadow:
+    inset 0 0 0 calc(0.02 * var(--u)) rgba(0, 0, 0, 0.4),
+    0 calc(0.035 * var(--u)) 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Chips drop onto a bet as they're added. */
+.rl-stack:not(.is-paid, .is-taken, .is-back) .rl-chip:last-child {
+  animation: rl-chip-drop 0.22s ease-out backwards;
+}
+
+@keyframes rl-chip-drop {
+  from {
+    translate: 0 calc((var(--i) * -0.075 - 0.35) * var(--u));
+    opacity: 0;
+  }
+}
+
+.rl-chip__amount {
+  font-family: var(--font-numerals);
+  font-weight: 700;
+  font-size: max(9px, calc(0.2 * var(--u)));
+  line-height: 1;
+  color: #fff;
+  text-shadow:
+    0 0 2px rgba(0, 0, 0, 0.9),
+    0 1px 1px rgba(0, 0, 0, 0.8);
+}
+
+/* Winnings: pushed out from the croupier, set beside the bet, then back to the seat. */
+.rl-stack.is-paid {
+  z-index: 6;
+  animation: rl-pay 2.4s cubic-bezier(0.3, 0.6, 0.3, 1) both;
+}
+
+@keyframes rl-pay {
+  0% {
+    translate: calc(var(--fx) * var(--u)) calc(var(--fy) * var(--u));
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  35%,
+  70% {
+    translate: 0 0;
+    opacity: 1;
+  }
+  100% {
+    translate: calc(var(--rx) * var(--u)) calc(var(--ry) * var(--u));
+    opacity: 0;
+  }
+}
+
+/* A lost bet, swept to the wheel; la partage's half, back to the seat. */
+.rl-stack.is-taken {
+  animation: rl-sweep 1s ease-in 0.45s both;
+}
+
+.rl-stack.is-back {
+  animation: rl-sweep 1s ease-in 1.1s both;
+}
+
+@keyframes rl-sweep {
+  from {
+    translate: 0 0;
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  to {
+    translate: calc(var(--rx) * var(--u)) calc(var(--ry) * var(--u));
+    opacity: 0;
+  }
+}
+
+/* ---- The dolly, and your result ------------------------------------------------------- */
+
+.rl-dolly {
+  z-index: 8;
+  width: calc(0.62 * var(--u));
+  height: calc(0.68 * var(--u));
+  margin: calc(-0.5 * var(--u)) 0 0 calc(-0.31 * var(--u));
+  pointer-events: none;
+  animation: rl-dolly 0.5s cubic-bezier(0.3, 1.3, 0.5, 1) backwards;
+}
+
+.rl-dolly svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
+}
+
+@keyframes rl-dolly {
+  from {
+    translate: 0 calc(-0.8 * var(--u));
+    opacity: 0;
+  }
+}
+
+.rl-burst {
+  z-index: 9;
+  translate: -50% -50%;
+  font-family: var(--font-salon);
+  font-size: max(18px, calc(0.56 * var(--u)));
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--ivory);
+  -webkit-text-stroke: 0.03em currentColor;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  animation: rl-burst 2.4s ease-out 0.25s both;
+}
+
+.rl-burst.is-up {
+  color: var(--gold-bright);
+}
+
+.rl-burst.is-down {
+  color: var(--rose);
+}
+
+@keyframes rl-burst {
+  0% {
+    opacity: 0;
+    translate: -50% -50%;
+    scale: 0.6;
+  }
+  15% {
+    opacity: 1;
+    scale: 1.1;
+  }
+  25% {
+    scale: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: -50% calc(-50% - 1.1 * var(--u));
+  }
+}
+
+/* ---- Picking a bet by tap ---------------------------------------------------------------- */
+
+.rl-overlay--sheet {
+  align-items: end;
+  background: rgba(5, 3, 3, 0.35);
+  backdrop-filter: none;
+}
+
+.rl-chooser {
+  width: min(100%, 560px);
+  max-height: min(70vh, calc(var(--app-height) - 40px));
+  overflow: auto;
+  margin: auto auto 0;
+  padding: 14px 16px 16px;
+  animation: rl-sheet 0.22s ease-out backwards;
+}
+
+@keyframes rl-sheet {
+  from {
+    translate: 0 30px;
+    opacity: 0;
+  }
+}
+
+.rl-chooser__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.rl-chooser h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: var(--step-1);
+}
+
+.rl-chooser__number {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.8em;
+  height: 1.8em;
+  padding: 0 4px;
+  border: 1px solid var(--gold);
+  font-family: var(--font-numerals);
+  font-weight: 700;
+  color: #f6eedc;
+}
+
+.rl-chooser__number[data-color='red'] {
+  background: var(--pocket-red);
+}
+
+.rl-chooser__number[data-color='black'] {
+  background: var(--pocket-black);
+}
+
+.rl-chooser__number[data-color='green'] {
+  background: var(--pocket-green);
+}
+
+.rl-chooser__close {
+  font-size: var(--step-0);
+  padding: 7px 14px 6px;
+}
+
+.rl-chooser__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rl-chooser__bet {
+  width: 100%;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name pays'
+    'yours yours';
+  align-items: center;
+  gap: 0 8px;
+  padding: 7px 10px;
+  border: 1px solid rgba(216, 178, 90, 0.35);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #3d0c18, #22060d);
+  color: var(--ivory);
+  text-align: left;
+}
+
+.rl-chooser__list li:first-child {
+  grid-column: 1 / -1;
+}
+
+@media (hover: hover) {
+  .rl-chooser__bet:hover {
+    border-color: var(--gold-bright);
+  }
+}
+
+.rl-chooser__bet:active {
+  background: linear-gradient(180deg, #5c1222, #350914);
+}
+
+.rl-chooser__name {
+  grid-area: name;
+  font-size: var(--step--1);
+}
+
+.rl-chooser__pays {
+  grid-area: pays;
+  font-size: var(--step--1);
+  color: var(--gold-bright);
+  white-space: nowrap;
+}
+
+.rl-chooser__yours {
+  grid-area: yours;
+  font-size: var(--step--1);
+  color: var(--mint);
+}
+
+/* ---- Your rail: chips and the spin ------------------------------------------------------ */
+
+.rl-controls {
+  position: relative;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px 28px;
+  min-height: 84px;
+  padding: 10px 18px;
+  border: 1px solid rgba(216, 178, 90, 0.5);
+  border-radius: 3px;
+  background: linear-gradient(180deg, #2a1a17, #120b0a);
+  box-shadow:
+    inset 0 0 0 3px #120d0e,
+    inset 0 0 0 4px rgba(216, 178, 90, 0.2),
+    0 10px 20px rgba(0, 0, 0, 0.5);
+}
+
+.rl-controls p {
+  margin: 0;
+}
+
+.rl-controls--broke,
+.rl-controls--waiting {
+  justify-content: space-between;
+}
+
+.rl-controls--broke p,
+.rl-controls__ask {
+  max-width: 60ch;
+}
+
+/* The chip rack: pick the chip you bet with. */
+.rl-rack {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+
+.rl-rack__chip {
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.6));
+  transition:
+    translate 0.1s ease-out,
+    filter 0.15s ease-out;
+}
+
+.rl-rack__chip[aria-checked='true'] {
+  translate: 0 -5px;
+  filter: drop-shadow(0 0 0 #000) drop-shadow(0 0 6px rgba(244, 220, 150, 0.95)) drop-shadow(0 6px 2px rgba(0, 0, 0, 0.5));
+}
+
+@media (hover: hover) {
+  .rl-rack__chip:hover {
+    translate: 0 -3px;
+  }
+}
+
+.rl-rack__chip .bj-chip-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.rl-rack__down {
+  min-height: 40px;
+  padding: 4px 12px;
+  border: 1px dashed rgba(242, 233, 214, 0.45);
+  border-radius: 999px;
+  background: none;
+  color: var(--ivory-dim);
+  font-family: var(--font-salon);
+  font-size: var(--step-0);
+  line-height: 1;
+  -webkit-text-stroke: 0.02em currentColor;
+}
+
+.rl-rack__down[aria-checked='true'] {
+  border-style: solid;
+  border-color: var(--rose);
+  background: rgba(195, 36, 47, 0.25);
+  color: #ffd9dc;
+}
+
+.rl-bet {
+  display: grid;
+  justify-items: center;
+  min-width: 110px;
+  line-height: 1.1;
+}
+
+.rl-bet__label {
+  font-size: var(--step--1);
+  color: var(--ivory-dim);
+}
+
+.rl-bet__amount {
+  font-family: var(--font-numerals);
+  font-weight: 700;
+  font-size: var(--step-3);
+  line-height: 1;
+  color: var(--gold-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.rl-controls__buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.rl-button--spin {
+  min-width: 150px;
+}
+
+/* ---- HUD: the terminal on the table --------------------------------------------------- */
+
+/* Above the stage and the croupier's calls, so the menus it opens cover the table. */
+.rl-hud.screen {
+  z-index: 100;
+  margin: max(12px, var(--safe-top)) max(12px, var(--safe-right)) max(12px, var(--safe-bottom)) 0;
+  border-radius: 12px;
+  padding: 16px 16px 14px;
+  gap: 10px;
+  color: var(--ph);
+  font-size: var(--step--1);
+}
+
+.rl-hud p {
+  margin: 0;
+}
+
+.rl-hud__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rl-hud__stake {
+  color: var(--ph-strong);
+  white-space: nowrap;
+}
+
+.rl-hud__status {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  line-height: 1.05;
+  color: var(--ph-strong);
+}
+
+.rl-hud__help {
+  min-height: 4.4em;
+  line-height: 1.45;
+}
+
+.rl-hud__note {
+  color: var(--ph-dim);
+}
+
+.rl-hud__log {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 4px 0 0;
+  padding: 8px 0 0;
+  list-style: none;
+  border-top: 2px solid var(--ph-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.4;
+  color: var(--ph-dim);
+}
+
+.rl-hud__log li::before {
+  content: '> ';
+}
+
+.rl-hud__log li[data-mine] {
+  color: var(--ph);
+}
+
+.rl-hud__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rl-hud .term-button {
+  font-size: var(--step-0);
+  padding: 4px 10px;
+}
+
+/* ---- Overlays ----------------------------------------------------------------- */
+
+.rl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(20px, var(--safe-top)) max(20px, var(--safe-right)) max(20px, var(--safe-bottom)) max(20px, var(--safe-left));
+  background: rgba(5, 3, 3, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+/* Centered, or from the top and scrolling when it's taller than a phone held sideways. */
+.rl-overlay > * {
+  margin: auto;
+}
+
+.rl-rules-modal {
+  max-width: 80ch;
+  max-height: calc(var(--app-height) * 0.86);
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  color: var(--ivory);
+  font-size: var(--step-0);
+}
+
+/* The table menu on phones. */
+.rl-menu.screen {
+  width: min(100%, 460px);
+  max-height: min(560px, calc(var(--app-height) - 40px));
+  padding: 14px 16px 16px;
+  gap: 12px;
+  border-radius: 12px;
+  color: var(--ph);
+  font-size: var(--step--1);
+}
+
+.rl-menu .rl-hud__log {
+  min-height: 4.5em;
+  margin: 0;
+  padding: 0 0 8px;
+  border-top: 0;
+  border-bottom: 2px solid var(--ph-faint);
+}
+
+.rl-menu .term-button {
+  font-size: var(--step-0);
+  padding: 6px 12px;
+}
+
+.rl-menu > .term-button--primary {
+  align-self: flex-start;
+}
+
+/* ---- Pages on narrow screens ------------------------------------------------------ */
+
+@media (max-width: 900px) {
+  .rl-wheels,
+  .rl-stakes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rl-regulars ul,
+  .rl-primer ol {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .rl-header {
+    gap: 8px 12px;
+  }
+
+  .rl-nav {
+    order: 1;
+    flex-basis: 100%;
+  }
+
+  .rl-sign__fan {
+    font-size: var(--step-2);
+  }
+
+  .rl-sign__text {
+    font-size: var(--step-2);
+  }
+
+  .rl-room-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* No keys to press on a touch screen. */
+@media (hover: none) and (pointer: coarse) {
+  .rl-key {
+    display: none;
+  }
+}
+
+/* ---- The table on phones and small windows ------------------------------------------
+ * Keep these queries in step with COMPACT_TABLE and TALL_TABLE in Table.tsx.
+ *
+ * Upright, the tall layout runs down the left of the screen, with the wheel
+ * beside it and the board of numbers and the seats under the wheel; then
+ * your rail and the HUD. Sideways, the wheel is on the left, the wide
+ * layout beside it with the seats under it, and the HUD takes a column on
+ * the right.
+ */
+
+@media (max-width: 900px), (max-height: 520px) {
+  .rl-game {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .rl-board {
+    gap: 4px;
+    padding: max(6px, var(--safe-top)) max(8px, var(--safe-right)) 4px max(8px, var(--safe-left));
+  }
+
+  .rl-croupier-bar {
+    justify-content: space-between;
+    min-height: 40px;
+    padding: 0 2px;
+  }
+
+  .rl-placard {
+    position: static;
+    translate: none;
+    order: 1;
+    padding: 3px 8px;
+  }
+
+  .rl-placard__table {
+    display: none;
+  }
+
+  .rl-portrait {
+    width: 30px;
+    height: 30px;
+  }
+
+  .rl-croupier-bar__name {
+    font-size: var(--step-1);
+  }
+
+  /* Hung from the top of the bar, so a long call grows down over the wheel instead of off the screen. */
+  .rl-talk--croupier {
+    top: 0;
+  }
+
+  .rl-talk--croupier .rl-talk__bubble {
+    max-width: min(320px, calc(100vw - 150px));
+    translate: 0 0;
+    transform-origin: 0 20px;
+  }
+
+  .rl-talk--croupier .rl-talk__bubble::before {
+    top: 20px;
+  }
+
+  .rl-numbers {
+    min-height: 0;
+    padding: 6px 8px 8px;
+    gap: 4px;
+  }
+
+  .rl-numbers__title {
+    font-size: var(--step--1);
+  }
+
+  .rl-numbers__list {
+    gap: 3px;
+  }
+
+  .rl-numbers__list li {
+    font-size: var(--step--1);
+    min-width: 1.9em;
+    height: 1.9em;
+  }
+
+  .rl-numbers__list li:first-child {
+    font-size: var(--step-0);
+  }
+
+  .rl-plate {
+    min-height: 36px;
+    padding: 3px 7px;
+    column-gap: 6px;
+  }
+
+  .rl-plate__chip {
+    width: 16px;
+    height: 16px;
+  }
+
+  .rl-plate__name {
+    font-size: var(--step--1);
+  }
+
+  .rl-plate__full {
+    display: none;
+  }
+
+  .rl-plate__short {
+    display: inline;
+  }
+
+  .rl-talk--seat .rl-talk__bubble {
+    min-width: 110px;
+    max-width: min(260px, 70vw);
+  }
+
+  .rl-controls {
+    min-height: 0;
+    gap: 8px 12px;
+    padding: 8px 10px;
+  }
+
+  .rl-rack {
+    gap: 6px;
+    padding: 3px 6px;
+  }
+
+  .rl-rack__chip {
+    width: 42px;
+    height: 42px;
+  }
+
+  .rl-bet {
+    min-width: 64px;
+  }
+
+  .rl-bet__amount {
+    font-size: var(--step-2);
+  }
+
+  .rl-button {
+    font-size: var(--step-0);
+    padding: 9px 14px 8px;
+  }
+
+  .rl-button--spin {
+    min-width: 0;
+  }
+
+  /* The HUD: status and stake, the hint and the Menu. */
+  .rl-hud.screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'status stake'
+      'help menu';
+    align-content: start;
+    gap: 4px 10px;
+    margin: 0 max(8px, var(--safe-right)) max(8px, var(--safe-bottom)) max(8px, var(--safe-left));
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .rl-hud__head {
+    display: contents;
+  }
+
+  .rl-hud__head > .term-dim {
+    display: none;
+  }
+
+  .rl-hud__stake {
+    grid-area: stake;
+    align-self: center;
+  }
+
+  .rl-hud__status {
+    grid-area: status;
+    font-size: var(--step-1);
+  }
+
+  /*
+   * Always three lines high, whatever it says: the felt above sizes itself
+   * to what's left, so a hint that grew a line would move the bets under
+   * your finger mid-tap.
+   */
+  .rl-hud__help {
+    grid-area: help;
+    height: 4.2em;
+    min-height: 0;
+    line-height: 1.4;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+
+  .rl-hud__menu {
+    grid-area: menu;
+    align-self: end;
+  }
+
+  .rl-hud .term-button {
+    padding: 6px 12px;
+  }
+}
+
+/*
+ * Upright: the tall layout on the left, as tall as the stage and up to 56%
+ * of its width, and the wheel in the corner beside it, with the numbers and
+ * the seats under it. The rack and the buttons share the rail in two rows.
+ */
+@media (max-width: 900px) and (orientation: portrait) {
+  .rl-plane {
+    --gap: 8px;
+    --u: min(100cqh / var(--fh), 100cqw * 0.58 / var(--fw));
+    --wheel: min(100cqw - var(--felt-w) - var(--gap), 100cqh * 0.42);
+    grid-template-columns: var(--felt-w) var(--wheel);
+    grid-template-rows: var(--wheel) minmax(0, calc(var(--felt-h) - var(--wheel) - var(--gap)));
+    grid-template-areas:
+      'felt wheel'
+      'felt side';
+  }
+
+  .rl-side {
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .rl-seats {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  /* A remark points across at the plate from over the felt, where there's room for it. */
+  .rl-plate .rl-talk--seat {
+    left: -10px;
+    top: 50%;
+    bottom: auto;
+  }
+
+  .rl-plate .rl-talk--seat .rl-talk__bubble {
+    right: 0;
+    bottom: auto;
+    translate: 0 -50%;
+    transform-origin: 100% 50%;
+    max-width: min(240px, 62vw);
+  }
+
+  .rl-plate .rl-talk--seat .rl-talk__bubble::before {
+    left: 100%;
+    right: auto;
+    top: 50%;
+    margin: -6px 0 0;
+    border: 6px solid transparent;
+    border-left: 9px solid var(--ivory);
+    border-right-width: 0;
+  }
+
+  /* The calls hang under the croupier, across the top of the stage, where there's the width for them. */
+  .rl-croupier-bar,
+  .rl-croupier-bar__who {
+    position: static;
+  }
+
+  /* Over the top of the layout, which takes no bets while he's talking about the spin, and clear of the wheel. */
+  .rl-talk--croupier {
+    left: max(8px, var(--safe-left));
+    top: calc(max(6px, var(--safe-top)) + 38px);
+  }
+
+  .rl-talk--croupier .rl-talk__bubble {
+    max-width: min(300px, 54vw);
+    transform-origin: 12px 0;
+  }
+
+  .rl-talk--croupier .rl-talk__bubble::before {
+    right: auto;
+    left: 12px;
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    border: 6px solid transparent;
+    border-bottom: 9px solid #fbf5e6;
+    border-top-width: 0;
+  }
+
+  .rl-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'rack bet'
+      'buttons buttons';
+    justify-items: start;
+    align-items: center;
+  }
+
+  .rl-controls--waiting,
+  .rl-controls--broke {
+    grid-template-areas:
+      'ask ask'
+      'buttons buttons';
+  }
+
+  .rl-controls__ask,
+  .rl-controls--broke p {
+    grid-area: ask;
+  }
+
+  .rl-rack {
+    grid-area: rack;
+  }
+
+  .rl-bet {
+    grid-area: bet;
+    justify-self: end;
+  }
+
+  .rl-controls__buttons {
+    grid-area: buttons;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.6fr;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .rl-controls--waiting .rl-controls__buttons {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  }
+}
+
+/* The narrowest phones: the HUD already says what's on the layout. */
+@media (max-width: 380px) and (orientation: portrait) {
+  .rl-controls {
+    grid-template-areas:
+      'rack rack'
+      'buttons buttons';
+  }
+
+  .rl-bet {
+    display: none;
+  }
+
+  .rl-rack__chip {
+    width: 38px;
+    height: 38px;
+  }
+
+  .rl-rack__down {
+    padding: 4px 8px;
+    min-height: 34px;
+  }
+}
+
+/* Short phones: a slimmer rail and HUD leave the felt more room. */
+@media (max-width: 900px) and (orientation: portrait) and (max-height: 700px) {
+  .rl-croupier-bar {
+    min-height: 34px;
+  }
+
+  .rl-portrait {
+    width: 26px;
+    height: 26px;
+  }
+
+  .rl-controls {
+    gap: 6px 10px;
+    padding: 6px 8px;
+  }
+
+  .rl-button {
+    padding: 7px 10px 6px;
+  }
+
+  .rl-hud.screen {
+    padding: 6px 10px;
+  }
+
+  .rl-hud__status {
+    font-size: var(--step-0);
+  }
+
+  .rl-hud__help {
+    height: 2.8em;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .rl-numbers__title {
+    display: none;
+  }
+
+  /* One line a plate: chip, name, stack. */
+  .rl-plate {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'chip name stack';
+    min-height: 28px;
+    padding: 2px 6px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .rl-game {
+    --hud-w: clamp(200px, 28vw, 260px);
+    grid-template-columns: minmax(0, 1fr) var(--hud-w);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .rl-board {
+    padding: max(4px, var(--safe-top)) 6px max(6px, var(--safe-bottom)) max(8px, var(--safe-left));
+  }
+
+  .rl-croupier-bar {
+    min-height: 34px;
+  }
+
+  /* The wheel on the left, as tall as the stage; the layout beside it, and the board and seats under that. */
+  .rl-plane {
+    --gap: 8px;
+    --wheel: min(100cqh, 34cqw);
+    --u: min((100cqw - var(--wheel) - var(--gap)) / var(--fw), (100cqh - 64px) / var(--fh));
+    grid-template-columns: var(--wheel) var(--felt-w);
+    grid-template-rows: var(--felt-h) minmax(0, 1fr);
+    grid-template-areas:
+      'wheel felt'
+      'wheel side';
+    height: 100cqh;
+    align-content: center;
+  }
+
+  .rl-wheel-spot {
+    align-self: center;
+    height: var(--wheel);
+  }
+
+  .rl-side {
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .rl-numbers {
+    padding: 4px 6px;
+  }
+
+  .rl-numbers__title {
+    display: none;
+  }
+
+  .rl-numbers__list {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .rl-seats {
+    gap: 6px;
+  }
+
+  .rl-controls {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 5px 8px;
+  }
+
+  .rl-rack__chip {
+    width: 34px;
+    height: 34px;
+  }
+
+  .rl-rack__down {
+    min-height: 32px;
+    padding: 2px 8px;
+  }
+
+  .rl-bet {
+    min-width: 0;
+  }
+
+  .rl-bet__label {
+    display: none;
+  }
+
+  .rl-button {
+    padding: 7px 12px 6px;
+  }
+
+  /* A column of its own on the right: status, stake, hint, then the Menu. */
+  .rl-hud.screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'status' 'stake' 'help' 'menu';
+    margin: max(6px, var(--safe-top)) max(8px, var(--safe-right)) max(6px, var(--safe-bottom)) 0;
+  }
+
+  .rl-hud__stake {
+    align-self: start;
+  }
+
+  .rl-hud__help {
+    height: auto;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+  }
+
+  .rl-hud__menu {
+    justify-self: start;
+  }
+}

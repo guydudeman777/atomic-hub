@@ -46,6 +46,9 @@ export type Sfx =
   // Connect Four
   | 'checker'
   | 'release'
+  // Roulette
+  | 'ball-spin'
+  | 'ball-drop'
 
 export interface SfxOptions {
   /** Stereo position, -1 (left) to 1 (right). */
@@ -217,6 +220,9 @@ const COUNTER = [1, 2.03, 3.1]
 
 /** Partials of a Connect Four checker: thin, hollow plastic, brighter than wood. */
 const PLASTIC = [1, 1.89, 3.05, 4.2]
+
+/** Partials of a roulette ball: hard phenolic, bright and quick against brass frets. */
+const PHENOLIC = [1, 2.21, 3.73]
 
 /** One die striking the table: a click on the felt with a little thump under it. */
 function knock(m: Mixer, out: AudioNode, t: number, level: number, pitch: number) {
@@ -504,6 +510,60 @@ const EFFECTS: Record<Sfx, Effect> = {
       metal(m, out, at, vary(1500, 0.18), vary(0.13, 0.3) * (1 - i / 22), PLASTIC, 0.04)
       if (i % 3 === 0) land(m, out, at + 0.01, vary(0.32, 0.25), 0.25)
       at += vary(0.045, 0.45) * (i < 10 ? 1 : 1.5)
+    }
+  },
+
+  'ball-spin': (m, out, t) => {
+    // The croupier sets the wheel turning and flicks the ball onto the track,
+    // where it rolls round with a whir that slows and falls as the ball
+    // loses speed, for the 3.78 seconds until it drops (ui/session.ts, DROP_MS).
+    const { ctx } = m
+    const roll = 3.78
+    const push = amp(ctx)
+    swell(push.gain, t, 0.22, 0.12, 0.5)
+    noise(m, t, 0.7, 'pink').connect(filter(ctx, 'lowpass', 380)).connect(push).connect(out)
+    land(m, out, t + 0.05, 0.25, 0.5)
+    slide(m, out, t + 0.32, 0.09, 1500, 3200, 0.18)
+    // The whir: noise in a band that falls with the ball's speed, pulsing once a turn.
+    const start = t + 0.38
+    const band = filter(ctx, 'bandpass', 2600, 2.4)
+    band.frequency.setValueAtTime(2600, start)
+    band.frequency.exponentialRampToValueAtTime(1300, start + roll - 0.4)
+    const env = amp(ctx)
+    env.gain.setValueAtTime(SILENT, start)
+    env.gain.exponentialRampToValueAtTime(0.16, start + 0.25)
+    env.gain.exponentialRampToValueAtTime(0.06, start + roll - 0.6)
+    env.gain.exponentialRampToValueAtTime(SILENT, start + roll - 0.3)
+    const turn = osc(ctx, 'sine', 4.6, start, roll)
+    turn.frequency.exponentialRampToValueAtTime(1.3, start + roll - 0.4)
+    const depth = amp(ctx, 0.045)
+    turn.connect(depth).connect(env.gain)
+    noise(m, start, roll, 'pink').connect(band).connect(env).connect(out)
+    // Under it, the ball rumbling on the wooden track.
+    const rumble = amp(ctx)
+    rumble.gain.setValueAtTime(SILENT, start)
+    rumble.gain.exponentialRampToValueAtTime(0.1, start + 0.3)
+    rumble.gain.exponentialRampToValueAtTime(SILENT, start + roll - 0.3)
+    noise(m, start, roll, 'pink').connect(filter(ctx, 'lowpass', 260)).connect(rumble).connect(out)
+  },
+
+  'ball-drop': (m, out, t) => {
+    // Off the track: the ball cracks against a deflector, hops onto the
+    // number ring, drops into a pocket, and rattles between its frets to
+    // rest. In step with rl-ball-fall in roulette.css: hits at 70%, 80%, 89%,
+    // 93% and 97% of the spin.
+    const hits: [number, number, number][] = [
+      [0, 0.5, 3600],
+      [0.54, 0.32, 3100],
+      [1.026, 0.36, 2900],
+      [1.13, 0.1, 3400],
+      [1.242, 0.2, 3000],
+      [1.33, 0.07, 3500],
+      [1.458, 0.12, 3100],
+    ]
+    for (const [at, level, pitch] of hits) {
+      metal(m, out, t + at, vary(pitch, 0.06), level * 0.5, PHENOLIC, 0.03)
+      land(m, out, t + at, level * 0.6, 0.12)
     }
   },
 }

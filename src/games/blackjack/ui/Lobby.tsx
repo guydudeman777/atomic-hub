@@ -4,7 +4,7 @@ import { Link } from '../../../router'
 import { navigate } from '../../../navigation'
 import { useSave } from '../../../store/save'
 import { REGULARS, STAKES, type TableMode } from '../content'
-import { SPOT_INDEXES, circleOf } from './layout'
+import { SPOT_INDEXES, WIDE_LAYOUT } from './layout'
 import { useSession } from './session'
 
 const MODES: { id: TableMode; name: string; blurb: string }[] = [
@@ -144,7 +144,7 @@ function MiniTable({ full }: { full: boolean }) {
       <path d="M45 0 A455 455 0 0 0 955 0 Z" fill="#1f54a3" />
       <rect x="400" y="14" width="200" height="34" rx="6" fill="#1a1416" stroke="#b28a3e" strokeWidth="4" />
       {SPOT_INDEXES.map((spot) => {
-        const c = circleOf(spot)
+        const c = WIDE_LAYOUT.circleOf(spot)
         const you = spot === 2
         const taken = you || full
         return (

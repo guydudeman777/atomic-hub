@@ -152,6 +152,12 @@ for (const view of ['3D', 'flat'] as const) {
     }
     await sitAndDeal(page)
 
+    // Upright, the tall table fills the room between the dealer and your rail.
+    const felt = await page.locator('.bj-felt').boundingBox()
+    const screen = page.viewportSize()!
+    expect(felt!.height).toBeGreaterThan(screen.height * 0.5)
+    expect(felt!.width).toBeGreaterThan(screen.width * 0.85)
+
     // Your plate, the dealer, your rail and the HUD are all on screen.
     await expectOnScreen(page, page.locator('.bj-plate.is-you'))
     await expectOnScreen(page, page.locator('.bj-dealer-bar'))

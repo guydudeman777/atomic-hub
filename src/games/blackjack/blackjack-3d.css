@@ -75,6 +75,10 @@
   transform: translateZ(2px);
 }
 
+:root[data-table3d='on'] .bj-impact {
+  transform: translateZ(1px);
+}
+
 /*
  * Speech bubbles and your result float just off the felt. (Stood up, they'd
  * cut through the rail, and half of them would sink into it.)

@@ -29,6 +29,7 @@ export type Sfx =
   // Chips
   | 'chip'
   | 'chips'
+  | 'slam'
   // Results
   | 'coin'
   | 'win'
@@ -302,6 +303,26 @@ const EFFECTS: Record<Sfx, Effect> = {
     for (let i = 0; i < 6; i++) {
       metal(m, out, t + 0.12 + i * vary(0.045, 0.35), vary(2400, 0.12), 0.15 * (1 - i / 8), CLAY, 0.045)
     }
+  },
+
+  slam: (m, out, t) => {
+    // A fist on a padded table: a deep thump through the wood, then every
+    // stack on the felt jumps and clatters back down.
+    const { ctx } = m
+    const thump = amp(ctx)
+    strike(thump.gain, t, 0.9, 0.28, 0.003)
+    const body = osc(ctx, 'sine', vary(95, 0.08), t, 0.32)
+    body.frequency.exponentialRampToValueAtTime(42, t + 0.22)
+    body.connect(thump).connect(out)
+    const pad = amp(ctx)
+    strike(pad.gain, t, 0.5, 0.12, 0.002)
+    noise(m, t, 0.14, 'pink').connect(filter(ctx, 'lowpass', 500)).connect(pad).connect(out)
+    land(m, out, t + 0.01, 0.6, 0.6)
+    for (let i = 0; i < 9; i++) {
+      const at = t + 0.06 + i * vary(0.03, 0.45) + (i > 4 ? 0.08 : 0)
+      metal(m, out, at, vary(2300, 0.15), 0.12 * (1 - i / 12), CLAY, 0.04)
+    }
+    slide(m, out, t + 0.05, 0.12, 2400, 900, 0.08)
   },
 
   coin: (m, out, t) => {

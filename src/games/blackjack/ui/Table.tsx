@@ -28,7 +28,7 @@ import { ChipStack, Chip } from './Chip'
 import { Felt } from './Felt'
 import { type Layout, type Place, SPOT_INDEXES, WIDE_LAYOUT, tallLayout } from './layout'
 import { RulesText } from './Rules'
-import { type Occupant, type Remark, canBet, useSession, yourStake } from './session'
+import { type Fx, type Occupant, type Remark, canBet, useSession, yourStake } from './session'
 
 /**
  * Phones and small windows get the compact table in blackjack.css, whose
@@ -101,8 +101,27 @@ export function Table() {
 
 // ---------------------------------------------------------------------------
 
+/** How long the table shakes under a fist. Keep in step with bj-slam in blackjack.css. */
+const SLAM_MS = 650
+
+/** The effect playing right now: it starts after its delay and lasts a moment. */
+function usePlaying(fx: Fx | null): Fx | null {
+  const [playing, setPlaying] = useState<Fx | null>(null)
+  useEffect(() => {
+    if (!fx) return
+    const start = window.setTimeout(() => setPlaying(fx), fx.delay)
+    const stop = window.setTimeout(() => setPlaying((now) => (now === fx ? null : now)), fx.delay + SLAM_MS)
+    return () => {
+      window.clearTimeout(start)
+      window.clearTimeout(stop)
+    }
+  }, [fx])
+  return playing
+}
+
 function TableView() {
-  const { state, stakes, seats, talk, call, result, bet } = useSession()
+  const { state, stakes, seats, talk, call, result, bet, fx, config } = useSession()
+  const slam = usePlaying(fx)
   const caps = useSave((s) => s.wallet.caps)
   const coach = useSave((s) => s.blackjack.coach)
   const { act, insure, deal, addChip, clearBet } = useSession.getState()
@@ -155,7 +174,7 @@ function TableView() {
       <div className="bj-board">
         <DealerBar name={stakes!.dealer.name} call={call} limits={`${stakes!.limits.min} to ${stakes!.limits.max} caps`} table={stakes!.name} />
 
-        <div className="bj-stage" ref={stageRef}>
+        <div className={`bj-stage${slam ? ' is-shaking' : ''}`} ref={stageRef}>
           <div
             className="bj-felt"
             role="region"
@@ -179,8 +198,11 @@ function TableView() {
                 acting={actor(s) === spot}
                 caps={caps}
                 talk={talk?.spot === spot && !shape.talk ? talk : null}
+                open={config?.mode === 'full' && spot !== YOUR_SPOT && !seats[spot]}
+                slamming={slam?.spot === spot}
               />
             ))}
+            {slam && <Impact key={slam.id} spot={slam.spot} />}
             {/* On the tall table the regulars' remarks go in the open felt, with the speaker's name. */}
             {shape.talk && (
               <SpeechBubble
@@ -289,9 +311,13 @@ interface SpotProps {
   acting: boolean
   caps: number
   talk: Remark | null
+  /** An empty seat at a full table, waiting for someone new. */
+  open: boolean
+  /** Their fist is coming down on the table. */
+  slamming: boolean
 }
 
-function SpotView({ spot, state, occupant, you, pendingBet, activeHand, acting, caps, talk }: SpotProps) {
+function SpotView({ spot, state, occupant, you, pendingBet, activeHand, acting, caps, talk, open, slamming }: SpotProps) {
   const { hands, insurance } = state.spots[spot]
   const seated = you || occupant
   const n = hands.length
@@ -318,14 +344,24 @@ function SpotView({ spot, state, occupant, you, pendingBet, activeHand, acting, 
           {insurancePaid && <Stack amount={insurance * 2} place={inSpot(spot, -60 * scale, 26 * scale)} from="tray" />}
         </>
       )}
+      {/* Keyed by who's sitting there, so a newcomer's plate arrives with them. */}
       {seated && (
-        <div className={`bj-plate${acting ? ' is-acting' : ''}${you ? ' is-you' : ''}${occupant?.leaving ? ' is-leaving' : ''}`} style={at(plate)}>
+        <div
+          key={occupant?.regular.id ?? 'you'}
+          className={`bj-plate${acting ? ' is-acting' : ''}${you ? ' is-you' : ''}${occupant?.leaving ? ' is-leaving' : ''}${occupant?.leaving === 'kicked' ? ' is-kicked' : ''}${slamming ? ' is-slamming' : ''}`}
+          style={at(plate)}
+        >
           {!you && occupant && <span className="bj-portrait" style={{ background: occupant.regular.color }} aria-hidden="true" />}
           <span className="bj-plate__name">{name}</span>
           <span className="bj-plate__stack">
             {stack.toLocaleString()}
             <span className="visually-hidden"> caps</span>
           </span>
+        </div>
+      )}
+      {open && (
+        <div key="open" className="bj-plate is-open" style={at(plate)}>
+          <span className="bj-plate__name">Open seat</span>
         </div>
       )}
       {!you && occupant && (
@@ -378,6 +414,12 @@ function HandView({ spot, hand, h, n, active, you }: { spot: number; hand: Hand;
 }
 
 // ---- Things on the felt ----------------------------------------------------------
+
+/** Where a fist hits the felt: two rings that spread out through it. */
+function Impact({ spot }: { spot: number }) {
+  const { circleOf } = useLayout()
+  return <div className="bj-impact" style={at(circleOf(spot))} aria-hidden="true" />
+}
 
 /** Absolute position on the felt, in felt units. */
 const at = (p: { x: number; y: number; rot?: number }): CSSProperties => ({ '--x': p.x, '--y': p.y, '--r': `${p.rot ?? 0}deg` }) as CSSProperties
@@ -478,7 +520,7 @@ function SpeechBubble({ name, remark, className, style, named = false }: BubbleP
   return (
     <div className={`bj-talk ${className}`} style={style} aria-live="polite">
       {visible && (
-        <p key={remark.id} className="bj-talk__bubble" style={{ '--hold': `${readingTime(remark.text)}ms` } as CSSProperties}>
+        <p key={remark.id} className={`bj-talk__bubble${remark.angry ? ' is-angry' : ''}`} style={{ '--hold': `${readingTime(remark.text)}ms` } as CSSProperties}>
           {named ? (
             <>
               <strong className="bj-talk__name">{name}</strong>

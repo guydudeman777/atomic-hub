@@ -43,7 +43,7 @@ export const GAMES: readonly GameInfo[] = [
   },
   {
     id: 'draw', name: 'Five-Card Draw', category: 'cards', ready: true, path: '/draw', icon: 'draw',
-    modes: 'Up to five card sharps at a saloon table',
+    modes: 'Heads up, or up to five saloon regulars',
     blurb: 'Ante up, draw up to three, and bet it all on what you kept. Fixed limit, in a back room where the regulars bluff.',
   },
   {

@@ -64,8 +64,8 @@ export const STAKES: readonly Stakes[] = [
     croupier: {
       name: 'Henri',
       hello: {
-        en: ['Good evening. Your chips are the gold ones, monsieur, madame.', 'Welcome to the Salon. Place your bets whenever you like.', 'A new player! Gold chips for you. Bonne chance.'],
-        fr: ['Bonsoir. Your chips are the gold ones. Faites vos jeux.', 'Bienvenue au Salon. The gold chips are yours.', 'Ah, a new player. Gold for you. Bonne chance.'],
+        en: ['Good evening. Your chips are the gold ones.', 'Welcome to the Salon. Take your time.', 'A new player! Gold chips for you, and good luck.'],
+        fr: ['Bonsoir. Your chips are the gold ones.', 'Bienvenue au Salon. The gold chips are yours.', 'Ah, a new player. Gold for you. Bonne chance.'],
       },
     },
   },
@@ -79,7 +79,7 @@ export const STAKES: readonly Stakes[] = [
       name: 'Mademoiselle Odette',
       hello: {
         en: ['Good evening, and welcome to the Grand Salon. Gold chips are yours.', 'Please, sit. The wheel is warm tonight.', 'Your chips are gold. The ball is waiting.'],
-        fr: ['Bonsoir, et bienvenue. Your chips are gold.', 'Asseyez-vous, je vous en prie. The wheel is warm tonight.', 'Gold for you. Faites vos jeux.'],
+        fr: ['Bonsoir, et bienvenue. Your chips are gold.', 'Asseyez-vous, je vous en prie. The wheel is warm tonight.', 'Gold for you, and bonne chance.'],
       },
     },
   },

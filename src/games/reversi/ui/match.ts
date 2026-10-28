@@ -18,6 +18,7 @@ import {
   apply,
   colOf,
   createGame,
+  discCount,
   distance,
   finalScore,
   other,
@@ -25,12 +26,12 @@ import {
 } from '../engine'
 
 export interface MatchConfig {
-  mode: 'ai' | 'hotseat'
+  mode: 'ai' | 'hotseat' | 'online'
   /** Set in AI mode. */
   opponentId?: string
   /** Black's name, then White's. Against the AI, yours is "You". */
   names: [string, string]
-  /** The color you play against the AI. In hot-seat, both are people. */
+  /** The color you play against the AI or online. In hot-seat, both are people. */
   you: Player
 }
 
@@ -72,6 +73,8 @@ export interface Result {
   score: [number, number]
   /** Against the AI: the opponent your win opened up, if it's the first time. */
   unlocked: string | null
+  /** Online: who gave the game up. */
+  resigned?: Player
 }
 
 // ---- Timing ---------------------------------------------------------------------
@@ -107,9 +110,12 @@ interface MatchStore {
   notice: Notice | null
   result: Result | null
   start: (config: MatchConfig) => void
-  play: (square: number) => void
+  /** `quiet` plays a move without its sounds, for catching up on an online game. */
+  play: (square: number, quiet?: boolean) => void
   /** Give up a game against the AI: it counts as a loss. */
   resign: () => void
+  /** Online: a player gives the game up, and the other wins. */
+  concede: (player: Player) => void
   leave: () => void
 }
 
@@ -122,12 +128,12 @@ let talk: TableTalk | null = null
 /** The greeting waits for you to sit down; remarks wait for the discs to settle. */
 const HELLO_DELAY_MS = 900
 
+const isYou = (config: MatchConfig, player: Player) => config.mode !== 'hotseat' && player === config.you
+
 /** Who's who in the log, from the table's point of view. */
 function nameOf(config: MatchConfig, player: Player): string {
-  return config.mode === 'ai' && player === config.you ? 'You' : config.names[player]
+  return isYou(config, player) ? 'You' : config.names[player]
 }
-
-const isYou = (config: MatchConfig, player: Player) => config.mode === 'ai' && player === config.you
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
@@ -220,7 +226,7 @@ export const useMatch = create<MatchStore>()((set, get) => ({
     }))
   },
 
-  play: (square) => {
+  play: (square, quiet = false) => {
     const { state, config, log, remark } = get()
     if (!state || !config || state.over) return
     const { state: next, events } = apply(state, square)
@@ -231,7 +237,7 @@ export const useMatch = create<MatchStore>()((set, get) => ({
       square,
       flipped: flipped?.type === 'flipped' ? flipped.squares : [],
     }
-    playMoveSounds(lastMove)
+    if (!quiet) playMoveSounds(lastMove)
     const settle = settleTime(lastMove)
 
     const passed = events.find((e) => e.type === 'passed')
@@ -241,8 +247,8 @@ export const useMatch = create<MatchStore>()((set, get) => ({
     if (next.over) {
       const unlocked = record(config, next.winner)
       result = { winner: next.winner, score: finalScore(next), unlocked }
-      // A fanfare for any win at hot-seat, and for yours against the AI. A draw passes quietly.
-      if (next.winner !== null) {
+      // A fanfare for any win at hot-seat, and for yours against the AI or online. A draw passes quietly.
+      if (next.winner !== null && !quiet) {
         const happy = config.mode === 'hotseat' || next.winner === config.you
         window.setTimeout(() => playSfx(happy ? 'win' : 'lose'), settle + 150)
       }
@@ -256,6 +262,19 @@ export const useMatch = create<MatchStore>()((set, get) => ({
       result,
       log: [...log, ...describe(events, config)].slice(-120),
       remark: said ? { id: ++remarkId, text: said, delay: settle + 120 } : remark,
+    })
+  },
+
+  concede: (player) => {
+    const { state, config, log } = get()
+    if (!state || !config || state.over) return
+    const winner = other(player)
+    const you = isYou(config, player)
+    window.setTimeout(() => playSfx(you ? 'lose' : 'win'), 150)
+    set({
+      state: { ...state, over: true, winner },
+      result: { winner, score: discCount(state), unlocked: null, resigned: player },
+      log: [...log, { id: ++logId, player, mine: you, text: `${nameOf(config, player)} ${you ? 'resign' : 'resigns'}. ${nameOf(config, winner)} ${isYou(config, winner) ? 'win' : 'wins'}.` }].slice(-120),
     })
   },
 
@@ -273,7 +292,7 @@ export const useMatch = create<MatchStore>()((set, get) => ({
   },
 }))
 
-/** "Black" or "White", with the player's name in hot-seat. */
+/** "Black" or "White", with the player's name in hot-seat and online. */
 export function colorLabel(config: MatchConfig, player: Player): string {
-  return config.mode === 'hotseat' ? `${config.names[player]} (${COLOR_NAME[player]})` : COLOR_NAME[player]
+  return config.mode === 'ai' ? COLOR_NAME[player] : `${config.names[player]} (${COLOR_NAME[player]})`
 }

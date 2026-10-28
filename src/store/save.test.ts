@@ -59,6 +59,16 @@ describe('save store', () => {
     expect(useSave.getState().settings.table3d).toBe(true)
   })
 
+  it('keeps Blackjack’s preferences, with defaults for saves made before Blackjack', () => {
+    useSave.getState().updateBlackjack({ coach: false })
+    const exported = snapshot(useSave.getState())
+    expect(exported.blackjack).toEqual({ coach: false, count: false })
+    const { blackjack: _, ...old } = exported
+    useSave.getState().updateBlackjack({ count: true })
+    expect(useSave.getState().importSave(JSON.stringify(old))).toEqual({ ok: true })
+    expect(useSave.getState().blackjack).toEqual({ coach: true, count: false })
+  })
+
   it('rejects files that are not saves', () => {
     expect(useSave.getState().importSave('{"hello":1}')).toMatchObject({ ok: false })
     expect(useSave.getState().importSave('not json')).toMatchObject({ ok: false })

@@ -1,0 +1,1673 @@
+/*
+ * Blackjack: a 1950s Strip casino. A dark carpeted room, one neon sign, and
+ * the blue felt table under its lamp. The in-game HUD reuses the hub's
+ * terminal screen. The 3D view is in blackjack-3d.css.
+ *
+ * No filter on .bj-felt or anything between it and the cards: filters
+ * flatten 3D for everything inside (the table's shadow is in its SVG).
+ *
+ * Everything on the felt is placed in felt units (--u, a thousandth of the
+ * table's width) from positions worked out in ui/layout.ts.
+ */
+
+.bj {
+  --felt: #1f54a3;
+  --gold: #e3c26a;
+  --gold-deep: #b28a3e;
+  --oxblood: #3f1013;
+  --cream: #f3ead6;
+  --cream-dim: #b8b2c8;
+  --lacquer: #161c36;
+  --lacquer-deep: #0f1328;
+  --pink: #ff4fa3;
+  --cyan: #46e9ff;
+  --red: #b3262c;
+  --font-deco: 'Limelight', 'Georgia', serif;
+
+  color: var(--cream);
+  min-height: var(--app-height);
+  font-family: var(--font-body);
+}
+
+/* The casino carpet: gold starbursts, cyan rings and pink boomerangs, worn dark. */
+.bj-room {
+  background-color: #110c20;
+  background-image:
+    radial-gradient(ellipse 65% 55% at 50% 42%, rgba(90, 130, 255, 0.13), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0, 0, 0, 0.7) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84' viewBox='0 0 84 84'%3E%3Cpath d='M42 27l2.6 12.4L57 42l-12.4 2.6L42 57l-2.6-12.4L27 42l12.4-2.6z' fill='%23e3c26a' fill-opacity='.11'/%3E%3Cg fill='none' stroke='%2346e9ff' stroke-opacity='.08' stroke-width='1.6'%3E%3Ccircle r='10'/%3E%3Ccircle cx='84' r='10'/%3E%3Ccircle cy='84' r='10'/%3E%3Ccircle cx='84' cy='84' r='10'/%3E%3C/g%3E%3Cpath d='M8 70q12-14 24 0M52 14q12 14 24 0' fill='none' stroke='%23ff4fa3' stroke-opacity='.09' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-attachment: fixed;
+}
+
+/* Phones don't keep fixed backgrounds still, and repaint them on every scroll. */
+@media (hover: none) {
+  .bj-room {
+    background-attachment: scroll;
+  }
+}
+
+.bj-ink-dim {
+  color: var(--cream-dim);
+}
+
+/* ---- Panels, buttons ---------------------------------------------------- */
+
+.bj-panel {
+  background: linear-gradient(180deg, var(--lacquer), var(--lacquer-deep));
+  border: 1px solid rgba(227, 194, 106, 0.35);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 40px rgba(0, 0, 0, 0.5);
+  padding: clamp(16px, 2vw, 28px);
+}
+
+.bj-panel h2,
+.bj-panel h3 {
+  font-family: var(--font-deco);
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--gold);
+  margin: 0 0 10px;
+}
+
+.bj-panel h2 {
+  font-size: var(--step-2);
+}
+
+.bj-panel h3 {
+  font-size: var(--step-1);
+  margin-top: 20px;
+}
+
+.bj-panel p {
+  margin: 0 0 10px;
+}
+
+.bj-panel a {
+  color: var(--gold);
+}
+
+.bj-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 9px 20px 8px;
+  border: 2px solid var(--gold-deep);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2a3053, #181c34);
+  color: var(--cream);
+  font-family: var(--font-deco);
+  font-size: var(--step-1);
+  line-height: 1;
+  text-decoration: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 3px 0 #0a0c18,
+    0 6px 12px rgba(0, 0, 0, 0.4);
+  transition:
+    translate 0.08s ease-out,
+    box-shadow 0.15s ease-out;
+}
+
+@media (hover: hover) {
+  .bj-button:hover:not(:disabled) {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, #343b66, #1e2340);
+  }
+}
+
+.bj-button:active:not(:disabled) {
+  translate: 0 2px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 1px 0 #0a0c18;
+}
+
+.bj-button--primary {
+  background: linear-gradient(180deg, #c8383f, #8e1d24);
+  border-color: var(--gold);
+}
+
+@media (hover: hover) {
+  .bj-button--primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #d84249, #a0232b);
+  }
+}
+
+.bj-button--big {
+  font-size: var(--step-2);
+  padding: 12px 34px 11px;
+}
+
+.bj-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* The coach's pick. */
+.bj-button.is-advised:not(:disabled) {
+  border-color: var(--cyan);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 3px 0 #0a0c18,
+    0 0 0 2px rgba(70, 233, 255, 0.35),
+    0 0 18px rgba(70, 233, 255, 0.55);
+}
+
+.bj-key {
+  font-family: var(--font-body);
+  font-size: var(--step--1);
+  padding: 1px 5px;
+  border: 1px solid rgba(243, 234, 214, 0.35);
+  border-radius: 3px;
+  opacity: 0.75;
+}
+
+.bj :focus-visible {
+  box-shadow: 0 0 0 2px var(--lacquer-deep), 0 0 0 4px var(--cyan);
+}
+
+.bj-portrait {
+  flex: none;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  border: 2px solid rgba(243, 234, 214, 0.7);
+}
+
+/* ---- Pages: lobby, strategy chart, rules ------------------------------- */
+
+.bj-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.bj-header {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2.4vw, 32px);
+  flex-wrap: wrap;
+  padding: 14px clamp(16px, 3vw, 40px);
+  border-bottom: 1px solid rgba(227, 194, 106, 0.25);
+  background: linear-gradient(180deg, rgba(6, 4, 14, 0.85), rgba(6, 4, 14, 0.4));
+}
+
+.bj-back,
+.bj-caps {
+  color: var(--cream-dim);
+  text-decoration: none;
+  font-size: var(--step--1);
+}
+
+@media (hover: hover) {
+  .bj-back:hover,
+  .bj-caps:hover {
+    color: var(--cream);
+  }
+}
+
+.bj-caps {
+  margin-left: auto;
+  font-family: var(--font-deco);
+  font-size: var(--step-1);
+  color: var(--gold);
+}
+
+/* The one neon sign in the room. It buzzes on as you walk in. */
+.bj-sign {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--font-deco);
+  font-weight: 400;
+  font-size: var(--step-4);
+  line-height: 1;
+  color: #ffe3f1;
+  text-shadow:
+    0 0 2px #fff,
+    0 0 8px var(--pink),
+    0 0 18px var(--pink),
+    0 0 38px rgba(255, 79, 163, 0.65);
+  animation: neon-on 1.3s steps(1, end) backwards;
+}
+
+.bj-sign__star {
+  width: 0.62em;
+  height: 0.62em;
+  fill: #dffbff;
+  filter: drop-shadow(0 0 3px var(--cyan)) drop-shadow(0 0 10px var(--cyan));
+  animation: neon-on 1.3s steps(1, end) 0.25s backwards;
+}
+
+/* Two false starts and a stutter, then it holds. */
+@keyframes neon-on {
+  0% {
+    opacity: 0.12;
+  }
+  8% {
+    opacity: 1;
+  }
+  13% {
+    opacity: 0.18;
+  }
+  22% {
+    opacity: 1;
+  }
+  27% {
+    opacity: 0.35;
+  }
+  36%,
+  100% {
+    opacity: 1;
+  }
+}
+
+.bj-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.bj-nav__link {
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: var(--cream-dim);
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .bj-nav__link:hover {
+    color: var(--cream);
+  }
+}
+
+.bj-nav__link[aria-current='page'] {
+  color: var(--lacquer-deep);
+  background: var(--gold);
+}
+
+.bj-main {
+  flex: 1;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: clamp(16px, 3vw, 36px) clamp(16px, 3vw, 40px) 48px;
+}
+
+.bj-page-panel {
+  max-width: 82ch;
+  margin: 0 auto;
+}
+
+.bj-lobby {
+  display: grid;
+  gap: 20px;
+}
+
+.bj-resume {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.bj-resume p {
+  margin: 0;
+}
+
+.bj-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.bj-mode {
+  display: grid;
+  grid-template-columns: minmax(110px, 34%) 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 6px 18px;
+  align-items: start;
+  text-align: left;
+  padding: 16px 18px;
+  border: 2px solid rgba(243, 234, 214, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+@media (hover: hover) {
+  .bj-mode:hover {
+    border-color: rgba(227, 194, 106, 0.5);
+  }
+}
+
+.bj-mode[aria-checked='true'] {
+  border-color: var(--gold);
+  background: rgba(227, 194, 106, 0.07);
+}
+
+.bj-mini {
+  grid-row: span 2;
+  width: 100%;
+  height: auto;
+}
+
+.bj-mode__name {
+  font-family: var(--font-deco);
+  font-size: var(--step-2);
+  line-height: 1;
+  padding-top: 4px;
+}
+
+.bj-mode__blurb {
+  color: var(--cream-dim);
+  max-width: 46ch;
+}
+
+.bj-stakes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.bj-stake {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  text-align: left;
+  padding: 0 0 14px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: none;
+}
+
+/* A table-limit sign: black acrylic, gold lettering. */
+.bj-stake__sign {
+  display: grid;
+  gap: 2px;
+  padding: 14px 16px 12px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #17171d, #08080b);
+  border: 1px solid #3a3a44;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 8px 18px rgba(0, 0, 0, 0.5);
+}
+
+.bj-stake__name {
+  color: var(--cream-dim);
+}
+
+.bj-stake__limits {
+  font-family: var(--font-deco);
+  font-size: var(--step-3);
+  line-height: 1;
+  color: var(--gold);
+  font-variant-numeric: lining-nums;
+}
+
+.bj-stake__blurb,
+.bj-stake__dealer {
+  padding: 0 4px;
+}
+
+.bj-stake__dealer {
+  color: var(--cream-dim);
+  font-size: var(--step--1);
+}
+
+@media (hover: hover) {
+  .bj-stake:hover .bj-stake__sign {
+    border-color: var(--gold-deep);
+  }
+}
+
+.bj-stake[aria-checked='true'] .bj-stake__sign {
+  border-color: var(--gold);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 2px rgba(227, 194, 106, 0.3),
+    0 8px 22px rgba(0, 0, 0, 0.55);
+}
+
+.bj-stake.is-short {
+  opacity: 0.55;
+}
+
+.bj-lobby__go {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 4px 4px 8px;
+}
+
+.bj-lobby__go p {
+  margin: 0;
+}
+
+.bj-regulars ul {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 28px;
+}
+
+.bj-regulars li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  color: var(--cream-dim);
+}
+
+.bj-regulars li strong {
+  color: var(--cream);
+  font-weight: 400;
+  font-family: var(--font-deco);
+  margin-right: 4px;
+}
+
+.bj-regulars .bj-portrait {
+  translate: 0 2px;
+}
+
+/* Rules and the strategy chart */
+
+.bj-rules ul {
+  margin: 0 0 10px;
+  padding-left: 1.2em;
+}
+
+.bj-rules li {
+  margin-bottom: 6px;
+}
+
+.bj-rules strong {
+  color: var(--gold);
+  font-weight: 400;
+}
+
+.bj-rules__keys {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.bj-rules__keys dt {
+  color: var(--gold);
+}
+
+.bj-rules__keys dd {
+  margin: 0;
+}
+
+.bj-strategy__charts {
+  display: grid;
+  gap: 18px;
+  margin: 14px 0;
+}
+
+.bj-chart {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bj-chart caption {
+  text-align: left;
+  font-family: var(--font-deco);
+  font-size: var(--step-1);
+  color: var(--gold);
+  padding-bottom: 4px;
+}
+
+.bj-chart th {
+  font-weight: 400;
+  color: var(--cream-dim);
+  padding: 2px 8px;
+}
+
+.bj-chart tbody th {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.bj-chart td,
+.bj-chart-legend [data-play] {
+  min-width: 2.4em;
+  padding: 3px 4px;
+  text-align: center;
+  border-radius: 3px;
+}
+
+[data-play='H'] {
+  background: #2e3a5e;
+  color: var(--cream);
+}
+
+[data-play='S'] {
+  background: #c9a94e;
+  color: #241c08;
+}
+
+[data-play='D'] {
+  background: #2f7a52;
+  color: var(--cream);
+}
+
+[data-play='Ds'] {
+  background: #5d9e74;
+  color: #0e2416;
+}
+
+[data-play='P'] {
+  background: #a3333d;
+  color: var(--cream);
+}
+
+.bj-chart-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.bj-chart-legend [data-play] {
+  display: inline-block;
+  margin-right: 4px;
+}
+
+/* ---- The table ----------------------------------------------------------- */
+
+.bj-game {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 22vw, 340px);
+  height: var(--app-height);
+  overflow: hidden;
+}
+
+.bj-board {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 6px;
+  min-height: 0;
+  padding: 10px clamp(10px, 1.6vw, 24px) 12px;
+}
+
+/* The dealer stands behind the middle of the table; the limits sign sits off to the side. */
+.bj-dealer-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 2px 6px;
+}
+
+.bj-dealer-bar__who {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bj-portrait--dealer {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  background: radial-gradient(circle at 40% 35%, #2a3156, #121630);
+  border-color: var(--gold-deep);
+  color: var(--gold);
+  font-family: var(--font-deco);
+  font-size: var(--step-1);
+}
+
+.bj-dealer-bar__name {
+  font-family: var(--font-deco);
+  font-size: var(--step-2);
+  line-height: 1;
+}
+
+.bj-placard {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  justify-items: end;
+  padding: 6px 12px 5px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #17171d, #08080b);
+  border: 1px solid #3a3a44;
+  line-height: 1.15;
+}
+
+.bj-placard__table {
+  font-size: var(--step--1);
+  color: var(--cream-dim);
+}
+
+.bj-placard__limits {
+  font-family: var(--font-deco);
+  color: var(--gold);
+}
+
+/* The stage holds the felt, as big as fits. */
+.bj-stage {
+  position: relative;
+  min-height: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+}
+
+.bj-felt {
+  --u: calc(min(100cqw, 200cqh) / 1000);
+  position: relative;
+  width: calc(1000 * var(--u));
+  height: calc(500 * var(--u));
+}
+
+.bj-felt__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/*
+ * Nothing on the felt takes a click or a tap (only the shoe and tray show
+ * their counts on hover), so a table drawn over the rail never gets in the way.
+ */
+.bj-felt {
+  pointer-events: none;
+}
+
+.bj-shoe,
+.bj-discards {
+  pointer-events: auto;
+}
+
+/* Only on a phone held upright: see the end of this file. */
+.bj-wall {
+  display: none;
+}
+
+/* Everything on the felt is placed by layout.ts, in felt units. */
+.bj-card,
+.bj-felt-stack,
+.bj-badge,
+.bj-plate,
+.bj-talk--seat,
+.bj-shoe,
+.bj-discards,
+.bj-glow,
+.bj-burst {
+  position: absolute;
+  left: calc(var(--x) * var(--u));
+  top: calc(var(--y) * var(--u));
+  rotate: var(--r, 0deg);
+}
+
+/* Labels sit centered on their point; they don't move, so translate is free for that. */
+.bj-badge,
+.bj-plate,
+.bj-burst {
+  translate: -50% -50%;
+}
+
+/* Cards */
+
+.bj-card {
+  --w: calc(66 * var(--u) * var(--s, 1) * var(--card-scale, 1));
+  width: var(--w);
+  height: calc(var(--w) * 1.4);
+  margin: calc(var(--w) * -0.7) 0 0 calc(var(--w) * -0.5);
+  z-index: calc(10 + var(--k));
+  perspective: calc(800 * var(--u));
+  filter: drop-shadow(0 calc(2 * var(--u)) calc(2 * var(--u)) rgba(0, 0, 0, 0.45));
+  transition:
+    left 0.3s ease-out,
+    top 0.3s ease-out,
+    width 0.3s ease-out,
+    height 0.3s ease-out,
+    margin 0.3s ease-out;
+  animation: bj-deal 0.42s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+}
+
+/* Out of the shoe and across the felt. */
+@keyframes bj-deal {
+  from {
+    translate: calc(var(--fx) * var(--u)) calc(var(--fy) * var(--u));
+    rotate: -24deg;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+}
+
+.bj-flip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.bj-flip__face,
+.bj-flip__back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.bj-flip__back {
+  transform: rotateY(180deg);
+}
+
+/* Face-up cards turn over as they land; the hole card waits face down, then turns. */
+.bj-card[data-down] .bj-flip {
+  transform: rotateY(180deg);
+}
+
+.bj-card:not([data-down]) .bj-flip {
+  animation: bj-turn 0.42s cubic-bezier(0.3, 0.6, 0.35, 1) backwards;
+}
+
+@keyframes bj-turn {
+  from {
+    transform: rotateY(180deg);
+  }
+  30% {
+    transform: rotateY(160deg);
+  }
+}
+
+/* The hand you're playing, lit from below. */
+.bj-glow {
+  width: calc(150 * var(--u) * var(--s, 1));
+  height: calc(170 * var(--u) * var(--s, 1));
+  margin: calc(-110 * var(--u) * var(--s, 1)) 0 0 calc(-60 * var(--u) * var(--s, 1));
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(70, 233, 255, 0.32), rgba(70, 233, 255, 0.1) 60%, transparent);
+  z-index: 5;
+  pointer-events: none;
+  animation: bj-glow 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes bj-glow {
+  to {
+    opacity: 0.55;
+  }
+}
+
+/* Chips */
+
+.bj-chip-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --c is a chip's unit: the felt's, grown on small tables so chips stay readable. */
+.bj-felt-stack {
+  --c: calc(var(--u) * var(--chip-scale, 1));
+  width: calc(40 * var(--c));
+  height: calc(40 * var(--c));
+  margin: calc(-20 * var(--c)) 0 0 calc(-20 * var(--c));
+  z-index: 30;
+}
+
+.bj-stack__chip {
+  position: absolute;
+  inset: 0;
+  translate: 0 calc(var(--i) * -3.4 * var(--c));
+  filter: drop-shadow(0 calc(1.5 * var(--c)) 0 rgba(0, 0, 0, 0.55));
+}
+
+.bj-felt-stack.is-from-player,
+.bj-felt-stack.is-from-tray {
+  animation: bj-chips-in 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+}
+
+.bj-felt-stack.is-from-tray {
+  animation-delay: 0.35s;
+}
+
+@keyframes bj-chips-in {
+  from {
+    translate: calc(var(--fx) * var(--u)) calc(var(--fy) * var(--u));
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+/* A lost bet, swept to the dealer's tray. */
+.bj-felt-stack.is-taken {
+  animation: bj-chips-out 0.5s ease-in 0.35s forwards;
+}
+
+@keyframes bj-chips-out {
+  to {
+    translate: calc(var(--fx) * var(--u)) calc(var(--fy) * var(--u));
+    opacity: 0;
+  }
+}
+
+/* Totals and results */
+
+.bj-badge {
+  z-index: 40;
+  padding: calc(4 * var(--u)) calc(8 * var(--u)) calc(3 * var(--u));
+  border: 1px solid rgba(227, 194, 106, 0.6);
+  border-radius: 999px;
+  background: rgba(10, 16, 40, 0.88);
+  color: var(--cream);
+  font-family: var(--font-deco);
+  font-size: max(11px, calc(16 * var(--u)));
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 calc(2 * var(--u)) calc(4 * var(--u)) rgba(0, 0, 0, 0.45);
+}
+
+.bj-badge.is-good {
+  background: var(--gold);
+  border-color: #fff2c4;
+  color: #241c08;
+}
+
+.bj-badge.is-bad {
+  background: #3a1115;
+  border-color: #8a3a40;
+  color: #f0b7bb;
+}
+
+/* Your result, floating up off the felt. */
+.bj-burst {
+  z-index: 60;
+  font-family: var(--font-deco);
+  font-size: calc(46 * var(--u));
+  line-height: 1;
+  color: var(--cream);
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 calc(3 * var(--u)) calc(8 * var(--u)) rgba(0, 0, 0, 0.6);
+  animation: bj-burst 2.2s ease-out forwards;
+}
+
+.bj-burst.is-up {
+  color: #fff2c4;
+  text-shadow:
+    0 0 calc(10 * var(--u)) rgba(227, 194, 106, 0.8),
+    0 calc(3 * var(--u)) calc(8 * var(--u)) rgba(0, 0, 0, 0.6);
+}
+
+.bj-burst.is-down {
+  color: #f0b7bb;
+}
+
+@keyframes bj-burst {
+  from {
+    opacity: 0;
+    transform: translateY(calc(30 * var(--u))) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: none;
+  }
+  75% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(calc(-40 * var(--u)));
+  }
+}
+
+/* Name plates on the rail: brass, engraved. */
+.bj-plate {
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  padding: calc(3 * var(--u)) calc(9 * var(--u));
+  border-radius: calc(4 * var(--u));
+  background: linear-gradient(180deg, #e2c272, #a17d34);
+  color: #2a1a08;
+  font-size: max(10px, calc(13 * var(--u)));
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 calc(2 * var(--u)) calc(3 * var(--u)) rgba(0, 0, 0, 0.5);
+}
+
+.bj-plate .bj-portrait {
+  width: calc(11 * var(--u));
+  height: calc(11 * var(--u));
+  border-width: 1px;
+  border-color: #2a1a08;
+}
+
+.bj-plate__name {
+  font-family: var(--font-deco);
+}
+
+.bj-plate__stack {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.bj-plate.is-you {
+  font-size: max(11px, calc(15 * var(--u)));
+}
+
+.bj-plate.is-acting {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 0 calc(2 * var(--u)) var(--cyan),
+    0 0 calc(14 * var(--u)) rgba(70, 233, 255, 0.7);
+}
+
+.bj-plate.is-leaving {
+  opacity: 0.5;
+}
+
+/* The shoe and the discard tray */
+
+.bj-shoe {
+  width: calc(96 * var(--u));
+  height: calc(62 * var(--u));
+  margin: calc(-31 * var(--u)) 0 0 calc(-48 * var(--u));
+  rotate: -14deg;
+  border-radius: calc(8 * var(--u)) calc(8 * var(--u)) calc(16 * var(--u)) calc(16 * var(--u));
+  background: linear-gradient(160deg, #3d404c, #15161b 70%);
+  border: 1px solid #55596a;
+  box-shadow: 0 calc(6 * var(--u)) calc(10 * var(--u)) rgba(0, 0, 0, 0.5);
+  z-index: 8;
+}
+
+.bj-shoe__card {
+  position: absolute;
+  left: calc(-8 * var(--u));
+  top: calc(8 * var(--u));
+  width: calc(44 * var(--u));
+  rotate: 90deg;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+}
+
+.bj-discards {
+  width: calc(70 * var(--u));
+  height: calc(94 * var(--u));
+  margin: calc(-47 * var(--u)) 0 0 calc(-35 * var(--u));
+  rotate: 10deg;
+  border-radius: calc(6 * var(--u));
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 calc(12 * var(--u)) rgba(255, 255, 255, 0.08);
+  z-index: 8;
+}
+
+/* The used cards, their edges thickening as the shoe goes down. */
+.bj-discards__stack {
+  position: absolute;
+  inset: calc(6 * var(--u));
+  border-bottom: calc(var(--n) * 0.6 * var(--u)) solid #ddd2bd;
+  border-radius: calc(5 * var(--u));
+  translate: 0 calc(var(--n) * -0.6 * var(--u));
+}
+
+/* Talk */
+
+.bj-talk {
+  pointer-events: none;
+  z-index: 70;
+}
+
+.bj-dealer-bar .bj-talk {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%;
+}
+
+.bj-talk--seat {
+  width: 0;
+  height: 0;
+  rotate: 0deg;
+}
+
+.bj-talk__bubble {
+  position: absolute;
+  width: max-content;
+  max-width: min(320px, 30vw);
+  margin: 0;
+  padding: 7px 12px 8px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fbf4e2, var(--cream));
+  color: #1f1b16;
+  font-size: var(--step--1);
+  line-height: 1.35;
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+  animation:
+    talk-in 0.24s cubic-bezier(0.3, 1.5, 0.5, 1) backwards,
+    talk-out 0.3s ease-in var(--hold) forwards;
+}
+
+.bj-talk--dealer .bj-talk__bubble {
+  translate: 0 -50%;
+  transform-origin: 0 50%;
+}
+
+.bj-talk--dealer .bj-talk__bubble::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  margin-top: -6px;
+  border: 6px solid transparent;
+  border-right: 9px solid var(--cream);
+  border-left-width: 0;
+}
+
+/*
+ * A regular's bubble goes out in the corner beside their plate, where the
+ * felt ends, so it never covers cards or your rail: under the plate for the
+ * outer seats, beside it for the inner ones.
+ */
+.bj-talk--seat .bj-talk__bubble {
+  width: max-content;
+  min-width: 90px;
+  max-width: calc(196 * var(--u));
+  font-size: max(12px, calc(13 * var(--u)));
+}
+
+.bj-talk--s0 .bj-talk__bubble,
+.bj-talk--s4 .bj-talk__bubble {
+  top: calc(36 * var(--u));
+}
+
+.bj-talk--s0 .bj-talk__bubble {
+  right: calc(-96 * var(--u));
+  transform-origin: 80% 0;
+}
+
+.bj-talk--s4 .bj-talk__bubble {
+  left: calc(-96 * var(--u));
+  transform-origin: 20% 0;
+}
+
+.bj-talk--s1 .bj-talk__bubble,
+.bj-talk--s3 .bj-talk__bubble {
+  top: 0;
+  translate: 0 -50%;
+}
+
+.bj-talk--s1 .bj-talk__bubble {
+  left: calc(72 * var(--u));
+  transform-origin: 0 50%;
+}
+
+.bj-talk--s3 .bj-talk__bubble {
+  right: calc(72 * var(--u));
+  transform-origin: 100% 50%;
+}
+
+.bj-talk--seat .bj-talk__bubble::before {
+  content: '';
+  position: absolute;
+  border: 6px solid transparent;
+}
+
+/* Pointing up at the plate... */
+.bj-talk--s0 .bj-talk__bubble::before,
+.bj-talk--s4 .bj-talk__bubble::before {
+  bottom: 100%;
+  border-bottom: 9px solid #fbf4e2;
+  border-top-width: 0;
+}
+
+.bj-talk--s0 .bj-talk__bubble::before {
+  right: calc(96 * var(--u) - 6px);
+}
+
+.bj-talk--s4 .bj-talk__bubble::before {
+  left: calc(96 * var(--u) - 6px);
+}
+
+/* ...or across at it. */
+.bj-talk--s1 .bj-talk__bubble::before,
+.bj-talk--s3 .bj-talk__bubble::before {
+  top: 50%;
+  margin-top: -6px;
+}
+
+.bj-talk--s1 .bj-talk__bubble::before {
+  right: 100%;
+  border-right: 9px solid #fbf4e2;
+  border-left-width: 0;
+}
+
+.bj-talk--s3 .bj-talk__bubble::before {
+  left: 100%;
+  border-left: 9px solid #fbf4e2;
+  border-right-width: 0;
+}
+
+@keyframes talk-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@keyframes talk-out {
+  to {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+
+/* Your rail: chips to bet with, or your choices for the hand. */
+
+.bj-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px 28px;
+  min-height: 84px;
+  padding: 10px 18px;
+  border-radius: 14px;
+  border-top: 2px solid var(--gold-deep);
+  background: linear-gradient(180deg, #4a1518, #250709);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 10px 20px rgba(0, 0, 0, 0.5);
+}
+
+.bj-controls p {
+  margin: 0;
+}
+
+.bj-controls--broke {
+  justify-content: space-between;
+}
+
+.bj-controls--broke p {
+  max-width: 60ch;
+}
+
+.bj-rack {
+  display: flex;
+  gap: 10px;
+}
+
+.bj-rack__chip {
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.6));
+  transition: translate 0.1s ease-out;
+}
+
+@media (hover: hover) {
+  .bj-rack__chip:hover:not(:disabled) {
+    translate: 0 -4px;
+  }
+}
+
+.bj-rack__chip:active:not(:disabled) {
+  translate: 0 1px;
+}
+
+.bj-rack__chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.bj-bet {
+  display: grid;
+  justify-items: center;
+  min-width: 110px;
+  line-height: 1.1;
+}
+
+.bj-bet__label,
+.bj-bet__note {
+  font-size: var(--step--1);
+  color: var(--cream-dim);
+}
+
+.bj-bet__amount {
+  font-family: var(--font-deco);
+  font-size: var(--step-3);
+  line-height: 1;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.bj-controls__buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.bj-button--play {
+  min-width: 128px;
+}
+
+.bj-controls__ask {
+  max-width: 44ch;
+}
+
+/* HUD: the terminal on the table */
+
+.bj-hud.screen {
+  margin: 12px 12px 12px 0;
+  border-radius: 12px;
+  padding: 16px 16px 14px;
+  gap: 10px;
+  color: var(--ph);
+  font-size: var(--step--1);
+}
+
+.bj-hud p {
+  margin: 0;
+}
+
+.bj-hud__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bj-hud__stake {
+  color: var(--ph-strong);
+}
+
+.bj-hud__status {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  line-height: 1.05;
+  color: var(--ph-strong);
+}
+
+.bj-hud__help {
+  min-height: 3em;
+  line-height: 1.45;
+}
+
+.bj-hud__count {
+  color: var(--ph-strong);
+  border: 1px solid var(--ph-faint);
+  padding: 4px 8px;
+}
+
+.bj-hud__log {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 4px 0 0;
+  padding: 8px 0 0;
+  list-style: none;
+  border-top: 2px solid var(--ph-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.4;
+  color: var(--ph-dim);
+}
+
+.bj-hud__log li::before {
+  content: '> ';
+}
+
+.bj-hud__log li[data-mine] {
+  color: var(--ph);
+}
+
+.bj-hud__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bj-hud .term-button {
+  font-size: var(--step-0);
+  padding: 4px 10px;
+}
+
+/* ---- Overlays -------------------------------------------------------------- */
+
+.bj-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(6, 4, 14, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+.bj-rules-modal {
+  max-width: 78ch;
+  max-height: 86vh;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  color: var(--cream);
+  font-size: var(--step-0);
+}
+
+/* ---- The table menu on phones ----------------------------------------------- */
+
+.bj-menu.screen {
+  width: min(100%, 460px);
+  max-height: min(560px, calc(var(--app-height) - 40px));
+  padding: 14px 16px 16px;
+  gap: 12px;
+  border-radius: 12px;
+  color: var(--ph);
+  font-size: var(--step--1);
+}
+
+.bj-menu .bj-hud__log {
+  min-height: 4.5em;
+  margin: 0;
+  padding: 0 0 8px;
+  border-top: 0;
+  border-bottom: 2px solid var(--ph-faint);
+}
+
+.bj-menu .term-button {
+  font-size: var(--step-0);
+  padding: 6px 12px;
+}
+
+.bj-menu > .term-button--primary {
+  align-self: flex-start;
+}
+
+/* ---- Pages on narrow screens ------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .bj-modes,
+  .bj-stakes,
+  .bj-regulars ul {
+    grid-template-columns: 1fr;
+  }
+
+  .bj-sign {
+    font-size: var(--step-3);
+  }
+}
+
+/* The strategy chart squeezes its cells, and scrolls sideways rather than widen the page. */
+.bj-strategy__charts {
+  overflow-x: auto;
+}
+
+@media (max-width: 640px) {
+  .bj-chart {
+    border-spacing: 1px;
+    font-size: 12px;
+  }
+
+  .bj-chart th {
+    padding: 2px 3px;
+  }
+
+  .bj-chart td {
+    min-width: 1.9em;
+    padding: 3px 1px;
+  }
+}
+
+/* No keys to press on a touch screen. */
+@media (hover: none) and (pointer: coarse) {
+  .bj-key {
+    display: none;
+  }
+}
+
+/* ---- The table on phones and small windows ------------------------------------
+ * Keep these queries in step with COMPACT_TABLE in Table.tsx.
+ *
+ * Upright, the dealer, the felt, your rail and the HUD stack. The felt is as
+ * wide as the screen, and its cards and chips grow against it so they stay
+ * readable. Sideways (the next block), the HUD takes a column on the right.
+ */
+
+@media (max-width: 900px), (max-height: 520px) {
+  .bj-game {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .bj-board {
+    gap: 4px;
+    padding: max(6px, var(--safe-top)) max(8px, var(--safe-right)) 4px max(8px, var(--safe-left));
+  }
+
+  .bj-felt {
+    --card-scale: 1.35;
+    --chip-scale: 1.25;
+  }
+
+  .bj-dealer-bar {
+    justify-content: space-between;
+    min-height: 40px;
+    padding: 0 2px;
+  }
+
+  .bj-placard {
+    position: static;
+    translate: none;
+    padding: 3px 8px;
+  }
+
+  .bj-placard__table {
+    display: none;
+  }
+
+  .bj-portrait--dealer {
+    width: 30px;
+    height: 30px;
+    font-size: var(--step-0);
+  }
+
+  .bj-dealer-bar__name {
+    font-size: var(--step-1);
+  }
+
+  .bj-talk__bubble {
+    max-width: min(320px, calc(100vw - 140px));
+  }
+
+  .bj-controls {
+    min-height: 0;
+    gap: 8px 14px;
+    padding: 8px 10px;
+    border-radius: 10px;
+  }
+
+  .bj-rack {
+    gap: 6px;
+  }
+
+  .bj-rack__chip {
+    width: 42px;
+    height: 42px;
+  }
+
+  .bj-bet {
+    min-width: 64px;
+  }
+
+  .bj-bet__amount {
+    font-size: var(--step-2);
+  }
+
+  .bj-button {
+    font-size: var(--step-0);
+    padding: 9px 14px 8px;
+  }
+
+  .bj-controls__buttons--play {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+    gap: 8px;
+  }
+
+  .bj-button--play {
+    min-width: 0;
+    padding-inline: 4px;
+  }
+
+  .bj-controls__ask {
+    font-size: var(--step--1);
+  }
+
+  /* The HUD: status and stake, the hint and the Menu, then the count. */
+  .bj-hud.screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'status stake'
+      'help menu'
+      'count count';
+    align-content: start;
+    gap: 4px 10px;
+    margin: 0 max(8px, var(--safe-right)) max(8px, var(--safe-bottom)) max(8px, var(--safe-left));
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .bj-hud__head {
+    display: contents;
+  }
+
+  .bj-hud__head > .term-dim {
+    display: none;
+  }
+
+  .bj-hud__stake {
+    grid-area: stake;
+    align-self: center;
+  }
+
+  .bj-hud__status {
+    grid-area: status;
+    font-size: var(--step-1);
+  }
+
+  .bj-hud__help {
+    grid-area: help;
+    min-height: 2.8em;
+    line-height: 1.4;
+  }
+
+  .bj-hud__count {
+    grid-area: count;
+  }
+
+  .bj-hud__menu {
+    grid-area: menu;
+    align-self: end;
+  }
+
+  .bj-hud .term-button {
+    padding: 6px 12px;
+  }
+}
+
+/*
+ * Upright, the table sits low, near your thumbs, and the sign hangs on the
+ * wall above it. The stage is exactly as tall as the felt.
+ */
+@media (max-width: 900px) and (orientation: portrait) {
+  .bj-board {
+    grid-template-rows: minmax(0, 1fr) auto auto auto;
+  }
+
+  .bj-wall {
+    display: grid;
+    place-items: center;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .bj-wall .bj-sign {
+    font-size: clamp(var(--step-2), 11vw, var(--step-4));
+  }
+
+  .bj-stage {
+    height: calc((100vw - var(--safe-left) - var(--safe-right) - 16px) * 0.5 + 6px);
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .bj-game {
+    --hud-w: clamp(200px, 28vw, 260px);
+    grid-template-columns: minmax(0, 1fr) var(--hud-w);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .bj-board {
+    padding: max(4px, var(--safe-top)) 6px max(6px, var(--safe-bottom)) max(8px, var(--safe-left));
+  }
+
+  .bj-dealer-bar {
+    min-height: 34px;
+  }
+
+  .bj-controls {
+    padding: 6px 8px;
+  }
+
+  .bj-rack__chip {
+    width: 36px;
+    height: 36px;
+  }
+
+  .bj-button {
+    padding: 7px 12px 6px;
+  }
+
+  /* A column of its own on the right: status, stake, hint, count, then the Menu. */
+  .bj-hud.screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'status' 'stake' 'help' 'count' 'menu';
+    margin: max(6px, var(--safe-top)) max(8px, var(--safe-right)) max(6px, var(--safe-bottom)) 0;
+  }
+
+  .bj-hud__stake {
+    align-self: start;
+  }
+
+  .bj-hud__menu {
+    justify-self: start;
+  }
+}

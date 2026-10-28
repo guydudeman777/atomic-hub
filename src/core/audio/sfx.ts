@@ -25,6 +25,10 @@ export type Sfx =
   | 'remove'
   | 'disband'
   | 'shuffle'
+  | 'flip'
+  // Chips
+  | 'chip'
+  | 'chips'
   // Results
   | 'coin'
   | 'win'
@@ -156,6 +160,9 @@ function vibe(m: Mixer, out: AudioNode, t: number, midi: number, length: number,
   osc(ctx, 'sine', f * 4, t, 0.3).connect(tine).connect(out)
 }
 
+/** Partials of a clay casino chip: lower and deader than a bottle cap. */
+const CLAY = [1, 1.58, 2.31]
+
 // ---------------------------------------------------------------------------
 // The effects
 
@@ -273,6 +280,28 @@ const EFFECTS: Record<Sfx, Effect> = {
     whoosh(m, out, t + 0.05, { length: 0.28, low: 600, high: 1500, level: 1.2 })
     land(m, out, t + 0.37, 0.4, 0.3)
     land(m, out, t + 0.43, 0.3, 0.3)
+  },
+
+  flip: (m, out, t) => {
+    // A card turned over on the felt: a flick of air, then a soft slap.
+    slide(m, out, t, 0.07, 900, 2200, 0.14)
+    land(m, out, t + 0.06, vary(0.42, 0.12), 0.3)
+  },
+
+  chip: (m, out, t) => {
+    // Clay chips knocking together: a bright, short clack with a little body.
+    metal(m, out, t, vary(2300, 0.1), 0.2, CLAY, 0.05)
+    land(m, out, t, 0.22, 0.25)
+    if (Math.random() < 0.6) metal(m, out, t + vary(0.035, 0.3), vary(2500, 0.1), 0.1, CLAY, 0.04)
+  },
+
+  chips: (m, out, t) => {
+    // A stack pushed across the felt and cut into a pile: a run of clacks.
+    slide(m, out, t, 0.18, 700, 1400, 0.12)
+    land(m, out, t + 0.14, 0.22, 0.2)
+    for (let i = 0; i < 6; i++) {
+      metal(m, out, t + 0.12 + i * vary(0.045, 0.35), vary(2400, 0.12), 0.15 * (1 - i / 8), CLAY, 0.045)
+    }
   },
 
   coin: (m, out, t) => {

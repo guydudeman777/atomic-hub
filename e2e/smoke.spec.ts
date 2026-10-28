@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
-import { skipBoot, watchErrors } from './helpers.ts'
+import { type Page, expect, test } from '@playwright/test'
+import { finishBlackjackRound, skipBoot, watchErrors } from './helpers.ts'
 
 test.beforeEach(async ({ page }) => {
   await skipBoot(page)
@@ -140,4 +140,69 @@ test('reduced motion swaps screens instantly', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Deal' })).toBeVisible()
   await expect(page.locator('html')).not.toHaveAttribute('data-leaving')
   await expect(page.locator('html')).not.toHaveAttribute('data-entering')
+})
+
+/** Deal a round and play it out, standing on everything and declining insurance. */
+async function playRound(page: Page) {
+  const deal = page.getByRole('button', { name: /^Deal/ })
+  await expect(deal).toBeEnabled()
+  await deal.click()
+  await expect(deal).toBeHidden()
+  await finishBlackjackRound(page)
+}
+
+for (const view of ['3D', 'flat'] as const) {
+  test(`a Blackjack round at a full table settles and pays out (${view} view)`, async ({ page }) => {
+    const errors = watchErrors(page)
+    if (view === 'flat') {
+      await page.goto('/#/settings')
+      await page.getByLabel('3D tables').uncheck()
+    }
+    await page.goto('/')
+    await page.getByRole('option', { name: /Blackjack/ }).click()
+    await page.getByRole('button', { name: 'Play Blackjack' }).click()
+    await expect(page.getByRole('radio', { name: /Full table/ })).toHaveAttribute('aria-checked', 'true')
+    await page.getByRole('button', { name: 'Take a seat' }).click()
+
+    // Four regulars at the felt, and the dealer greets you.
+    await expect(page.locator('.bj-plate')).toHaveCount(5)
+    await expect(page.locator('.bj-talk--dealer .bj-talk__bubble')).toContainText('Dot says:')
+    await page.getByRole('button', { name: /Add a 5 chip/ }).click()
+    await expect(page.locator('.bj-bet__amount')).toHaveText('10')
+
+    await playRound(page)
+    const log = page.getByRole('list', { name: 'Table log' })
+    await expect(log.getByText(/^(You win \d+ caps|Blackjack! You win \d+ caps|You lose \d+ caps|Push)/)).toHaveCount(1)
+    await expect(page.locator('.bj-hud__status')).toHaveText(/You win|You lose|Push|Blackjack/)
+
+    // The round is on the record.
+    await page.getByRole('button', { name: 'Leave table' }).click()
+    await page.getByRole('link', { name: 'Back to the hub' }).click()
+    await page.getByRole('link', { name: 'Records' }).click()
+    await expect(page.getByRole('row', { name: /Blackjack/ }).getByRole('cell').first()).toHaveText('1')
+    expect(errors).toEqual([])
+  })
+}
+
+test('one on one with the dealer, with the coach pointing at a play', async ({ page }) => {
+  const errors = watchErrors(page)
+  await page.goto('/#/blackjack')
+  await page.getByRole('radio', { name: /One on one/ }).click()
+  await page.getByRole('button', { name: 'Take a seat' }).click()
+  await expect(page.locator('.bj-plate')).toHaveCount(1)
+  const deal = page.getByRole('button', { name: /^Deal/ })
+  await deal.click()
+
+  // Your first decision has the book's play lit up, unless a blackjack settled the round already.
+  const advised = page.locator('.bj-button.is-advised')
+  await expect(advised.or(deal)).toBeVisible({ timeout: 15_000 })
+  if (await advised.isVisible()) await expect(page.locator('.bj-hud__help')).toContainText(/The book (says|never)/)
+  await finishBlackjackRound(page)
+  expect(errors).toEqual([])
+})
+
+test('the Blackjack strategy chart covers every hand', async ({ page }) => {
+  await page.goto('/#/blackjack/strategy')
+  await expect(page.getByRole('table')).toHaveCount(3)
+  await expect(page.getByRole('row', { name: /^16 / }).getByRole('cell')).toHaveText(['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'])
 })

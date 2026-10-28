@@ -1,0 +1,109 @@
+/*
+ * The 3D table, on while Settings → 3D tables is (html[data-table3d='on']).
+ * Plain CSS 3D transforms, as at the Blackjack and Caravan tables:
+ *
+ * - The felt is one plane tilted away from you by --tilt, seen from your
+ *   chair through the stage's perspective. The dealer stands at the far end.
+ * - Cards lie a pixel apart in depth, so they stack the way the flat view's
+ *   z-index does, and lift off the felt as they're dealt.
+ * - Chip stacks rise off the felt, a little over 2 units per chip.
+ */
+
+/* Seen from straight above the top of the stage, so the far end stays under the dealer. */
+:root[data-table3d='on'] .dw-stage {
+  perspective: 1500px;
+  perspective-origin: 50% 0;
+}
+
+/*
+ * Tilted back from its near edge, which stays put at the bottom of the
+ * stage. Tilted, it stands cos(tilt) as tall as it's deep, so it can be
+ * that much deeper, and its far end shrinks, so it can be a little wider.
+ */
+:root[data-table3d='on'] .dw-felt {
+  --tilt: 24deg;
+  --u: calc(min(104cqw, (100cqh - 4px) / cos(var(--tilt)) * 1000 / var(--felt-h, 560)) / 1000);
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  translate: -50% 0;
+  transform-origin: 50% 100%;
+  transform: rotateX(var(--tilt));
+  transform-style: preserve-3d;
+}
+
+/* The tall table is deep already; tipped back as far, its far end would be a sliver. */
+:root[data-table3d='on'] .dw-felt[data-shape='tall'] {
+  --tilt: 15deg;
+}
+
+:root[data-table3d='on'] .dw-card {
+  transform: translateZ(calc(1px + var(--k) * 0.8px));
+  animation-name: dw-deal-3d;
+  animation-duration: 0.5s;
+}
+
+/* Out of the deck, up over the felt, and down where it lands. */
+@keyframes dw-deal-3d {
+  from {
+    translate: calc(var(--fx) * var(--u)) calc(var(--fy) * var(--u)) calc(40 * var(--u));
+    rotate: -20deg;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  55% {
+    translate: calc(var(--fx) * var(--u) * 0.3) calc(var(--fy) * var(--u) * 0.3) calc(30 * var(--u));
+  }
+}
+
+/* Your cards are a little off the felt: you're holding them. */
+:root[data-table3d='on'] .dw-card.is-yours {
+  transform: translateZ(calc(8px + var(--k) * 0.8px));
+}
+
+/* Picked to throw away: lifted toward you as well as up. */
+:root[data-table3d='on'] .dw-card.is-marked {
+  translate: 0 calc(var(--cw) * -0.2) calc(var(--cw) * 0.15);
+}
+
+:root[data-table3d='on'] .dw-card.is-folded,
+:root[data-table3d='on'] .dw-card.is-tossed {
+  animation-name: dw-to-muck;
+}
+
+:root[data-table3d='on'] .dw-felt-stack {
+  transform-style: preserve-3d;
+  transform: translateZ(1px);
+}
+
+:root[data-table3d='on'] .dw-stack__chip {
+  translate: 0 0 calc(var(--i) * 2.3 * var(--c));
+}
+
+:root[data-table3d='on'] .dw-pot {
+  transform-style: preserve-3d;
+  transform: translateZ(1px);
+}
+
+/*
+ * Labels, speech and your result float just off the felt, over the
+ * regulars' cards. (Stood up, they'd cut through the rail, and half of them
+ * would sink into it.)
+ */
+:root[data-table3d='on'] :is(.dw-plate, .dw-dealer-chip, .dw-drew, .dw-hand-name) {
+  transform: translateZ(6px);
+}
+
+:root[data-table3d='on'] :is(.dw-talk--seat, .dw-talk--table) {
+  translate: 0 0 9px;
+}
+
+:root[data-table3d='on'] .dw-burst {
+  translate: -50% -50% 12px;
+}
+
+:root[data-table3d='on'] :is(.dw-deck, .dw-muck) {
+  transform: translateZ(2px);
+}

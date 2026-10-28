@@ -1,6 +1,7 @@
 /**
  * Sound effects. Cards get warm, airy whooshes and soft landings on felt;
- * bottle caps clink; the terminal keeps its electronic blips. Every effect
+ * bottle caps clink; dice skitter and crack off the table's wall; board
+ * game discs clack onto wood; the terminal keeps its electronic blips. Every effect
  * varies a little each time, so a long game never repeats itself exactly.
  */
 
@@ -30,6 +31,10 @@ export type Sfx =
   | 'chip'
   | 'chips'
   | 'slam'
+  // Dice and boards
+  | 'dice'
+  | 'disc'
+  | 'disc-flip'
   // Results
   | 'coin'
   | 'win'
@@ -164,6 +169,18 @@ function vibe(m: Mixer, out: AudioNode, t: number, midi: number, length: number,
 
 /** Partials of a clay casino chip: lower and deader than a bottle cap. */
 const CLAY = [1, 1.58, 2.31]
+
+/** Partials of a casino die: hard acetate, brighter than clay and quicker to die away. */
+const ACETATE = [1, 1.72, 2.67, 3.4]
+
+/** Partials of a board game disc: a thick wooden counter, low and dry. */
+const COUNTER = [1, 2.03, 3.1]
+
+/** One die striking the table: a click on the felt with a little thump under it. */
+function knock(m: Mixer, out: AudioNode, t: number, level: number, pitch: number) {
+  metal(m, out, t, vary(pitch, 0.1), level * 0.45, ACETATE, 0.025)
+  land(m, out, t, level, 0.18)
+}
 
 // ---------------------------------------------------------------------------
 // The effects
@@ -324,6 +341,50 @@ const EFFECTS: Record<Sfx, Effect> = {
       metal(m, out, at, vary(2300, 0.15), 0.12 * (1 - i / 12), CLAY, 0.04)
     }
     slide(m, out, t + 0.05, 0.12, 2400, 900, 0.08)
+  },
+
+  dice: (m, out, t) => {
+    // A pair thrown the length of the table: each die skips over the felt,
+    // cracks off the rubber wall at the far end, and tumbles to a stop.
+    const { ctx } = m
+    const wallAt = t + vary(0.42, 0.08)
+    for (let die = 0; die < 2; die++) {
+      let at = t + die * vary(0.035, 0.5)
+      let gap = vary(0.13, 0.15)
+      for (let i = 0; i < 3 && at < wallAt - 0.03; i++) {
+        knock(m, out, at, vary(0.28, 0.2) * (1 - i * 0.15), 3100)
+        at += gap
+        gap *= 0.85
+      }
+      const hit = wallAt + die * vary(0.025, 0.6)
+      knock(m, out, hit, vary(0.5, 0.15), 2500)
+      at = hit + vary(0.09, 0.2)
+      gap = vary(0.08, 0.2)
+      let level = 0.3
+      for (let i = 0; i < 4; i++) {
+        knock(m, out, at, vary(level, 0.2), 3300)
+        at += gap
+        gap *= 0.72
+        level *= 0.62
+      }
+    }
+    // The wall itself: rubber over wood, a dull thud under the cracks.
+    const thud = amp(ctx)
+    strike(thud.gain, wallAt, 0.35, 0.12, 0.003)
+    noise(m, wallAt, 0.14, 'pink').connect(filter(ctx, 'lowpass', 420)).connect(thud).connect(out)
+  },
+
+  disc: (m, out, t) => {
+    // A disc set down on the board: a dry wooden clack with a little body.
+    metal(m, out, t, vary(1250, 0.08), 0.18, COUNTER, 0.035)
+    land(m, out, t, vary(0.5, 0.12), 0.55)
+  },
+
+  'disc-flip': (m, out, t) => {
+    // A disc turned over where it lies: a flick of air and a light tick.
+    slide(m, out, t, 0.05, 1300, 2600, 0.07)
+    metal(m, out, t + 0.05, vary(1700, 0.12), 0.09, COUNTER, 0.025)
+    land(m, out, t + 0.05, vary(0.18, 0.2), 0.3)
   },
 
   coin: (m, out, t) => {

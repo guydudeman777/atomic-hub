@@ -1,0 +1,107 @@
+/*
+ * The 3D board, on while Settings → 3D tables is (html[data-table3d='on']).
+ * Plain CSS 3D transforms, as at the card tables:
+ *
+ * - The coffee table and the board are one plane tilted away from you by
+ *   --tilt, seen from your chair through the stage's perspective. Its near
+ *   edge stays put at the bottom of the stage.
+ * - The board's walnut frame has a front edge you can see, and the felt,
+ *   the squares and the discs each sit a little above the layer below.
+ * - Discs drop from above the board, and turned discs lift as they roll
+ *   over. (The flat view runs the same animations; without perspective the
+ *   lift doesn't show, so they read as a quick flip in place.)
+ *
+ * filter, opacity below 1 and overflow flatten 3D for everything inside, so
+ * keep them off the chain from the plane down to the discs.
+ */
+
+:root[data-table3d='on'] .rv-stage {
+  perspective: 1500px;
+  /* Seen from above the top of the stage: the far edge shrinks toward it but never past it. */
+  perspective-origin: 50% 0;
+}
+
+:root[data-table3d='on'] .rv-plane {
+  --tilt: 28deg;
+  /*
+   * Tilted back, the board stands cos(tilt) as tall as it's deep, so it can
+   * be that much deeper than the stage is tall. Its front edge hangs below.
+   */
+  --board: min(100cqw - 48px, (100cqh - 34px) / cos(var(--tilt)));
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  translate: -50% 0;
+  transform-origin: 50% 100%;
+  transform: rotateX(var(--tilt));
+  transform-style: preserve-3d;
+}
+
+:root[data-table3d='on'] .rv-coffee {
+  transform: translateZ(-1px);
+}
+
+/*
+ * Each layer sits half a pixel above the one below it. Browsers can't order
+ * hits between elements in the same plane, so without this, taps on a
+ * square could land on the frame instead.
+ */
+:root[data-table3d='on'] :is(.rv-board, .rv-grid, .rv-square) {
+  transform-style: preserve-3d;
+}
+
+:root[data-table3d='on'] .rv-grid {
+  transform: translateZ(0.5px);
+}
+
+:root[data-table3d='on'] .rv-square {
+  transform: translateZ(0.5px);
+}
+
+:root[data-table3d='on'] .rv-dot {
+  transform: translateZ(1px);
+}
+
+/* The frame's front edge: walnut end grain, hanging down from the near side. */
+:root[data-table3d='on'] .rv-board::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--cell) * 0.32);
+  transform-origin: 50% 100%;
+  transform: rotateX(90deg);
+  border-radius: 0 0 calc(var(--cell) * 0.24) calc(var(--cell) * 0.24);
+  background: linear-gradient(180deg, #3a2211, #1e1006);
+}
+
+/* The board's shadow on the teak, cast ahead of it by the lamp. */
+:root[data-table3d='on'] .rv-board {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 180, 0.25),
+    inset 0 0 0 calc(var(--cell) * 0.06) rgba(0, 0, 0, 0.25),
+    0 calc(var(--cell) * -0.2) calc(var(--cell) * 0.4) rgba(0, 0, 0, 0.5);
+}
+
+/* The pass notice stands up off the board to face you. */
+:root[data-table3d='on'] .rv-notice {
+  translate: -50% -50% 40px;
+}
+
+/* Held upright on a phone, the board is already deep; tipped back as far, its far edge would be a sliver. */
+@media (max-width: 900px) and (orientation: portrait) {
+  :root[data-table3d='on'] .rv-plane {
+    --tilt: 18deg;
+    --board: min(100cqw - 20px, (100cqh - 22px) / cos(var(--tilt)));
+    bottom: 16px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  :root[data-table3d='on'] .rv-plane {
+    --tilt: 22deg;
+    --board: min(100cqw - 24px, (100cqh - 22px) / cos(var(--tilt)));
+    bottom: 16px;
+  }
+}

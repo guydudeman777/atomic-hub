@@ -42,9 +42,9 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'No-limit Hold’em with blinds and side pots against bots with their own personalities.',
   },
   {
-    id: 'draw', name: 'Five-Card Draw', category: 'cards', ready: false, path: '/draw', icon: 'draw',
-    modes: '2–6 seats, AI or hot-seat',
-    blurb: 'Ante up, draw up to three, and bet it all on what you kept.',
+    id: 'draw', name: 'Five-Card Draw', category: 'cards', ready: true, path: '/draw', icon: 'draw',
+    modes: 'Heads up, or up to five saloon regulars',
+    blurb: 'Ante up, draw up to three, and bet it all on what you kept. Fixed limit, in a back room where the regulars bluff.',
   },
   {
     id: 'solitaire', name: 'Solitaire', category: 'cards', ready: false, path: '/solitaire', icon: 'solitaire',
@@ -62,9 +62,9 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'Single-zero wheel with every inside and outside bet.',
   },
   {
-    id: 'craps', name: 'Craps', category: 'casino', ready: false, path: '/craps', icon: 'dice',
-    modes: 'Against the house',
-    blurb: 'Pass line, come bets, odds and the field.',
+    id: 'craps', name: 'Craps', category: 'casino', ready: true, path: '/craps', icon: 'dice',
+    modes: 'Against the house, with the dice in your hand and three regulars at the rail',
+    blurb: 'Pass line, come bets, full odds, place bets, the field and the hardways, on a green felt layout under the marquee lights.',
   },
   {
     id: 'slots', name: 'Slots', category: 'casino', ready: false, path: '/slots', icon: 'slots',
@@ -82,9 +82,9 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'American rules: forced captures, multi-jumps and kings.',
   },
   {
-    id: 'reversi', name: 'Reversi', category: 'board', ready: false, path: '/reversi', icon: 'reversi',
-    modes: 'Against the AI or hot-seat',
-    blurb: 'Flank and flip. Corners win games.',
+    id: 'reversi', name: 'Reversi', category: 'board', ready: true, path: '/reversi', icon: 'reversi',
+    modes: 'Four opponents on a ladder, or hot-seat',
+    blurb: 'Flank and flip. Corners win games. On a walnut board in an atomic-age den.',
   },
   {
     id: 'battleship', name: 'Battleship', category: 'board', ready: false, path: '/battleship', icon: 'ships',

@@ -45,6 +45,9 @@ function gameScreen(prefix: string, importer: () => Promise<GameModule>): GameSc
 export const GAME_SCREENS: readonly GameScreen[] = [
   gameScreen('/caravan', () => import('./games/caravan/ui/CaravanApp')),
   gameScreen('/blackjack', () => import('./games/blackjack/ui/BlackjackApp')),
+  gameScreen('/draw', () => import('./games/draw/ui/DrawApp')),
+  gameScreen('/craps', () => import('./games/craps/ui/CrapsApp')),
+  gameScreen('/reversi', () => import('./games/reversi/ui/ReversiApp')),
 ]
 
 export function screenFor(path: string): GameScreen | undefined {

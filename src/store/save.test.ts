@@ -69,6 +69,19 @@ describe('save store', () => {
     expect(useSave.getState().blackjack).toEqual({ coach: true, count: false })
   })
 
+  it('keeps each table’s preferences, with defaults for saves made before the table opened', () => {
+    useSave.getState().updateDraw({ hints: false })
+    useSave.getState().updateCraps({ guide: false })
+    useSave.getState().updateReversi({ showMoves: false })
+    const { draw, craps, reversi, ...old } = snapshot(useSave.getState())
+    expect({ draw, craps, reversi }).toEqual({ draw: { hints: false }, craps: { guide: false }, reversi: { showMoves: false, beaten: {} } })
+    expect(useSave.getState().importSave(JSON.stringify(old))).toEqual({ ok: true })
+    const fresh = newSave()
+    expect(useSave.getState().draw).toEqual(fresh.draw)
+    expect(useSave.getState().craps).toEqual(fresh.craps)
+    expect(useSave.getState().reversi).toEqual(fresh.reversi)
+  })
+
   it('rejects files that are not saves', () => {
     expect(useSave.getState().importSave('{"hello":1}')).toMatchObject({ ok: false })
     expect(useSave.getState().importSave('not json')).toMatchObject({ ok: false })

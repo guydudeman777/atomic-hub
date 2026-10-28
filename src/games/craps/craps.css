@@ -1,0 +1,1967 @@
+/*
+ * Craps: the pit on a classic Vegas floor. Red-and-gold carpet, a marquee of
+ * chasing bulbs, and a green felt layout in a mahogany tub. The in-game HUD
+ * reuses the hub's terminal screen. The 3D view is in craps-3d.css.
+ *
+ * No filter on .cr-felt or anything between it and the dice: filters
+ * flatten 3D for everything inside (the table's shadow is in its SVG).
+ *
+ * Everything on the felt is placed in felt units (--u, a thousandth of the
+ * layout's width) from positions worked out in ui/layout.ts. The layout is
+ * --felt-h units tall; --d is a chip's diameter and --die a die's side,
+ * both in felt units, and --scale says how much bigger they are than the
+ * wide layout's.
+ */
+
+.cr {
+  --gold: #f2cd5c;
+  --gold-deep: #b8892e;
+  --cream: #f6efdd;
+  --cream-dim: #c8bda5;
+  --mahogany: #4a170b;
+  --mahogany-deep: #250904;
+  --lacquer: #1e0f0a;
+  --lacquer-deep: #120805;
+  --bulb: #ffd45e;
+  --red: #d42f36;
+  --red-deep: #8f161c;
+  --mint: #6de3a3;
+  --font-deco: 'Limelight', 'Georgia', serif;
+  --font-sign: 'Monoton', 'Limelight', serif;
+
+  color: var(--cream);
+  min-height: var(--app-height);
+  font-family: var(--font-body);
+}
+
+/* The casino carpet: gold diamonds and teal fans on oxblood, worn dark. */
+.cr-room {
+  background-color: #2a0a0c;
+  background-image:
+    radial-gradient(ellipse 65% 55% at 50% 45%, rgba(255, 200, 90, 0.12), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0, 0, 0, 0.7) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath d='M36 22l7 14-7 14-7-14z' fill='%23f2cd5c' fill-opacity='.1'/%3E%3Cpath d='M0 0q12 12 0 24M72 48q-12 12 0 24' fill='none' stroke='%2346c9b8' stroke-opacity='.08' stroke-width='2'/%3E%3Cg fill='%23f2cd5c' fill-opacity='.08'%3E%3Ccircle cx='0' cy='36' r='3'/%3E%3Ccircle cx='72' cy='36' r='3'/%3E%3Ccircle cx='36' cy='0' r='3'/%3E%3Ccircle cx='36' cy='72' r='3'/%3E%3C/g%3E%3C/svg%3E");
+  background-attachment: fixed;
+}
+
+/* Phones don't keep fixed backgrounds still, and repaint them on every scroll. */
+@media (hover: none) {
+  .cr-room {
+    background-attachment: scroll;
+  }
+}
+
+.cr-ink-dim {
+  color: var(--cream-dim);
+}
+
+/* ---- Panels, buttons ---------------------------------------------------- */
+
+.cr-panel {
+  background: linear-gradient(180deg, var(--lacquer), var(--lacquer-deep));
+  border: 1px solid rgba(242, 205, 92, 0.35);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 40px rgba(0, 0, 0, 0.5);
+  padding: clamp(16px, 2vw, 28px);
+}
+
+.cr-panel h2,
+.cr-panel h3 {
+  font-family: var(--font-deco);
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--gold);
+  margin: 0 0 10px;
+}
+
+.cr-panel h2 {
+  font-size: var(--step-2);
+}
+
+.cr-panel h3 {
+  font-size: var(--step-1);
+  margin-top: 20px;
+}
+
+.cr-panel p {
+  margin: 0 0 10px;
+}
+
+.cr-panel a {
+  color: var(--gold);
+}
+
+.cr-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 9px 20px 8px;
+  border: 2px solid var(--gold-deep);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #4a2116, #26100a);
+  color: var(--cream);
+  font-family: var(--font-deco);
+  font-size: var(--step-1);
+  line-height: 1;
+  text-decoration: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 3px 0 #120604,
+    0 6px 12px rgba(0, 0, 0, 0.4);
+  transition:
+    translate 0.08s ease-out,
+    box-shadow 0.15s ease-out;
+}
+
+@media (hover: hover) {
+  .cr-button:hover:not(:disabled) {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, #5b2a1c, #30140c);
+  }
+}
+
+.cr-button:active:not(:disabled) {
+  translate: 0 2px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 1px 0 #120604;
+}
+
+.cr-button--primary {
+  background: linear-gradient(180deg, #d63a40, #93171d);
+  border-color: var(--gold);
+}
+
+@media (hover: hover) {
+  .cr-button--primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #e5454b, #a51d24);
+  }
+}
+
+.cr-button--big {
+  font-size: var(--step-2);
+  padding: 12px 34px 11px;
+}
+
+.cr-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cr-key {
+  font-family: var(--font-body);
+  font-size: var(--step--1);
+  padding: 1px 5px;
+  border: 1px solid rgba(246, 239, 221, 0.35);
+  border-radius: 3px;
+  opacity: 0.75;
+}
+
+.cr :focus-visible {
+  box-shadow: 0 0 0 2px var(--lacquer-deep), 0 0 0 4px var(--gold);
+}
+
+/* ---- Pages: lobby, bets and odds, rules -------------------------------- */
+
+.cr-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.cr-header {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2.4vw, 32px);
+  flex-wrap: wrap;
+  padding: 16px clamp(16px, 3vw, 40px);
+  border-bottom: 1px solid rgba(242, 205, 92, 0.25);
+  background: linear-gradient(180deg, rgba(10, 2, 2, 0.85), rgba(10, 2, 2, 0.4));
+}
+
+.cr-back,
+.cr-caps {
+  color: var(--cream-dim);
+  text-decoration: none;
+  font-size: var(--step--1);
+}
+
+@media (hover: hover) {
+  .cr-back:hover,
+  .cr-caps:hover {
+    color: var(--cream);
+  }
+}
+
+.cr-caps {
+  margin-left: auto;
+  font-family: var(--font-deco);
+  font-size: var(--step-1);
+  color: var(--gold);
+}
+
+/*
+ * The marquee over the pit: neon in Monoton, in a frame of bulbs that chase
+ * around it. The frame is a strip of dots, masked down to a border.
+ */
+.cr-marquee {
+  position: relative;
+  margin: 0;
+  padding: 10px 22px 8px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #3a0c10, #1c0507);
+  box-shadow:
+    inset 0 0 0 2px #6b1c22,
+    0 6px 18px rgba(0, 0, 0, 0.55);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.cr-marquee__text {
+  position: relative;
+  display: block;
+  font-family: var(--font-sign);
+  font-size: var(--step-4);
+  letter-spacing: 0.06em;
+  color: #fff3c7;
+  text-shadow:
+    0 0 2px #fff,
+    0 0 8px var(--bulb),
+    0 0 18px #ff9d2e,
+    0 0 34px rgba(255, 120, 40, 0.6);
+  animation: cr-neon-on 1.3s steps(1, end) backwards;
+}
+
+.cr-marquee__bulbs {
+  position: absolute;
+  inset: 0;
+  padding: 5px;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 4px 50%, #fffbe6 0 1.4px, var(--bulb) 2.2px, transparent 3.4px) 0 0 / 14px 10px,
+    radial-gradient(circle at 11px 50%, #7a5414 0 1.4px, transparent 2.4px) 0 0 / 14px 10px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  animation: cr-chase 0.5s steps(1, end) infinite;
+}
+
+/* Every other bulb lights in turn, so the lights seem to run round the frame. */
+@keyframes cr-chase {
+  50% {
+    background-position: 7px 0, 7px 0;
+  }
+}
+
+/* Two false starts and a stutter, then it holds. */
+@keyframes cr-neon-on {
+  0% {
+    opacity: 0.12;
+  }
+  8% {
+    opacity: 1;
+  }
+  13% {
+    opacity: 0.18;
+  }
+  22% {
+    opacity: 1;
+  }
+  27% {
+    opacity: 0.35;
+  }
+  36%,
+  100% {
+    opacity: 1;
+  }
+}
+
+.cr-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cr-nav__link {
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: var(--cream-dim);
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .cr-nav__link:hover {
+    color: var(--cream);
+  }
+}
+
+.cr-nav__link[aria-current='page'] {
+  color: var(--lacquer-deep);
+  background: var(--gold);
+}
+
+.cr-main {
+  flex: 1;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: clamp(16px, 3vw, 36px) clamp(16px, 3vw, 40px) 48px;
+}
+
+.cr-page-panel {
+  max-width: 82ch;
+  margin: 0 auto;
+}
+
+.cr-lobby {
+  display: grid;
+  gap: 20px;
+}
+
+.cr-resume {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cr-resume p {
+  margin: 0;
+}
+
+.cr-stakes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.cr-stake {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  text-align: left;
+  padding: 0 0 14px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: none;
+}
+
+/* A table-limit sign: green felt in a brass frame, as it sits on the rail. */
+.cr-stake__sign {
+  display: grid;
+  gap: 2px;
+  padding: 14px 16px 12px;
+  border-radius: 6px;
+  background: radial-gradient(ellipse at 40% 30%, #1c8a4a, #0b4f28);
+  border: 2px solid var(--gold-deep);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 8px 18px rgba(0, 0, 0, 0.5);
+}
+
+.cr-stake__name,
+.cr-stake__props {
+  color: #e7f3e9;
+}
+
+.cr-stake__props {
+  font-size: var(--step--1);
+  opacity: 0.8;
+}
+
+.cr-stake__limits {
+  font-family: var(--font-deco);
+  font-size: var(--step-3);
+  line-height: 1;
+  color: var(--gold);
+  font-variant-numeric: lining-nums;
+}
+
+.cr-stake__blurb,
+.cr-stake__dealer {
+  padding: 0 4px;
+}
+
+.cr-stake__dealer {
+  color: var(--cream-dim);
+  font-size: var(--step--1);
+}
+
+@media (hover: hover) {
+  .cr-stake:hover .cr-stake__sign {
+    border-color: var(--gold);
+  }
+}
+
+.cr-stake[aria-checked='true'] .cr-stake__sign {
+  border-color: #fff0b8;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 0 0 3px rgba(242, 205, 92, 0.35),
+    0 8px 22px rgba(0, 0, 0, 0.55);
+}
+
+.cr-stake.is-short {
+  opacity: 0.55;
+}
+
+.cr-lobby__go {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 4px 4px 8px;
+}
+
+.cr-lobby__go p {
+  margin: 0;
+}
+
+.cr-regulars ul {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 28px;
+}
+
+.cr-regulars li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  color: var(--cream-dim);
+}
+
+.cr-regulars li strong {
+  color: var(--cream);
+  font-weight: 400;
+  font-family: var(--font-deco);
+  margin-right: 4px;
+}
+
+.cr-regulars .cr-portrait-dot {
+  width: 12px;
+  height: 12px;
+  border-color: rgba(246, 239, 221, 0.7);
+  translate: 0 1px;
+}
+
+.cr-primer ol {
+  margin: 0 0 12px;
+  padding-left: 1.4em;
+  display: grid;
+  gap: 8px;
+}
+
+.cr-primer strong,
+.cr-rules strong {
+  color: var(--gold);
+  font-weight: 400;
+}
+
+/* Rules and the odds tables */
+
+.cr-rules ul {
+  margin: 0 0 10px;
+  padding-left: 1.2em;
+}
+
+.cr-rules li {
+  margin-bottom: 6px;
+}
+
+.cr-rules__keys {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.cr-rules__keys dt {
+  color: var(--gold);
+}
+
+.cr-rules__keys dd {
+  margin: 0;
+}
+
+.cr-bets__tables {
+  display: grid;
+  gap: 22px;
+  margin: 16px 0 4px;
+  overflow-x: auto;
+}
+
+.cr-odds {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.cr-odds caption {
+  text-align: left;
+  font-family: var(--font-deco);
+  font-size: var(--step-1);
+  color: var(--gold);
+  padding-bottom: 6px;
+}
+
+.cr-odds th,
+.cr-odds td {
+  padding: 5px 10px 5px 0;
+  text-align: left;
+  border-bottom: 1px solid rgba(242, 205, 92, 0.15);
+  vertical-align: baseline;
+}
+
+.cr-odds thead th {
+  font-weight: 400;
+  color: var(--cream-dim);
+  font-size: var(--step--1);
+}
+
+.cr-odds tbody th {
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.cr-odds__note {
+  color: var(--cream-dim);
+  font-size: var(--step--1);
+}
+
+.cr-odds [data-edge] {
+  white-space: nowrap;
+}
+
+.cr-odds [data-edge='none'] {
+  color: var(--mint);
+}
+
+.cr-odds [data-edge='low'] {
+  color: #d9f0c2;
+}
+
+.cr-odds [data-edge='mid'] {
+  color: var(--gold);
+}
+
+.cr-odds [data-edge='high'] {
+  color: #ff8d8f;
+}
+
+/* ---- The table ----------------------------------------------------------- */
+
+.cr-game {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 22vw, 340px);
+  height: var(--app-height);
+  overflow: hidden;
+}
+
+.cr-board {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 6px;
+  min-height: 0;
+  padding: 10px clamp(10px, 1.6vw, 24px) 12px;
+}
+
+/* The stickman stands across the table; the limits sign sits off to the side. */
+.cr-stick-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 2px 6px;
+}
+
+.cr-stick-bar__who {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cr-portrait {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid var(--gold-deep);
+  background: radial-gradient(circle at 40% 35%, #2a6a44, #0c3520);
+  color: var(--gold);
+}
+
+.cr-portrait svg {
+  width: 62%;
+  height: 62%;
+}
+
+.cr-stick-bar__name {
+  font-family: var(--font-deco);
+  font-size: var(--step-2);
+  line-height: 1;
+}
+
+/* On the left, so the stickman's calls have the room to his right. */
+.cr-placard {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  justify-items: start;
+  padding: 6px 12px 5px;
+  border-radius: 4px;
+  background: radial-gradient(ellipse at 40% 30%, #1c8a4a, #0b4f28);
+  border: 1px solid var(--gold-deep);
+  line-height: 1.15;
+}
+
+.cr-placard__table {
+  font-size: var(--step--1);
+  color: #d9eadc;
+}
+
+.cr-placard__limits {
+  font-family: var(--font-deco);
+  color: var(--gold);
+}
+
+/*
+ * The stage holds the felt, as big as fits. Its own stacking order keeps the
+ * bets' z-indexes inside it, under the HUD and its menu.
+ */
+.cr-stage {
+  position: relative;
+  z-index: 0;
+  min-height: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+}
+
+.cr-felt {
+  --u: calc(min(100cqw, 100cqh * 1000 / var(--felt-h, 620)) / 1000);
+  position: relative;
+  width: calc(1000 * var(--u));
+  height: calc(var(--felt-h, 620) * var(--u));
+}
+
+.cr-felt__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+/* Everything on the felt is placed by layout.ts, in felt units. */
+.cr-zone,
+.cr-stack,
+.cr-chips-tap,
+.cr-puck,
+.cr-die,
+.cr-burst,
+.cr-plate,
+.cr-talk--seat {
+  position: absolute;
+  left: calc(var(--x) * var(--u));
+  top: calc(var(--y) * var(--u));
+}
+
+/* ---- Bet areas -------------------------------------------------------------- */
+
+.cr-zone {
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--h) * var(--u));
+  padding: 0;
+  border: 0;
+  border-radius: calc(8 * var(--u));
+  background: transparent;
+  z-index: 2;
+  transition:
+    background-color 0.15s ease-out,
+    box-shadow 0.15s ease-out;
+}
+
+.cr-zone[aria-disabled='true'] {
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .cr-zone.is-open:not([aria-disabled='true']):hover {
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 0 0 2px rgba(246, 239, 221, 0.75);
+  }
+
+  .cr-game.is-taking-down .cr-zone.is-open:not([aria-disabled='true']):hover {
+    background: rgba(212, 47, 54, 0.14);
+    box-shadow: inset 0 0 0 2px #ff8d8f;
+  }
+}
+
+.cr-zone:active:not([aria-disabled='true']) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* The guide's pick, glowing gold. */
+.cr-zone.is-advised:not([aria-disabled='true']) {
+  box-shadow:
+    inset 0 0 0 3px var(--gold),
+    0 0 calc(18 * var(--u)) rgba(242, 205, 92, 0.6);
+  animation: cr-advise 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes cr-advise {
+  to {
+    box-shadow:
+      inset 0 0 0 3px rgba(242, 205, 92, 0.55),
+      0 0 calc(6 * var(--u)) rgba(242, 205, 92, 0.3);
+  }
+}
+
+/* Taking bets down: every bet that can come down is ringed in red. */
+.cr-game.is-taking-down .cr-zone.is-open {
+  box-shadow: inset 0 0 0 2px rgba(255, 141, 143, 0.75);
+}
+
+/* ---- Chips ------------------------------------------------------------------ */
+
+.cr .bj-chip-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --cd is a chip's diameter in pixels: grown on small tables so chips stay readable. */
+.cr-stack,
+.cr-chips-tap {
+  --cd: calc(var(--d) * var(--u) * var(--chip-scale, 1));
+  width: var(--cd);
+  height: var(--cd);
+  margin: calc(var(--cd) / -2) 0 0 calc(var(--cd) / -2);
+}
+
+.cr-stack {
+  z-index: 30;
+  pointer-events: none;
+}
+
+.cr-stack__chip {
+  position: absolute;
+  inset: 0;
+  translate: 0 calc(var(--i) * -0.085 * var(--cd));
+  filter: drop-shadow(0 calc(0.04 * var(--cd)) 0 rgba(0, 0, 0, 0.55));
+}
+
+/* Chips drop onto a bet as they're added. (Not the ones being paid, swept or handed back.) */
+.cr-stack:not(.is-paid, .is-back, .is-taken) .cr-stack__chip {
+  animation: cr-chip-drop 0.2s ease-out backwards;
+}
+
+@keyframes cr-chip-drop {
+  from {
+    translate: 0 calc((var(--i) * -0.085 - 0.5) * var(--cd));
+    opacity: 0;
+  }
+}
+
+/* A bet that's off this roll wears the dealer's OFF button. */
+.cr-stack__off {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  translate: -50% -70%;
+  padding: 0 calc(0.12 * var(--cd));
+  border-radius: 999px;
+  background: #111;
+  color: #f4efe2;
+  font-family: var(--font-deco);
+  font-size: max(9px, calc(0.3 * var(--cd)));
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  z-index: 20;
+}
+
+.cr-stack.is-off .cr-stack__chip {
+  opacity: 0.82;
+}
+
+/* A come bet on its number: a button you tap for odds. */
+.cr-chips-tap {
+  z-index: 31;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+}
+
+.cr-chips-tap .cr-stack {
+  left: 50%;
+  top: 50%;
+}
+
+.cr-chips-tap.is-open:not([aria-disabled='true']) {
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .cr-chips-tap.is-open:not([aria-disabled='true']):hover {
+    box-shadow: 0 0 0 2px var(--gold), 0 0 calc(12 * var(--u)) rgba(242, 205, 92, 0.7);
+  }
+}
+
+.cr-game.is-taking-down .cr-chips-tap.is-open {
+  box-shadow: 0 0 0 2px #ff8d8f;
+}
+
+/* A come bet travelling to its number. */
+.cr-stack.is-moved,
+.cr-chips-tap .cr-stack.is-moved {
+  animation: cr-chips-move 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+}
+
+@keyframes cr-chips-move {
+  from {
+    translate: calc(var(--fx) * var(--u)) calc(var(--fy) * var(--u));
+  }
+}
+
+/* Winnings: pushed out from the bank, set beside the bet, then back to your rail. */
+.cr-stack.is-paid {
+  z-index: 45;
+  animation: cr-paid 2.1s cubic-bezier(0.3, 0.6, 0.4, 1) forwards;
+}
+
+@keyframes cr-paid {
+  0% {
+    translate: calc(var(--fx) * var(--u)) calc(var(--fy) * var(--u));
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  25%,
+  72% {
+    translate: 0 0;
+    opacity: 1;
+  }
+  100% {
+    translate: calc(var(--rx) * var(--u)) calc(var(--ry) * var(--u));
+    opacity: 0;
+  }
+}
+
+/* A bet that comes down with its winnings, or odds handed back. */
+.cr-stack.is-back {
+  z-index: 44;
+  animation: cr-back 2.1s ease-in forwards;
+}
+
+@keyframes cr-back {
+  0%,
+  72% {
+    translate: 0 0;
+    opacity: 1;
+  }
+  100% {
+    translate: calc(var(--rx) * var(--u)) calc(var(--ry) * var(--u));
+    opacity: 0;
+  }
+}
+
+/* A lost bet, swept to the bank. */
+.cr-stack.is-taken {
+  z-index: 44;
+  animation: cr-taken 1.1s ease-in forwards;
+}
+
+@keyframes cr-taken {
+  0%,
+  30% {
+    translate: 0 0;
+    opacity: 1;
+  }
+  100% {
+    translate: calc(var(--rx) * var(--u)) calc(var(--ry) * var(--u));
+    opacity: 0;
+  }
+}
+
+/* ---- The puck ------------------------------------------------------------------ */
+
+.cr-puck {
+  --p: calc(var(--d) * 1.05 * var(--u) * var(--chip-scale, 1));
+  width: var(--p);
+  height: var(--p);
+  margin: calc(var(--p) / -2) 0 0 calc(var(--p) / -2);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-family: var(--font-deco);
+  font-size: calc(var(--p) * 0.32);
+  line-height: 1;
+  z-index: 40;
+  pointer-events: none;
+  box-shadow:
+    0 calc(0.06 * var(--p)) calc(0.1 * var(--p)) rgba(0, 0, 0, 0.55),
+    inset 0 0 0 calc(0.06 * var(--p)) rgba(0, 0, 0, 0.2);
+  transition:
+    left 0.45s cubic-bezier(0.3, 0.7, 0.3, 1),
+    top 0.45s cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+
+.cr-puck.is-off {
+  background: radial-gradient(circle at 40% 35%, #3a3a3a, #0b0b0b);
+  color: #f4efe2;
+}
+
+.cr-puck.is-on {
+  background: radial-gradient(circle at 40% 35%, #ffffff, #dcd6c6);
+  color: #111;
+  animation: cr-puck-flip 0.45s ease-out;
+}
+
+/* Turned over as it moves to the point. */
+@keyframes cr-puck-flip {
+  from {
+    rotate: y 180deg;
+  }
+}
+
+/* ---- The dice ---------------------------------------------------------------- */
+
+.cr-dice {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 80;
+}
+
+/*
+ * Out of your hand, down the table to the wall, back off it in a hop, and to
+ * rest: the wall at 44%, in step with the `dice` sound. Flat, height shows
+ * as size; the 3D view lifts them for real (craps-3d.css).
+ */
+.cr-die {
+  --dd: calc(var(--die) * var(--u) * var(--chip-scale, 1));
+  width: var(--dd);
+  height: var(--dd);
+  margin: calc(var(--dd) / -2) 0 0 calc(var(--dd) / -2);
+  perspective: calc(10 * var(--dd));
+  animation: cr-throw 0.95s linear var(--delay, 0ms) backwards;
+}
+
+/* The die's shadow on the felt. */
+.cr-die::before {
+  content: '';
+  position: absolute;
+  inset: 8% -6% -14% 10%;
+  border-radius: 30%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.55), transparent);
+}
+
+@keyframes cr-throw {
+  0% {
+    translate: calc(var(--sx) * var(--u)) calc(var(--sy) * var(--u));
+    scale: 1.45;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.25, 0.4, 0.6, 1);
+  }
+  8% {
+    opacity: 1;
+  }
+  44% {
+    translate: calc(var(--wx) * var(--u)) calc(var(--wy) * var(--u));
+    scale: 1.05;
+    animation-timing-function: cubic-bezier(0.2, 0.6, 0.5, 1);
+  }
+  62% {
+    translate: calc(var(--hx) * var(--u)) calc(var(--hy) * var(--u));
+    scale: 1.18;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  76% {
+    scale: 1;
+  }
+  84% {
+    scale: 1.05;
+  }
+  100% {
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+.cr-die__cube {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateZ(var(--rz)) rotateX(var(--fx)) rotateY(var(--fy));
+  animation: cr-tumble 0.95s cubic-bezier(0.15, 0.55, 0.3, 1) var(--delay, 0ms) backwards;
+}
+
+/* Tumbling the whole way, slowing as it settles on its face. */
+@keyframes cr-tumble {
+  from {
+    transform: rotateZ(calc(var(--rz) - 240deg)) rotateX(calc(var(--fx) + 900deg)) rotateY(calc(var(--fy) + 540deg));
+  }
+}
+
+/* Translucent casino red with white pips. Face 1 is on top; 6 under it, 2 and 5 at the sides, 3 and 4 at the ends. */
+.cr-die__face {
+  position: absolute;
+  inset: 0;
+  border-radius: 14%;
+  background: radial-gradient(circle at 30% 25%, #ec4a50, #b3121a 60%, #8c0b12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  backface-visibility: hidden;
+}
+
+.cr-die__face svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: #fdf8ee;
+}
+
+.cr-die__face[data-face='1'] {
+  transform: translateZ(calc(var(--dd) / 2));
+}
+
+.cr-die__face[data-face='6'] {
+  transform: rotateY(180deg) translateZ(calc(var(--dd) / 2));
+}
+
+.cr-die__face[data-face='2'] {
+  transform: rotateY(90deg) translateZ(calc(var(--dd) / 2));
+}
+
+.cr-die__face[data-face='5'] {
+  transform: rotateY(-90deg) translateZ(calc(var(--dd) / 2));
+}
+
+.cr-die__face[data-face='3'] {
+  transform: rotateX(90deg) translateZ(calc(var(--dd) / 2));
+}
+
+.cr-die__face[data-face='4'] {
+  transform: rotateX(-90deg) translateZ(calc(var(--dd) / 2));
+}
+
+/* ---- Your result -------------------------------------------------------------- */
+
+.cr-burst {
+  z-index: 90;
+  translate: -50% -50%;
+  font-family: var(--font-deco);
+  font-size: calc(46 * var(--u) * var(--scale, 1));
+  line-height: 1;
+  color: var(--cream);
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 calc(3 * var(--u)) calc(8 * var(--u)) rgba(0, 0, 0, 0.6);
+  animation: cr-burst 2.2s ease-out forwards;
+}
+
+.cr-burst.is-up {
+  color: #fff2c4;
+  text-shadow:
+    0 0 calc(10 * var(--u)) rgba(242, 205, 92, 0.8),
+    0 calc(3 * var(--u)) calc(8 * var(--u)) rgba(0, 0, 0, 0.6);
+}
+
+.cr-burst.is-down {
+  color: #f0b7bb;
+}
+
+@keyframes cr-burst {
+  from {
+    opacity: 0;
+    transform: translateY(calc(30 * var(--u))) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: none;
+  }
+  75% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(calc(-40 * var(--u)));
+  }
+}
+
+/* ---- The rail: your plate and the regulars' ------------------------------------- */
+
+/* Brass, engraved, screwed to the rail. */
+.cr-plate {
+  z-index: 20;
+  translate: -50% -50%;
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  padding: calc(2 * var(--u)) calc(9 * var(--u));
+  border-radius: calc(4 * var(--u));
+  background: linear-gradient(180deg, #e2c272, #a17d34);
+  color: #2a1a08;
+  font-size: max(11px, calc(13 * var(--u)));
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 calc(2 * var(--u)) calc(3 * var(--u)) rgba(0, 0, 0, 0.5);
+  animation: cr-plate-in 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+}
+
+@keyframes cr-plate-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+.cr-plate.is-you {
+  background: linear-gradient(180deg, #fff0b8, #d9b25a);
+}
+
+.cr-plate__name {
+  font-family: var(--font-deco);
+}
+
+.cr-plate__stack {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.cr-plate__short {
+  display: none;
+}
+
+.cr-portrait-dot {
+  flex: none;
+  width: max(8px, calc(10 * var(--u)));
+  height: max(8px, calc(10 * var(--u)));
+  border-radius: 50%;
+  border: 1px solid #2a1a08;
+}
+
+/* A small table: first names. Upright, just the name, with the stack in its title. */
+@container (max-width: 800px) {
+  .cr-plate__full {
+    display: none;
+  }
+
+  .cr-plate__short {
+    display: inline;
+  }
+}
+
+.cr-felt[data-shape='tall'] .cr-plate:not(.is-you) .cr-plate__stack {
+  display: none;
+}
+
+/* ---- Talk: the stickman's calls, and the rail's remarks ---------------------------- */
+
+.cr-talk {
+  pointer-events: none;
+  z-index: 70;
+}
+
+.cr-talk--stick {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%;
+}
+
+.cr-talk__bubble {
+  position: absolute;
+  width: max-content;
+  max-width: min(340px, 32vw);
+  margin: 0;
+  padding: 7px 12px 8px;
+  border-radius: 10px;
+  translate: 0 -50%;
+  transform-origin: 0 50%;
+  background: linear-gradient(180deg, #fbf4e2, var(--cream));
+  color: #1f1b16;
+  font-size: var(--step--1);
+  line-height: 1.35;
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+  animation:
+    cr-talk-in 0.24s cubic-bezier(0.3, 1.5, 0.5, 1) backwards,
+    cr-talk-out 0.3s ease-in var(--hold) forwards;
+}
+
+.cr-talk__bubble::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  margin-top: -6px;
+  border: 6px solid transparent;
+  border-right: 9px solid var(--cream);
+  border-left-width: 0;
+}
+
+/* A regular's remark rises from their plate, pointing down at it. */
+.cr-talk--seat {
+  width: 0;
+  height: 0;
+}
+
+.cr-talk--seat .cr-talk__bubble {
+  top: auto;
+  bottom: calc(18 * var(--u));
+  translate: -50% 0;
+  min-width: 100px;
+  max-width: min(calc(280 * var(--u) * var(--scale, 1)), 72vw);
+  font-size: max(12px, calc(13 * var(--u)));
+  transform-origin: 50% 100%;
+}
+
+.cr-talk--seat .cr-talk__bubble::before {
+  right: auto;
+  left: 50%;
+  top: 100%;
+  margin: 0 0 0 -6px;
+  border: 6px solid transparent;
+  border-top: 9px solid var(--cream);
+  border-bottom-width: 0;
+}
+
+/* The outer seats' bubbles lean in from the table's edges. */
+.cr-talk--s0 .cr-talk__bubble {
+  translate: calc(-90 * var(--u)) 0;
+  transform-origin: calc(90 * var(--u)) 100%;
+}
+
+.cr-talk--s0 .cr-talk__bubble::before {
+  left: calc(90 * var(--u));
+}
+
+.cr-talk--s2 .cr-talk__bubble {
+  translate: calc(-100% + 110 * var(--u)) 0;
+  transform-origin: calc(100% - 110 * var(--u)) 100%;
+}
+
+.cr-talk--s2 .cr-talk__bubble::before {
+  left: auto;
+  right: calc(110 * var(--u) - 6px);
+}
+
+@keyframes cr-talk-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@keyframes cr-talk-out {
+  to {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+
+/* ---- Your rail: chips, and the dice ------------------------------------------------ */
+
+.cr-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px 28px;
+  min-height: 84px;
+  padding: 10px 18px;
+  border-radius: 14px;
+  border-top: 2px solid var(--gold-deep);
+  background: linear-gradient(180deg, #5a1d0e, #2a0b05);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.35),
+    0 10px 20px rgba(0, 0, 0, 0.5);
+}
+
+.cr-controls p {
+  margin: 0;
+}
+
+.cr-controls--broke {
+  justify-content: space-between;
+}
+
+.cr-controls--broke p {
+  max-width: 60ch;
+}
+
+/* The chip groove along the rail: pick the chip you bet with. */
+.cr-rack {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.cr-rack__chip {
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.6));
+  transition:
+    translate 0.1s ease-out,
+    filter 0.15s ease-out;
+}
+
+.cr-rack__chip[aria-checked='true'] {
+  translate: 0 -5px;
+  filter: drop-shadow(0 0 0 #000) drop-shadow(0 0 6px rgba(242, 205, 92, 0.95)) drop-shadow(0 6px 2px rgba(0, 0, 0, 0.5));
+}
+
+@media (hover: hover) {
+  .cr-rack__chip:hover {
+    translate: 0 -3px;
+  }
+}
+
+.cr-rack__down {
+  min-height: 40px;
+  padding: 4px 12px;
+  border: 2px dashed rgba(246, 239, 221, 0.4);
+  border-radius: 999px;
+  background: none;
+  color: var(--cream-dim);
+  font-family: var(--font-deco);
+  font-size: var(--step-0);
+  line-height: 1;
+}
+
+.cr-rack__down[aria-checked='true'] {
+  border-style: solid;
+  border-color: #ff8d8f;
+  background: rgba(212, 47, 54, 0.25);
+  color: #ffd9da;
+}
+
+.cr-bet {
+  display: grid;
+  justify-items: center;
+  min-width: 110px;
+  line-height: 1.1;
+}
+
+.cr-bet__label {
+  font-size: var(--step--1);
+  color: var(--cream-dim);
+}
+
+.cr-bet__amount {
+  font-family: var(--font-deco);
+  font-size: var(--step-3);
+  line-height: 1;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.cr-controls__buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.cr-button--roll {
+  min-width: 140px;
+}
+
+/* ---- HUD: the terminal on the table ------------------------------------------------ */
+
+/* Above the stage and the stickman's calls, so the menu and rules it opens cover the table. */
+.cr-hud.screen {
+  z-index: 100;
+  margin: 12px 12px 12px 0;
+  border-radius: 12px;
+  padding: 16px 16px 14px;
+  gap: 10px;
+  color: var(--ph);
+  font-size: var(--step--1);
+}
+
+.cr-hud p {
+  margin: 0;
+}
+
+.cr-hud__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cr-hud__stake {
+  color: var(--ph-strong);
+}
+
+.cr-hud__status {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  line-height: 1.05;
+  color: var(--ph-strong);
+}
+
+.cr-hud__help {
+  min-height: 4.4em;
+  line-height: 1.45;
+}
+
+.cr-hud__warn {
+  color: var(--ph-strong);
+  border: 1px solid var(--ph-faint);
+  padding: 4px 8px;
+}
+
+/* The latest rolls, newest first, sevens marked. */
+.cr-hud__rolls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A label for the eye; screen readers get the list's own name. */
+.cr-hud__rolls::before {
+  content: 'Rolls';
+  align-self: center;
+  margin-right: 4px;
+  color: var(--ph-dim);
+}
+
+.cr-hud__rolls li {
+  min-width: 2.1em;
+  padding: 1px 4px;
+  border: 1px solid var(--ph-faint);
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  line-height: 1.1;
+  color: var(--ph-dim);
+}
+
+.cr-hud__rolls li:first-child {
+  color: var(--ph-strong);
+  border-color: var(--ph-dim);
+}
+
+.cr-hud__rolls li[data-seven] {
+  background: var(--ph-faint);
+}
+
+.cr-hud__log {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 4px 0 0;
+  padding: 8px 0 0;
+  list-style: none;
+  border-top: 2px solid var(--ph-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.4;
+  color: var(--ph-dim);
+}
+
+.cr-hud__log li::before {
+  content: '> ';
+}
+
+.cr-hud__log li[data-mine] {
+  color: var(--ph);
+}
+
+.cr-hud__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cr-hud .term-button {
+  font-size: var(--step-0);
+  padding: 4px 10px;
+}
+
+/* ---- Overlays -------------------------------------------------------------- */
+
+.cr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(10, 2, 2, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+.cr-rules-modal {
+  max-width: 78ch;
+  max-height: 86vh;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  color: var(--cream);
+  font-size: var(--step-0);
+}
+
+/* ---- The table menu on phones ----------------------------------------------- */
+
+.cr-menu.screen {
+  width: min(100%, 460px);
+  max-height: min(560px, calc(var(--app-height) - 40px));
+  padding: 14px 16px 16px;
+  gap: 12px;
+  border-radius: 12px;
+  color: var(--ph);
+  font-size: var(--step--1);
+}
+
+.cr-menu .cr-hud__log {
+  min-height: 4.5em;
+  margin: 0;
+  padding: 0 0 8px;
+  border-top: 0;
+  border-bottom: 2px solid var(--ph-faint);
+}
+
+.cr-menu .term-button {
+  font-size: var(--step-0);
+  padding: 6px 12px;
+}
+
+.cr-menu > .term-button--primary {
+  align-self: flex-start;
+}
+
+/* ---- Pages on narrow screens ------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .cr-stakes,
+  .cr-regulars ul {
+    grid-template-columns: 1fr;
+  }
+
+  .cr-marquee__text {
+    font-size: var(--step-3);
+  }
+}
+
+@media (max-width: 640px) {
+  .cr-odds {
+    font-size: 14px;
+  }
+
+  .cr-odds__note {
+    display: none;
+  }
+}
+
+/* No keys to press on a touch screen. */
+@media (hover: none) and (pointer: coarse) {
+  .cr-key {
+    display: none;
+  }
+}
+
+/* ---- The table on phones and small windows ------------------------------------
+ * Keep these queries in step with COMPACT_TABLE in Table.tsx.
+ *
+ * Upright, the stickman, the felt, your rail and the HUD stack, and the felt
+ * is the tall layout. Sideways, the HUD takes a column on the right, and the
+ * wide layout's chips and dice grow against the felt so they stay readable.
+ */
+
+@media (max-width: 900px), (max-height: 520px) {
+  .cr-game {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .cr-board {
+    gap: 4px;
+    padding: max(6px, var(--safe-top)) max(8px, var(--safe-right)) 4px max(8px, var(--safe-left));
+  }
+
+  .cr-felt {
+    --chip-scale: 1.3;
+  }
+
+  .cr-stick-bar {
+    justify-content: space-between;
+    min-height: 40px;
+    padding: 0 2px;
+  }
+
+  .cr-placard {
+    position: static;
+    translate: none;
+    padding: 3px 8px;
+  }
+
+  .cr-placard__table {
+    display: none;
+  }
+
+  .cr-portrait {
+    width: 30px;
+    height: 30px;
+  }
+
+  .cr-stick-bar__name {
+    font-size: var(--step-1);
+  }
+
+  /* Hung from the top of the bar, so a long call grows down over the wall instead of off the screen. */
+  .cr-talk--stick {
+    top: 0;
+  }
+
+  .cr-talk--stick .cr-talk__bubble {
+    max-width: min(320px, calc(100vw - 130px));
+    translate: 0 0;
+    transform-origin: 0 20px;
+  }
+
+  .cr-talk--stick .cr-talk__bubble::before {
+    top: 20px;
+  }
+
+  .cr-controls {
+    min-height: 0;
+    gap: 8px 12px;
+    padding: 8px 10px;
+    border-radius: 10px;
+  }
+
+  .cr-rack {
+    gap: 6px;
+    padding: 3px 6px;
+  }
+
+  .cr-rack__chip {
+    width: 42px;
+    height: 42px;
+  }
+
+  .cr-bet {
+    min-width: 64px;
+  }
+
+  .cr-bet__amount {
+    font-size: var(--step-2);
+  }
+
+  .cr-button {
+    font-size: var(--step-0);
+    padding: 9px 14px 8px;
+  }
+
+  .cr-button--roll {
+    min-width: 0;
+  }
+
+  /* The HUD: status and stake, the hint and the Menu, then the rolls. */
+  .cr-hud.screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'status stake'
+      'help menu'
+      'rolls rolls'
+      'warn warn';
+    align-content: start;
+    gap: 4px 10px;
+    margin: 0 max(8px, var(--safe-right)) max(8px, var(--safe-bottom)) max(8px, var(--safe-left));
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .cr-hud__head {
+    display: contents;
+  }
+
+  .cr-hud__head > .term-dim {
+    display: none;
+  }
+
+  .cr-hud__stake {
+    grid-area: stake;
+    align-self: center;
+  }
+
+  .cr-hud__status {
+    grid-area: status;
+    font-size: var(--step-1);
+  }
+
+  /*
+   * Always three lines high, whatever it says: the felt above sizes itself
+   * to what's left, so a hint that grew a line would move the bets under
+   * your finger mid-tap.
+   */
+  .cr-hud__help {
+    grid-area: help;
+    height: 4.2em;
+    min-height: 0;
+    line-height: 1.4;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+
+  .cr-hud__rolls {
+    grid-area: rolls;
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .cr-hud__rolls li {
+    font-size: var(--step-0);
+  }
+
+  .cr-hud__warn {
+    grid-area: warn;
+  }
+
+  .cr-hud__menu {
+    grid-area: menu;
+    align-self: end;
+  }
+
+  .cr-hud .term-button {
+    padding: 6px 12px;
+  }
+}
+
+/*
+ * Upright, the layout is the tall column (layout.ts), with chips already
+ * sized for it. The rack and the buttons share the rail in two rows, and
+ * the HUD gives up its roll history for room. Keep the query in step with
+ * TALL_TABLE in Table.tsx.
+ */
+@media (max-width: 900px) and (orientation: portrait) {
+  .cr-felt[data-shape='tall'] {
+    --chip-scale: 1;
+  }
+
+  /* The calls hang under the stickman, across the top of the felt, where there's the width for them. */
+  .cr-stick-bar,
+  .cr-stick-bar__who {
+    position: static;
+  }
+
+  .cr-board {
+    position: relative;
+  }
+
+  .cr-talk--stick {
+    left: max(8px, var(--safe-left));
+    right: max(8px, var(--safe-right));
+    top: calc(max(6px, var(--safe-top)) + 38px);
+  }
+
+  .cr-talk--stick .cr-talk__bubble {
+    max-width: 100%;
+    transform-origin: 12px 0;
+  }
+
+  .cr-talk--stick .cr-talk__bubble::before {
+    right: auto;
+    left: 12px;
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    border: 6px solid transparent;
+    border-bottom: 9px solid #fbf4e2;
+    border-top-width: 0;
+  }
+
+  .cr-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'rack bet'
+      'buttons buttons';
+    justify-items: start;
+    align-items: center;
+  }
+
+  .cr-rack {
+    grid-area: rack;
+  }
+
+  .cr-bet {
+    grid-area: bet;
+    justify-self: end;
+  }
+
+  .cr-controls__buttons {
+    grid-area: buttons;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.6fr;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .cr-hud__rolls {
+    display: none;
+  }
+}
+
+/* The narrowest phones: the HUD already says what's on the layout. */
+@media (max-width: 380px) and (orientation: portrait) {
+  .cr-controls {
+    grid-template-areas:
+      'rack rack'
+      'buttons buttons';
+  }
+
+  .cr-bet {
+    display: none;
+  }
+
+  .cr-rack__chip {
+    width: 38px;
+    height: 38px;
+  }
+
+  .cr-rack__down {
+    padding: 4px 8px;
+    min-height: 34px;
+  }
+}
+
+/* Short phones: a slimmer rail and HUD leave the felt more room. */
+@media (max-width: 900px) and (orientation: portrait) and (max-height: 700px) {
+  .cr-stick-bar {
+    min-height: 34px;
+  }
+
+  .cr-portrait {
+    width: 26px;
+    height: 26px;
+  }
+
+  .cr-controls {
+    gap: 6px 10px;
+    padding: 6px 8px;
+  }
+
+  .cr-button {
+    padding: 7px 10px 6px;
+  }
+
+  .cr-hud.screen {
+    padding: 6px 10px;
+  }
+
+  .cr-hud__status {
+    font-size: var(--step-0);
+  }
+
+  .cr-hud__help {
+    height: 2.8em;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .cr-game {
+    --hud-w: clamp(200px, 28vw, 260px);
+    grid-template-columns: minmax(0, 1fr) var(--hud-w);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .cr-board {
+    padding: max(4px, var(--safe-top)) 6px max(6px, var(--safe-bottom)) max(8px, var(--safe-left));
+  }
+
+  .cr-stick-bar {
+    min-height: 34px;
+  }
+
+  .cr-controls {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 5px 8px;
+  }
+
+  .cr-rack__chip {
+    width: 34px;
+    height: 34px;
+  }
+
+  .cr-rack__down {
+    min-height: 32px;
+    padding: 2px 8px;
+  }
+
+  .cr-bet {
+    min-width: 0;
+  }
+
+  .cr-bet__label {
+    display: none;
+  }
+
+  .cr-button {
+    padding: 7px 12px 6px;
+  }
+
+  /* A column of its own on the right: status, stake, hint, rolls, then the Menu. */
+  .cr-hud.screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'status' 'stake' 'help' 'rolls' 'warn' 'menu';
+    margin: max(6px, var(--safe-top)) max(8px, var(--safe-right)) max(6px, var(--safe-bottom)) 0;
+  }
+
+  .cr-hud__stake {
+    align-self: start;
+  }
+
+  .cr-hud__rolls {
+    flex-wrap: wrap;
+  }
+
+  .cr-hud__menu {
+    justify-self: start;
+  }
+}

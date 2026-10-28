@@ -236,6 +236,8 @@ export function sendThrough(fn: ((input: Input) => void) | null) {
 }
 
 let talk: WheelTalk | null = null
+/** Regulars who went broke this sitting: they don't come back with a fresh stack. */
+const broke = new Set<string>()
 
 const caps = () => useSave.getState().wallet.caps
 
@@ -406,6 +408,7 @@ export const useSession = create<SessionStore>()((set, get) => {
       const bye = talk?.say({ seat: i, regular: seat.regular }, 'goodbye')
       if (bye && !quiet) remark = { id: ++remarkId, seat: i, text: bye, delay: TALK_DELAY_MS }
       lines.push({ id: ++logId, mine: false, text: `${seat.regular.name} is out of caps and leaves the table.` })
+      broke.add(seat.regular.id)
       waits[i] = 2 + randInt(rng, 3)
       return null
     })
@@ -413,7 +416,10 @@ export const useSession = create<SessionStore>()((set, get) => {
     const empty = nextSeats.findIndex((s, i) => s === null && waits[i] === 0)
     if (empty !== -1 && stakes && !online) {
       const here = new Set(nextSeats.flatMap((s) => (s ? [s.regular.id] : [])))
-      const free = REGULARS.filter((r) => !here.has(r.id))
+      const away = REGULARS.filter((r) => !here.has(r.id))
+      // Someone who hasn't gone broke tonight, if there's anyone left.
+      const fresh = away.filter((r) => !broke.has(r.id))
+      const free = fresh.length ? fresh : away
       if (free.length) {
         const regular = pick(free, rng)
         const seat = rebuy(seatRegular(regular, stakes, next), next)
@@ -558,6 +564,7 @@ export const useSession = create<SessionStore>()((set, get) => {
       if (!config.online && caps() < buyInOf(stakes)) return false
       const state = createTable({ wheel: config.wheel, limits: stakes.limits })
       talk = new WheelTalk(createRng(randomSeed()))
+      broke.clear()
       const me = config.online?.me ?? 0
       const players: (Player | null)[] = Array.from({ length: ONLINE_SEATS }, () => null)
       for (const p of config.online?.players ?? []) {

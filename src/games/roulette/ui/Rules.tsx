@@ -93,7 +93,7 @@ export function RulesText() {
         <dt>Backspace</dt>
         <dd>Clear the layout</dd>
         <dt>Shift+Enter</dt>
-        <dd>On a number: every bet on it</dd>
+        <dd>On a number: every bet on it. Right-clicking it does the same.</dd>
       </dl>
     </div>
   )

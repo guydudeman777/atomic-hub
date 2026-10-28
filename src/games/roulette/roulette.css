@@ -637,7 +637,7 @@
   font-size: var(--step--1);
 }
 
-.rl-odds [data-edge] {
+.rl-odds td:not(.rl-odds__note) {
   white-space: nowrap;
 }
 

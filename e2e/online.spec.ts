@@ -207,3 +207,41 @@ test('three players at an online Five-Card Draw table, each seeing it from their
   expect(errors.flat()).toEqual([])
   await context.close()
 })
+
+test('two players at an online Craps table: the same dice, and the dice go round', async ({ browser }) => {
+  test.setTimeout(90_000)
+  const { context, host, guest, errors } = await twoPlayers(browser)
+  const code = await hostTable(host, 'craps', 'Hostess')
+  await joinTable(guest, 'craps', code, 'Guesty')
+  await host.getByRole('button', { name: 'Start' }).click()
+  for (const page of [host, guest]) await expect(page.getByRole('region', { name: 'Craps layout' })).toBeVisible({ timeout: 10_000 })
+
+  // The host shoots first; the guest sees whose dice they are, and each sees the other at the rail.
+  await expect(host.getByRole('button', { name: /^Roll/ })).toBeEnabled()
+  await expect(guest.getByRole('button', { name: 'Hostess has the dice' })).toBeDisabled()
+  await expect(host.locator('.cr-plate.is-player')).toContainText('Guesty')
+  await expect(guest.locator('.cr-plate.is-player')).toContainText('Hostess')
+
+  // Both bet the pass line; the guest's chips show on the host's rail.
+  for (const page of [host, guest]) await page.getByRole('button', { name: /^Pass line/ }).click()
+  await expect(host.locator('.cr-plate.is-player .cr-plate__stack')).not.toHaveText('0')
+
+  // Roll until the dice change hands, keeping a line bet down on every come-out.
+  const rolls = (page: Page) => page.locator('.cr-hud__rolls li').allTextContents()
+  await expect(async () => {
+    const shooter = (await host.getByRole('button', { name: /^Roll/ }).isEnabled().catch(() => false)) ? host : guest
+    const other = shooter === host ? guest : host
+    if (await shooter.getByRole('button', { name: /^Roll/ }).isEnabled({ timeout: 500 }).catch(() => false)) {
+      if ((await shooter.locator('.cr-hud__status').textContent())?.startsWith('Coming out')) {
+        await shooter.getByRole('button', { name: /^Pass line/ }).click({ timeout: 500 }).catch(() => {})
+      }
+      await shooter.getByRole('button', { name: /^Roll/ }).click({ timeout: 500 }).catch(() => {})
+    }
+    expect(await rolls(other)).toEqual(await rolls(shooter))
+    await expect(guest.getByRole('button', { name: /^Roll/ })).toBeEnabled({ timeout: 1500 })
+  }).toPass({ timeout: 75_000 })
+  await expect(guest.getByRole('list', { name: 'Table log' })).toContainText('The dice come to you.')
+  await expect.poll(() => rolls(guest)).toEqual(await rolls(host))
+  expect(errors.flat()).toEqual([])
+  await context.close()
+})

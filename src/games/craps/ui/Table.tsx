@@ -25,7 +25,10 @@ import {
 import { Felt } from './Felt'
 import { type Layout, type Point, type Shape, WIDE_LAYOUT, ZONE_SPOTS, tallLayout } from './layout'
 import { RulesText } from './Rules'
-import { type RailRemark, type RailSeat, type Remark, type Settled, forfeitOf, needsLineBet, useSession } from './session'
+import { type Player, type RailRemark, type RailSeat, type Remark, type Settled, forfeitOf, needsLineBet, useSession } from './session'
+import { GAME, checksumAfter, leaveOnline } from './online'
+import { useGameLink } from '../../../net/store'
+import { LinkBanner } from '../../../net/ui/LinkBanner'
 
 /**
  * Phones and small windows get the compact table in craps.css, whose media
@@ -57,19 +60,31 @@ function useAspect(ref: RefObject<HTMLElement | null>): number {
 }
 
 export function Table() {
-  const { sitting, state, stakes } = useSession()
+  const { sitting, state, stakes, online, dice } = useSession()
+  const link = useGameLink(GAME)
 
   // No seat? Back to the lobby.
   useEffect(() => {
     if (!state || !stakes) navigate('/craps')
   }, [state, stakes])
 
+  // Online: play the other players' bets and throws as they come, once the dice are down.
+  const waiting = online?.queue.length ?? 0
+  useEffect(() => {
+    if (waiting) useSession.getState().pump(checksumAfter(link))
+  }, [state, dice, waiting, link])
+
   if (!state || !stakes) return null
-  return <TableView key={sitting} />
+  return (
+    <>
+      <TableView key={sitting} />
+      {online && <LinkBanner link={link} waitsForOthers={false} onGone={() => void navigate('/craps', { during: leaveOnline })} />}
+    </>
+  )
 }
 
 function TableView() {
-  const { state, stakes, call, settled, dice, chip, takingDown, rail, talk } = useSession()
+  const { state, stakes, call, settled, dice, chip, takingDown, rail, talk, online } = useSession()
   const caps = useSave((s) => s.wallet.caps)
   const guide = useSave((s) => s.craps.guide)
   const { roll, pickChip, setTakingDown, clear, rebet } = useSession.getState()
@@ -120,7 +135,7 @@ function TableView() {
               <Chips state={s} settled={settled} rolling={rolling} takingDown={takingDown} />
               {settled && <Ghosts key={`ghosts-${settled.id}`} settled={settled} />}
               <Puck point={s.point} />
-              <RailPlates rail={rail} talk={talk} caps={caps} />
+              <RailPlates rail={rail} talk={talk} caps={caps} players={online?.players ?? []} shooter={online ? (online.shooter === online.me ? 'you' : online.shooter) : 'you'} />
               {dice && <ThrownDice key={`dice-${dice.id}`} id={dice.id} dice={dice.dice} />}
               {settled && dice?.landed && burstFor(settled) && <ResultBurst key={`burst-${settled.id}`} net={settled.net} />}
             </LayoutContext.Provider>
@@ -359,11 +374,27 @@ function Puck({ point }: { point: TableState['point'] }) {
  * Brass name plates on the rail: yours with your caps, and the regulars'
  * with theirs. A regular's remarks rise from their plate.
  */
-function RailPlates({ rail, talk, caps }: { rail: (RailSeat | null)[]; talk: RailRemark | null; caps: number }) {
+function RailPlates({ rail, talk, caps, players, shooter }: { rail: (RailSeat | null)[]; talk: RailRemark | null; caps: number; players: (Player | null)[]; shooter: number | 'you' }) {
   const { shape } = useLayout()
+  // Other players stand at the far end of the rail, regulars nearer you.
+  const others = players.filter((p): p is Player => !!p)
   return (
     <>
-      <div className="cr-plate is-you" style={at(shape.you)}>
+      {others.map((p, k) => (
+        <div
+          key={`player-${p.seat}`}
+          className={`cr-plate is-player${shooter === p.seat ? ' is-shooter' : ''}`}
+          style={at(shape.seats[shape.seats.length - 1 - k])}
+          title={`${p.name}${shooter === p.seat ? ', shooting' : ''}`}
+        >
+          <span className="cr-plate__name">{p.name}</span>
+          <span className="cr-plate__stack">
+            {onLayout(p.state.bets).toLocaleString()}
+            <span className="visually-hidden"> caps on the layout</span>
+          </span>
+        </div>
+      ))}
+      <div className={`cr-plate is-you${shooter === 'you' && others.length ? ' is-shooter' : ''}`} style={at(shape.you)}>
         <span className="cr-plate__name">You</span>
         <span className="cr-plate__stack">
           {caps.toLocaleString()}
@@ -518,12 +549,14 @@ interface ControlsProps {
 }
 
 function Controls({ state, chips, chip, takingDown, rolling, caps, min }: ControlsProps) {
-  const { pickChip, setTakingDown, clear, rebet, roll, lost } = useSession()
+  const { pickChip, setTakingDown, clear, rebet, roll, lost, online, passDice } = useSession()
   const down = onLayout(state.bets)
   const removable = activeSpots(state.bets).some((spot) => canTakeDown(state, spot))
+  const shooting = !online || online.shooter === online.me
   const broke = needsLineBet(state) && caps < min
+  const shooterName = online && !shooting ? (online.players[online.shooter]?.name ?? 'Someone') : null
 
-  if (broke && down === 0) {
+  if (broke && down === 0 && !online) {
     return (
       <div className="cr-controls cr-controls--broke">
         <p>
@@ -575,9 +608,20 @@ function Controls({ state, chips, chip, takingDown, rolling, caps, min }: Contro
         <button className="cr-button" onClick={rebet} disabled={rolling || lost.length === 0} title="Put back what the last roll took (B)">
           Rebet
         </button>
-        <button className="cr-button cr-button--primary cr-button--roll" onClick={roll} disabled={rolling} aria-describedby="cr-help">
-          Roll <span className="cr-key">R</span>
-        </button>
+        {shooting && online && broke && (
+          <button className="cr-button" onClick={passDice} disabled={rolling}>
+            Pass the dice
+          </button>
+        )}
+        {shooting ? (
+          <button className="cr-button cr-button--primary cr-button--roll" onClick={roll} disabled={rolling} aria-describedby="cr-help">
+            Roll <span className="cr-key">R</span>
+          </button>
+        ) : (
+          <button className="cr-button cr-button--primary cr-button--roll" disabled>
+            {shooterName} has the dice
+          </button>
+        )}
       </div>
     </div>
   )
@@ -621,7 +665,7 @@ function RollHistory({ history }: { history: TableState['history'] }) {
 }
 
 function Hud() {
-  const { state, stakes, log, dice, focus, notice, leave } = useSession()
+  const { state, stakes, log, dice, focus, notice, leave, online } = useSession()
   const guide = useSave((s) => s.craps.guide)
   const updateCraps = useSave((s) => s.updateCraps)
   const table3d = useSave((s) => s.settings.table3d)
@@ -657,7 +701,7 @@ function Hud() {
   else if (needsLineBet(s)) help = `${compact ? 'Tap' : 'Click'} a chip, then the pass line or don’t pass. The shooter needs a line bet to come out.`
   else help = `${compact ? 'Tap' : 'Click'} a bet to put your chip down, then roll.`
 
-  const getUp = () => void navigate('/craps', { during: leave })
+  const getUp = () => void navigate('/craps', { during: online ? leaveOnline : leave })
 
   const tableLog = (
     <ol className="cr-hud__log" ref={logRef} aria-label="Table log">
@@ -704,11 +748,14 @@ function Hud() {
   return (
     <aside className="cr-hud screen" aria-label="Game status">
       <div className="cr-hud__head">
-        <p className="term-dim">Craps, {stakes!.name.toLowerCase()}</p>
+        <p className="term-dim">
+          Craps{online ? ' online' : ''}, {stakes!.name.toLowerCase()}
+        </p>
         {down > 0 && <p className="cr-hud__stake">On the layout {down.toLocaleString()}</p>}
       </div>
       <p className="cr-hud__status" aria-live="polite">
         {statusOf(s, rolling)}
+        {online && !rolling && online.shooter !== online.me ? `. ${online.players[online.shooter]?.name ?? 'Someone'} has the dice` : ''}
       </p>
       <p className="cr-hud__help" id="cr-help" role={notice ? 'status' : undefined}>
         {help}

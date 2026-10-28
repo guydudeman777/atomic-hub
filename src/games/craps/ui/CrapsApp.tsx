@@ -1,6 +1,8 @@
+import { codeFromPath } from '../../../net/codes'
 import { Link } from '../../../router'
 import { useSave } from '../../../store/save'
 import { Lobby } from './Lobby'
+import { GAME, useCrapsOnline } from './online'
 import { BetsTable, RulesText } from './Rules'
 import { Table } from './Table'
 import '@fontsource/limelight/latin-400.css'
@@ -15,6 +17,7 @@ const SECTIONS = [
 ]
 
 export default function CrapsApp({ path }: { path: string }) {
+  useCrapsOnline(path)
   if (path === '/craps/play') {
     return (
       <div className="cr cr-room">
@@ -26,7 +29,7 @@ export default function CrapsApp({ path }: { path: string }) {
   let page
   if (path === '/craps/bets') page = <div className="cr-panel cr-page-panel"><BetsTable /></div>
   else if (path === '/craps/rules') page = <div className="cr-panel cr-page-panel"><RulesText /></div>
-  else page = <Lobby />
+  else page = <Lobby inviteCode={codeFromPath(path, GAME)} />
 
   return (
     <div className="cr cr-room cr-page">
@@ -38,7 +41,7 @@ export default function CrapsApp({ path }: { path: string }) {
         <Marquee />
         <nav className="cr-nav" aria-label="Craps">
           {SECTIONS.map((s) => (
-            <Link key={s.path} to={s.path} className="cr-nav__link" aria-current={path === s.path ? 'page' : undefined}>
+            <Link key={s.path} to={s.path} className="cr-nav__link" aria-current={path === s.path || (s.path === '/craps' && path.startsWith('/craps/join/')) ? 'page' : undefined}>
               <span className="wide-only">{s.label}</span>
               <span className="narrow-only">{s.short}</span>
             </Link>

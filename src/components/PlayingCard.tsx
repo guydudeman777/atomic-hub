@@ -1,7 +1,7 @@
 /**
  * SVG playing cards. Faces share one design; each collectible set gets its
  * own back and an accent color on the face frame. Caravan's face cards name
- * what they do; the casino deck's are plain court cards.
+ * what they do; the casino and saloon decks' are plain court cards.
  */
 
 import { memo, useId } from 'react'
@@ -19,10 +19,11 @@ const SET_ACCENT: Record<string, string> = {
   atomic: '#2a7a7e',
   gold: '#b48a2a',
   vegas: '#a3202a',
+  saloon: '#8a6a2a',
 }
 
 /** Sets whose court cards don't carry Caravan's effect labels. */
-const PLAIN_FACES = new Set(['vegas'])
+const PLAIN_FACES = new Set(['vegas', 'saloon'])
 
 const accentOf = (set: string) => SET_ACCENT[set] ?? '#6b7445'
 
@@ -208,6 +209,28 @@ function Back({ set, uid }: { set: string; uid: string }) {
           <circle cx="50" cy="70" r="17" fill="#6a1219" stroke="#e3c26a" strokeWidth="1.6" />
           <path d={starburst(50, 70, 13, 4, 8)} fill="#e3c26a" />
           <circle cx="50" cy="70" r="2.6" fill="#6a1219" />
+        </>
+      )
+    case 'saloon':
+      // A riverboat deck: cream border, navy lattice, a brass horseshoe for luck.
+      return (
+        <>
+          <defs>
+            <pattern id={`${uid}n`} width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width="8" height="8" fill="#1c2a45" />
+              <path d="M0 0H8M0 0V8" stroke="#33497a" strokeWidth="1" />
+            </pattern>
+          </defs>
+          <rect width={W} height={H} rx="7" fill="#efe3c4" />
+          <rect x="6" y="6" width={W - 12} height={H - 12} rx="4" fill={`url(#${uid}n)`} />
+          <rect x="10" y="10" width={W - 20} height={H - 20} rx="3" fill="none" stroke="#c9a456" strokeWidth="1.2" />
+          <ellipse cx="50" cy="70" rx="19" ry="25" fill="#efe3c4" stroke="#c9a456" strokeWidth="1.6" />
+          <path d="M40.5 56 v10 a9.5 9.5 0 0 0 19 0 v-10" fill="none" stroke="#8a6a2a" strokeWidth="5.5" strokeLinecap="round" />
+          <g fill="#efe3c4">
+            {[[40.5, 59], [40.5, 66], [59.5, 59], [59.5, 66], [45, 73.5], [55, 73.5]].map(([x, y]) => (
+              <circle key={`${x}${y}`} cx={x} cy={y} r="1.1" />
+            ))}
+          </g>
         </>
       )
     default:

@@ -25,7 +25,7 @@ import {
 import { Felt } from './Felt'
 import { type Layout, type Point, type Shape, WIDE_LAYOUT, ZONE_SPOTS, tallLayout } from './layout'
 import { RulesText } from './Rules'
-import { type Remark, type Settled, forfeitOf, needsLineBet, useSession } from './session'
+import { type RailRemark, type RailSeat, type Remark, type Settled, forfeitOf, needsLineBet, useSession } from './session'
 
 /**
  * Phones and small windows get the compact table in craps.css, whose media
@@ -69,7 +69,7 @@ export function Table() {
 }
 
 function TableView() {
-  const { state, stakes, call, settled, dice, chip, takingDown } = useSession()
+  const { state, stakes, call, settled, dice, chip, takingDown, rail, talk } = useSession()
   const caps = useSave((s) => s.wallet.caps)
   const guide = useSave((s) => s.craps.guide)
   const { roll, pickChip, setTakingDown, clear, rebet } = useSession.getState()
@@ -120,8 +120,9 @@ function TableView() {
               <Chips state={s} settled={settled} rolling={rolling} takingDown={takingDown} />
               {settled && <Ghosts key={`ghosts-${settled.id}`} settled={settled} />}
               <Puck point={s.point} />
+              <RailPlates rail={rail} talk={talk} caps={caps} />
               {dice && <ThrownDice key={`dice-${dice.id}`} id={dice.id} dice={dice.dice} />}
-              {settled?.decided && dice?.landed && <ResultBurst key={`burst-${settled.id}`} net={settled.net} />}
+              {settled && dice?.landed && burstFor(settled) && <ResultBurst key={`burst-${settled.id}`} net={settled.net} />}
             </LayoutContext.Provider>
           </div>
         </div>
@@ -147,7 +148,7 @@ function StickmanBar({ name, call, limits, table }: { name: string; call: Remark
           </svg>
         </span>
         <span className="cr-stick-bar__name">{name}</span>
-        <SpeechBubble name={name} remark={call} />
+        <SpeechBubble name={name} remark={call} className="cr-talk--stick" />
       </div>
       <div className="cr-placard" aria-label={`${table}: bets from ${limits}`}>
         <span className="cr-placard__table">{table}</span>
@@ -160,8 +161,8 @@ function StickmanBar({ name, call, limits, table }: { name: string; call: Remark
 /** Long enough to read the line twice at a relaxed pace. */
 const readingTime = (text: string) => Math.min(6000, Math.max(2400, 1500 + text.length * 55))
 
-/** The latest call, shown after its delay and faded after a while. A newer one replaces it. */
-function SpeechBubble({ name, remark }: { name: string; remark: Remark | null }) {
+/** The latest remark, shown after its delay and faded after a while. A newer one replaces it. */
+function SpeechBubble({ name, remark, className, style }: { name: string; remark: Remark | null; className: string; style?: CSSProperties }) {
   const [shown, setShown] = useState<number | null>(null)
   useEffect(() => {
     if (!remark) return
@@ -175,7 +176,7 @@ function SpeechBubble({ name, remark }: { name: string; remark: Remark | null })
   }, [remark])
   const visible = remark !== null && shown === remark.id
   return (
-    <div className="cr-talk" aria-live="polite">
+    <div className={`cr-talk ${className}`} style={style} aria-live="polite">
       {visible && (
         <p key={remark.id} className="cr-talk__bubble" style={{ '--hold': `${readingTime(remark.text)}ms` } as CSSProperties}>
           <span className="visually-hidden">{name} says: </span>
@@ -268,13 +269,12 @@ const Chips = memo(function Chips({ state, settled, rolling, takingDown }: { sta
         const off = !isWorking(state, spot)
         const came = moved.get(spot)
         const { kind, number } = spotInfo(spot)
-        const key = came ? `${spot}-${settled!.id}` : spot
         const stack = (
           <Stack
-            key={key}
+            key={spot}
             amount={amount}
             place={place}
-            className={`${came ? 'is-moved' : 'is-down'}${off ? ' is-off' : ''}`}
+            className={`${came ? 'is-moved' : ''}${off ? ' is-off' : ''}`}
             style={came ? from(place, chipsAt(came)) : undefined}
           >
             {off && <span className="cr-stack__off">Off</span>}
@@ -288,7 +288,7 @@ const Chips = memo(function Chips({ state, settled, rolling, takingDown }: { sta
         const what = kind === 'come-point' ? `Your come bet on the ${number}` : `Your don’t come bet on the ${number}`
         return (
           <button
-            key={key}
+            key={spot}
             className={`cr-chips-tap${open ? ' is-open' : ''}`}
             style={{ ...at(place), ...(came ? from(place, chipsAt(came)) : {}) } as CSSProperties}
             aria-disabled={rolling || !open}
@@ -353,6 +353,53 @@ function Puck({ point }: { point: TableState['point'] }) {
       {point === null ? 'OFF' : 'ON'}
     </div>
   )
+}
+
+/**
+ * Brass name plates on the rail: yours with your caps, and the regulars'
+ * with theirs. A regular's remarks rise from their plate.
+ */
+function RailPlates({ rail, talk, caps }: { rail: (RailSeat | null)[]; talk: RailRemark | null; caps: number }) {
+  const { shape } = useLayout()
+  return (
+    <>
+      <div className="cr-plate is-you" style={at(shape.you)}>
+        <span className="cr-plate__name">You</span>
+        <span className="cr-plate__stack">
+          {caps.toLocaleString()}
+          <span className="visually-hidden"> caps</span>
+        </span>
+      </div>
+      {rail.map((seat, i) =>
+        seat ? (
+          // Keyed by who's there, so a newcomer's plate arrives with them.
+          <Fragment key={seat.regular.id}>
+            <div className="cr-plate" style={at(shape.seats[i])} title={`${seat.regular.name}: ${seat.stack.toLocaleString()} caps`}>
+              <span className="cr-portrait-dot" style={{ background: seat.regular.color }} aria-hidden="true" />
+              <span className="cr-plate__name">
+                <span className="cr-plate__full">{seat.regular.name}</span>
+                <span className="cr-plate__short" aria-hidden="true">
+                  {seat.regular.short}
+                </span>
+              </span>
+              <span className="cr-plate__stack">
+                {seat.stack.toLocaleString()}
+                <span className="visually-hidden"> caps</span>
+              </span>
+            </div>
+            <SpeechBubble name={seat.regular.name} remark={talk?.seat === i ? talk : null} className={`cr-talk--seat cr-talk--s${i}`} style={at(shape.seats[i])} />
+          </Fragment>
+        ) : null,
+      )}
+    </>
+  )
+}
+
+/** Whether a roll's result is worth showing: you won or lost on it, or a barred 12 was all that happened. A wash shows nothing. */
+function burstFor({ net, decided, events }: Settled): boolean {
+  if (!decided) return false
+  if (net !== 0) return true
+  return !events.some((e) => e.type === 'won' || e.type === 'lost')
 }
 
 /** Your result for the roll, rising off the felt. */

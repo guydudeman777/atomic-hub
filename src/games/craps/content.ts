@@ -129,7 +129,7 @@ const ABOUT: Record<BetKind, string> = {
   'come-odds': 'Odds behind a come bet. Off on the come-out.',
   'dont-come-point': 'Wins on a 7, loses when its number rolls. Tap it to lay odds.',
   'dont-come-odds': 'Odds laid behind a don’t come bet. Always working.',
-  field: 'One roll. 3, 4, 9, 10 and 11 pay even money, 2 pays double, 12 pays triple. 5, 6, 7 and 8 lose.',
+  field: 'One roll: wins on 2, 3, 4, 9, 10, 11 or 12, and loses on 5, 6, 7 or 8.',
   place: 'Wins every time the number rolls before a 7, and stays up. Off on the come-out.',
   hard: 'Wins only when the number rolls as a pair. Loses to a 7 or the number rolled any other way. Off on the come-out.',
   'any-seven': 'One roll: wins on any 7.',

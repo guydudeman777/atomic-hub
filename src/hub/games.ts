@@ -63,8 +63,8 @@ export const GAMES: readonly GameInfo[] = [
   },
   {
     id: 'craps', name: 'Craps', category: 'casino', ready: true, path: '/craps', icon: 'dice',
-    modes: 'Against the house, with the dice in your hand',
-    blurb: 'Pass line, come bets, odds, place bets and the field, on a green felt layout under the marquee lights.',
+    modes: 'Against the house, with the dice in your hand and three regulars at the rail',
+    blurb: 'Pass line, come bets, full odds, place bets, the field and the hardways, on a green felt layout under the marquee lights.',
   },
   {
     id: 'slots', name: 'Slots', category: 'casino', ready: false, path: '/slots', icon: 'slots',

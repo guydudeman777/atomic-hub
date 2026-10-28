@@ -7,6 +7,11 @@ test.beforeEach(async ({ page }) => {
   await skipBoot(page)
 })
 
+/** Once it settles (bubbles and plates spring in a little past full size), the element's box lies inside the screen. */
+async function expectSettledOnScreen(page: Page, locator: Locator) {
+  await expect(() => expectOnScreen(page, locator)).toPass({ timeout: 3000 })
+}
+
 /** The element's box lies inside the screen. */
 async function expectOnScreen(page: Page, locator: Locator) {
   const box = await locator.boundingBox()
@@ -58,6 +63,10 @@ for (const view of ['3D', 'flat'] as const) {
       await page.getByLabel('3D tables').uncheck()
     }
     await stepUp(page)
+    // The stickman's greeting hangs under him, on screen, while it lasts.
+    const hello = page.locator('.cr-talk--stick .cr-talk__bubble')
+    await expect(hello).toBeVisible()
+    await expectSettledOnScreen(page, hello)
 
     // Upright, the layout is the tall column and fills the width.
     const felt = page.locator('.cr-felt')
@@ -73,7 +82,7 @@ for (const view of ['3D', 'flat'] as const) {
     await expectOnScreen(page, page.locator('.cr-stick-bar'))
     await expectOnScreen(page, page.locator('.cr-controls'))
     await expectOnScreen(page, page.locator('.cr-hud'))
-    await expectOnScreen(page, page.locator('.cr-talk__bubble'))
+    for (const plate of await page.locator('.cr-plate').all()) await expectSettledOnScreen(page, plate)
 
     // Each tap lands on the bet tapped, even as the guide's hint changes under the felt.
     await zone(page, 'pass').tap()
@@ -143,12 +152,14 @@ test.describe('on the narrowest phones', () => {
 
     await page.goto('/#/craps')
     await page.getByRole('button', { name: 'Step up to the rail' }).tap()
+    const hello = page.locator('.cr-talk--stick .cr-talk__bubble')
+    await expect(hello).toBeVisible()
+    await expectSettledOnScreen(page, hello)
     await zone(page, 'pass').tap()
     await expect(page.locator('.cr-hud__stake')).toHaveText('On the layout 5')
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
     for (const z of await page.locator('.cr-zone').all()) await expectOnScreen(page, z)
     await expectOnScreen(page, page.locator('.cr-controls'))
     await expectOnScreen(page, page.locator('.cr-hud'))
-    await expectOnScreen(page, page.locator('.cr-talk__bubble'))
   })
 })

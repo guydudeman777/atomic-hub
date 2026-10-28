@@ -56,7 +56,7 @@
   translate: 0 0 calc(var(--i) * 0.06 * var(--cd));
 }
 
-:root[data-table3d='on'] .cr-stack.is-down .cr-stack__chip:last-of-type {
+:root[data-table3d='on'] .cr-stack:not(.is-paid, .is-back, .is-taken) .cr-stack__chip {
   animation-name: cr-chip-drop-3d;
 }
 
@@ -120,7 +120,15 @@
   }
 }
 
-/* Your result floats just off the felt. */
+/* Your result and the rail's remarks float just off the felt; the plates sit on the rail. */
 :root[data-table3d='on'] .cr-burst {
   translate: -50% -50% 6px;
+}
+
+:root[data-table3d='on'] .cr-talk--seat {
+  translate: 0 0 6px;
+}
+
+:root[data-table3d='on'] .cr-plate {
+  transform: translateZ(2px);
 }

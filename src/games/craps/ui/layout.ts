@@ -65,6 +65,9 @@ export interface Shape {
   house: Point
   /** Your place at the rail: winnings and bets that come down go back there. */
   rail: Point
+  /** Name plates on the rail: yours, and the regulars' beside you. */
+  you: Point
+  seats: readonly Point[]
 }
 
 const rect = (x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h })
@@ -103,6 +106,8 @@ function wideShape(): Shape {
     launch: { x: 470, y: 680 },
     house: { x: 500, y: -30 },
     rail: { x: 470, y: 660 },
+    you: { x: 470, y: h - 12 },
+    seats: [130, 300, 820].map((x) => ({ x, y: h - 12 })),
   }
 }
 
@@ -183,6 +188,8 @@ export function tallShape(h: number): Shape {
     launch: { x: 500, y: h + 80 },
     house: { x: 500, y: -40 },
     rail: { x: 500, y: h + 60 },
+    you: { x: 500, y: h - 12 },
+    seats: [140, 310, 860].map((x) => ({ x, y: h - 12 })),
   }
 }
 

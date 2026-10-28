@@ -45,8 +45,11 @@ for (const view of ['3D', 'flat'] as const) {
     await page.getByRole('button', { name: 'Play Craps' }).click()
     await page.getByRole('button', { name: 'Step up to the rail' }).click()
 
-    // The stickman says hello, and the guide lights up the pass line.
-    await expect(page.locator('.cr-talk__bubble')).toContainText('Benny says:')
+    // The stickman says hello, three regulars line the rail beside you, one of them says hello too, and the guide lights up the pass line.
+    await expect(page.locator('.cr-talk--stick .cr-talk__bubble')).toContainText('Benny says:')
+    await expect(page.locator('.cr-plate')).toHaveCount(4)
+    await expect(page.locator('.cr-plate.is-you')).toContainText('You500')
+    await expect(page.locator('.cr-talk--seat .cr-talk__bubble')).toContainText('says:', { timeout: 8000 })
     await expect(zone(page, 'pass')).toHaveClass(/is-advised/)
     await expect(page.locator('html')).toHaveAttribute('data-table3d', view === '3D' ? 'on' : 'off')
 

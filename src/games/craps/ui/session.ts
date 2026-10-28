@@ -1,6 +1,7 @@
 /**
- * The table you're at: the layout and your chips on it, the dice in the
- * air, the log and the stickman's calls. Not persisted. Caps leave your
+ * The table you're at: the layout and your chips on it, the regulars at
+ * the rail, the dice in the air, the log, and what the stickman and the
+ * regulars say. Not persisted. Caps leave your
  * wallet as they go on the layout and come back as they're paid or taken
  * down, so getting up returns every bet that can come down, and forfeits
  * the contract bets that can't.
@@ -13,10 +14,11 @@
 import { create } from 'zustand'
 import { crowdReaction } from '../../../core/audio/live'
 import { playSfx } from '../../../core/audio/sfx'
-import { createRng, pick, randomSeed } from '../../../core/rng'
+import { createRng, pick, randInt, randomSeed } from '../../../core/rng'
 import { useSave } from '../../../store/save'
 import { stickmanCall } from '../calls'
 import { type Stakes, spotName, stakesById } from '../content'
+import { REGULARS, RailTalk, type Regular, type Talker, momentsOf, pickRegulars, railBets } from '../rail'
 import {
   type ApplyResult,
   type BetSpot,
@@ -33,6 +35,7 @@ import {
   isLegal,
   maxBet,
   minBet,
+  onLayout,
   spotInfo,
   summarize,
   unitOf,
@@ -75,6 +78,19 @@ export interface Settled {
   decided: boolean
 }
 
+/** A regular at the rail: their stack, and their bets on their own copy of the table. */
+export interface RailSeat {
+  regular: Regular
+  stack: number
+  /** Same point and dice as yours; their bets. */
+  state: TableState
+}
+
+/** Something a regular says, by their seat at the rail. */
+export interface RailRemark extends Remark {
+  seat: number
+}
+
 /** A word from the dealer about a bet you tried: why it won't go down, or come up. */
 export interface Notice {
   id: number
@@ -98,6 +114,12 @@ interface SessionStore {
   lost: { spot: BetSpot; amount: number }[]
   log: LogEntry[]
   call: Remark | null
+  /** The regulars at the rail, by seat. An empty seat is null. */
+  rail: (RailSeat | null)[]
+  /** For each empty seat, the rolls left before someone new steps up. */
+  railWaits: number[]
+  /** The regulars' latest remark. */
+  talk: RailRemark | null
   notice: Notice | null
   sit: (config: SitConfig) => boolean
   pickChip: (value: number) => void
@@ -125,9 +147,15 @@ const rng = createRng(randomSeed())
 /** From the throw to the dice coming to rest: in step with the `dice` sound and cr-throw in craps.css. */
 export const LAND_MS = 950
 const HELLO_DELAY_MS = 900
+/** A regular's remark waits for the stickman's call. */
+const TALK_DELAY_MS = 700
 
-/** The roll in the air, and the timer that lands it. */
-let inFlight: { result: ApplyResult; timer: number } | null = null
+/** Seats at the rail beside yours. */
+export const RAIL_SEATS = 3
+
+/** The roll in the air, the rail after it, and the timer that lands it. */
+let inFlight: { result: ApplyResult; rail: (RailSeat | null)[]; railEvents: (TableEvent[] | null)[]; timer: number } | null = null
+let talk: RailTalk | null = null
 
 const caps = () => useSave.getState().wallet.caps
 
@@ -246,7 +274,8 @@ export const useSession = create<SessionStore>()((set, get) => {
   /** The dice come to rest: settle the roll, pay out, and call it. */
   const land = () => {
     if (!inFlight) return
-    const { result } = inFlight
+    const { result, railEvents } = inFlight
+    let rail = inFlight.rail
     window.clearTimeout(inFlight.timer)
     inFlight = null
     const { state: next, events } = result
@@ -259,11 +288,11 @@ export const useSession = create<SessionStore>()((set, get) => {
 
     // The chips get pushed, and the room reacts to the big moments.
     if (paid > 0) playSfx('chips', { delay: 0.25 })
-    const change = events.find((e) => e.type === 'point-made' || e.type === 'seven-out')
-    if (change?.type === 'point-made') {
+    const turn = events.find((e) => e.type === 'point-made' || e.type === 'seven-out')
+    if (turn?.type === 'point-made') {
       crowdReaction('cheer')
       if (net > 0) playSfx('win', { delay: 0.35 })
-    } else if (change?.type === 'seven-out') {
+    } else if (turn?.type === 'seven-out') {
       crowdReaction('groan')
       if (net < 0) playSfx('lose', { delay: 0.4 })
     } else if (net > 0 && paid >= 10 * Math.max(1, lost) && paid >= (get().stakes?.limits.min ?? 0) * 4) {
@@ -276,6 +305,20 @@ export const useSession = create<SessionStore>()((set, get) => {
     if (mineDecided > 1 && net !== 0) lines.push({ id: ++logId, mine: true, text: net > 0 ? `You’re up ${net.toLocaleString()} caps on the roll.` : `You’re down ${(-net).toLocaleString()} caps on the roll.` })
     const text = stickmanCall(events, rng)
 
+    // The rail has its say. Anyone out of caps with nothing left on the layout gets up.
+    const min = get().stakes?.limits.min ?? 0
+    const said = talk?.react(momentsOf(events, next, railEvents, min), talkers(rail))
+    let remark: RailRemark | null = said ? { id: ++remarkId, seat: said.seat, text: said.text, delay: TALK_DELAY_MS } : get().talk
+    const waits = get().railWaits.map((w, seat) => (rail[seat] ? w : Math.max(0, w - 1)))
+    rail = rail.map((seat, i) => {
+      if (!seat || seat.stack >= min || onLayout(seat.state.bets) > 0) return seat
+      const bye = talk?.say({ seat: i, regular: seat.regular }, 'goodbye')
+      if (bye) remark = { id: ++remarkId, seat: i, text: bye, delay: TALK_DELAY_MS }
+      lines.push({ id: ++logId, mine: false, text: `${seat.regular.name} is out of caps and steps away from the rail.` })
+      waits[i] = 2 + randInt(rng, 3)
+      return null
+    })
+
     set((s) => ({
       state: next,
       dice: s.dice ? { ...s.dice, landed: true } : null,
@@ -283,7 +326,29 @@ export const useSession = create<SessionStore>()((set, get) => {
       lost: lostBets.length > 0 ? lostBets : s.lost,
       log: [...s.log, ...lines].slice(-150),
       call: text ? { id: ++remarkId, text, delay: 0 } : s.call,
+      rail,
+      railWaits: waits,
+      talk: remark,
     }))
+  }
+
+  /** A regular steps up to an empty seat that's been empty long enough, before the next roll. */
+  const arrive = (state: TableState) => {
+    const { rail, railWaits, stakes } = get()
+    if (!stakes) return rail
+    const seat = rail.findIndex((r, i) => r === null && railWaits[i] === 0)
+    const here = new Set(rail.flatMap((r) => (r ? [r.regular.id] : [])))
+    const free = REGULARS.filter((r) => !here.has(r.id))
+    if (seat === -1 || free.length === 0) return rail
+    const regular = pick(free, rng)
+    const next = rail.map((r, i) => (i === seat ? seatRegular(regular, stakes, state) : r))
+    const hello = talk?.say({ seat, regular }, 'hello')
+    set((s) => ({
+      rail: next,
+      log: [...s.log, { id: ++logId, mine: false, text: `${regular.name} steps up to the rail.` }],
+      talk: hello ? { id: ++remarkId, seat, text: hello, delay: 200 } : s.talk,
+    }))
+    return next
   }
 
   return {
@@ -298,15 +363,24 @@ export const useSession = create<SessionStore>()((set, get) => {
     lost: [],
     log: [],
     call: null,
+    rail: [],
+    railWaits: [],
+    talk: null,
     notice: null,
 
     sit: (config) => {
       const stakes = stakesById(config.stakesId)
       if (caps() < stakes.limits.min) return false
+      const state = createTable({ limits: stakes.limits, seed: randomSeed() })
+      talk = new RailTalk(createRng(randomSeed()))
+      const rail = pickRegulars(rng).map((regular) => seatRegular(regular, stakes, state))
+      // One of the regulars says hello once the stickman has.
+      const greeter = randInt(rng, rail.length)
+      const hello = talk.say({ seat: greeter, regular: rail[greeter].regular }, 'hello')
       set((s) => ({
         sitting: s.sitting + 1,
         stakes,
-        state: createTable({ limits: stakes.limits, seed: randomSeed() }),
+        state,
         chip: stakes.chips[1] ?? stakes.chips[0],
         takingDown: false,
         focus: null,
@@ -315,6 +389,9 @@ export const useSession = create<SessionStore>()((set, get) => {
         lost: [],
         log: [{ id: ++logId, mine: false, text: `You step up to the rail at the ${stakes.name.toLowerCase()} table. ${stakes.stickman.name} is on the stick, and the dice are yours.` }],
         call: { id: ++remarkId, text: pick(stakes.stickman.hello, rng), delay: HELLO_DELAY_MS },
+        rail,
+        railWaits: rail.map(() => 0),
+        talk: hello ? { id: ++remarkId, seat: greeter, text: hello, delay: HELLO_DELAY_MS + 2200 } : null,
         notice: null,
       }))
       return true
@@ -414,8 +491,24 @@ export const useSession = create<SessionStore>()((set, get) => {
       }
       const result = apply(state, { type: 'roll' })
       const dice = result.state.history[0]
+      // The regulars put their chips down and ride the same dice.
+      const railEvents: (TableEvent[] | null)[] = []
+      const rail = arrive(state).map((seat) => {
+        if (!seat) {
+          railEvents.push(null)
+          return null
+        }
+        let { stack, state: theirs } = seat
+        for (const action of railBets(seat.regular.style, theirs, stack)) {
+          theirs = apply(theirs, action, stack).state
+          stack -= action.type === 'bet' ? action.amount : 0
+        }
+        const after = apply(theirs, { type: 'roll', dice })
+        railEvents.push(after.events)
+        return { ...seat, stack: stack + summarize(after.events).back, state: after.state }
+      })
       playSfx('dice')
-      inFlight = { result, timer: window.setTimeout(land, LAND_MS) }
+      inFlight = { result, rail, railEvents, timer: window.setTimeout(land, LAND_MS) }
       set({ dice: { id: result.state.rolls, dice, landed: false }, notice: null, focus: null })
     },
 
@@ -432,10 +525,18 @@ export const useSession = create<SessionStore>()((set, get) => {
         }
         if (forfeit > 0) useSave.getState().recordResult('craps', 'loss', -forfeit)
       }
-      set({ stakes: null, state: null, dice: null, settled: null, lost: [], log: [], call: null, notice: null, focus: null, takingDown: false })
+      talk = null
+      set({ stakes: null, state: null, dice: null, settled: null, lost: [], log: [], call: null, rail: [], railWaits: [], talk: null, notice: null, focus: null, takingDown: false })
     },
   }
 })
+
+/** A regular stepping up with a fresh buy-in, at the point the table's on. */
+function seatRegular(regular: Regular, stakes: Stakes, table: TableState): RailSeat {
+  return { regular, stack: regular.bankroll * stakes.limits.min, state: createTable({ limits: stakes.limits, seed: table.seed, point: table.point }) }
+}
+
+const talkers = (rail: (RailSeat | null)[]): Talker[] => rail.flatMap((seat, i) => (seat ? [{ seat: i, regular: seat.regular }] : []))
 
 /** On the come-out, the shooter has to have a line bet to roll. */
 export const needsLineBet = (state: TableState): boolean => state.point === null && betOn(state, 'pass') === 0 && betOn(state, 'dont-pass') === 0

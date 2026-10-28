@@ -4,6 +4,7 @@ import { Link } from '../../../router'
 import { navigate } from '../../../navigation'
 import { useSave } from '../../../store/save'
 import { STAKES } from '../content'
+import { REGULARS } from '../rail'
 import { useSession } from './session'
 
 export function Lobby() {
@@ -79,6 +80,21 @@ export function Lobby() {
                 : 'Pick a table you can cover.'}
         </p>
       </div>
+
+      <section className="cr-panel cr-lobby__section cr-regulars" aria-labelledby="cr-regulars-title">
+        <h2 id="cr-regulars-title">At the rail</h2>
+        <p className="cr-ink-dim">Three regulars play beside you on any night, each with their own way of betting your dice. When one runs out of caps, someone else steps up.</p>
+        <ul>
+          {REGULARS.map((r) => (
+            <li key={r.id}>
+              <span className="cr-portrait-dot" style={{ background: r.color }} aria-hidden="true" />
+              <span>
+                <strong>{r.name}</strong> {r.blurb}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="cr-panel cr-lobby__section cr-primer" aria-labelledby="cr-primer-title">
         <h2 id="cr-primer-title">New to the game?</h2>

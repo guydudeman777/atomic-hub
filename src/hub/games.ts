@@ -13,7 +13,9 @@ export interface GameInfo {
   modes: string
   ready: boolean
   path: string
-  icon: 'caravan' | 'cards' | 'chip' | 'dice' | 'wheel' | 'reels' | 'grid' | 'discs' | 'ships' | 'xo'
+  icon:
+    | 'caravan' | 'blackjack' | 'holdem' | 'draw' | 'solitaire' | 'videopoker' | 'wheel' | 'dice' | 'slots'
+    | 'connect4' | 'grid' | 'reversi' | 'ships' | 'xo'
 }
 
 /** `short` labels the tabs on phones, where the full labels don't fit in a row. */
@@ -30,27 +32,27 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'Build three caravans worth 21 to 26 and outbid your rival on at least two. Win cards from five opponents and build your own deck.',
   },
   {
-    id: 'blackjack', name: 'Blackjack', category: 'cards', ready: true, path: '/blackjack', icon: 'cards',
+    id: 'blackjack', name: 'Blackjack', category: 'cards', ready: true, path: '/blackjack', icon: 'blackjack',
     modes: 'A full table of regulars, or one on one with the dealer',
     blurb: 'Blue felt, a six-deck shoe and caps on the line. Dealer stands on soft 17, blackjack pays 3 to 2, and a coach knows the book.',
   },
   {
-    id: 'holdem', name: 'Texas Hold’em', category: 'cards', ready: false, path: '/holdem', icon: 'chip',
+    id: 'holdem', name: 'Texas Hold’em', category: 'cards', ready: false, path: '/holdem', icon: 'holdem',
     modes: '2–6 seats, AI or hot-seat',
     blurb: 'No-limit Hold’em with blinds and side pots against bots with their own personalities.',
   },
   {
-    id: 'draw', name: 'Five-Card Draw', category: 'cards', ready: false, path: '/draw', icon: 'cards',
+    id: 'draw', name: 'Five-Card Draw', category: 'cards', ready: false, path: '/draw', icon: 'draw',
     modes: '2–6 seats, AI or hot-seat',
     blurb: 'Ante up, draw up to three, and bet it all on what you kept.',
   },
   {
-    id: 'solitaire', name: 'Solitaire', category: 'cards', ready: false, path: '/solitaire', icon: 'cards',
+    id: 'solitaire', name: 'Solitaire', category: 'cards', ready: false, path: '/solitaire', icon: 'solitaire',
     modes: 'Solo',
     blurb: 'Klondike, draw one or three, with undo and optional Vegas scoring in caps.',
   },
   {
-    id: 'videopoker', name: 'Video Poker', category: 'casino', ready: false, path: '/videopoker', icon: 'reels',
+    id: 'videopoker', name: 'Video Poker', category: 'casino', ready: false, path: '/videopoker', icon: 'videopoker',
     modes: 'Solo',
     blurb: 'Jacks or Better on a full-pay table. Hold, draw, collect.',
   },
@@ -65,12 +67,12 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'Pass line, come bets, odds and the field.',
   },
   {
-    id: 'slots', name: 'Slots', category: 'casino', ready: false, path: '/slots', icon: 'reels',
+    id: 'slots', name: 'Slots', category: 'casino', ready: false, path: '/slots', icon: 'slots',
     modes: 'Solo',
     blurb: 'Three reels of wasteland junk with a published paytable.',
   },
   {
-    id: 'connect4', name: 'Connect Four', category: 'board', ready: false, path: '/connect4', icon: 'discs',
+    id: 'connect4', name: 'Connect Four', category: 'board', ready: false, path: '/connect4', icon: 'connect4',
     modes: 'Against the AI or hot-seat',
     blurb: 'Drop discs, line up four.',
   },
@@ -80,7 +82,7 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'American rules: forced captures, multi-jumps and kings.',
   },
   {
-    id: 'reversi', name: 'Reversi', category: 'board', ready: false, path: '/reversi', icon: 'discs',
+    id: 'reversi', name: 'Reversi', category: 'board', ready: false, path: '/reversi', icon: 'reversi',
     modes: 'Against the AI or hot-seat',
     blurb: 'Flank and flip. Corners win games.',
   },

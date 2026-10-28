@@ -82,6 +82,25 @@ export interface ReversiSave {
   beaten: Record<string, number>
 }
 
+export interface Connect4Save {
+  /** Mark the cells where a checker would make four, for either player. */
+  threats: boolean
+  /** Wins against each opponent id, which opens the next one on the ladder. */
+  beaten: Record<string, number>
+}
+
+export interface TicTacToeSave {
+  /** Classic 3×3 or Ultimate, as last picked in the lobby. */
+  variant: 'classic' | 'ultimate'
+  /** Wins against each opponent id, which opens the next one on the ladder. */
+  beaten: Record<string, number>
+}
+
+export interface RouletteSave {
+  /** What each bet pays, and its house edge, shown as you point at it. */
+  guide: boolean
+}
+
 export interface SaveData {
   version: 1
   wallet: WalletState
@@ -92,6 +111,9 @@ export interface SaveData {
   draw: DrawSave
   craps: CrapsSave
   reversi: ReversiSave
+  connect4: Connect4Save
+  tictactoe: TicTacToeSave
+  roulette: RouletteSave
 }
 
 export type GameResult = 'win' | 'loss' | 'draw'
@@ -113,6 +135,9 @@ interface SaveActions {
   updateDraw: (patch: Partial<DrawSave>) => void
   updateCraps: (patch: Partial<CrapsSave>) => void
   updateReversi: (patch: Partial<ReversiSave>) => void
+  updateConnect4: (patch: Partial<Connect4Save>) => void
+  updateTicTacToe: (patch: Partial<TicTacToeSave>) => void
+  updateRoulette: (patch: Partial<RouletteSave>) => void
   importSave: (json: string) => { ok: true } | { ok: false; error: string }
   resetSave: () => void
 }
@@ -145,12 +170,15 @@ export const newSave = (): SaveData => ({
   draw: { hints: true },
   craps: { guide: true },
   reversi: { showMoves: true, beaten: {} },
+  connect4: { threats: false, beaten: {} },
+  tictactoe: { variant: 'classic', beaten: {} },
+  roulette: { guide: true },
 })
 
 /** Just the data fields, for export. */
 export function snapshot(state: SaveData): SaveData {
-  const { version, wallet, settings, stats, caravan, blackjack, draw, craps, reversi } = state
-  return { version, wallet, settings, stats, caravan, blackjack, draw, craps, reversi }
+  const { version, wallet, settings, stats, caravan, blackjack, draw, craps, reversi, connect4, tictactoe, roulette } = state
+  return { version, wallet, settings, stats, caravan, blackjack, draw, craps, reversi, connect4, tictactoe, roulette }
 }
 
 function isSaveData(value: unknown): value is SaveData {
@@ -244,6 +272,12 @@ export const useSave = create<SaveData & SaveActions>()(
 
       updateReversi: (patch) => set((s) => ({ reversi: { ...s.reversi, ...patch } })),
 
+      updateConnect4: (patch) => set((s) => ({ connect4: { ...s.connect4, ...patch } })),
+
+      updateTicTacToe: (patch) => set((s) => ({ tictactoe: { ...s.tictactoe, ...patch } })),
+
+      updateRoulette: (patch) => set((s) => ({ roulette: { ...s.roulette, ...patch } })),
+
       importSave: (json) => {
         let parsed: unknown
         try {
@@ -260,6 +294,9 @@ export const useSave = create<SaveData & SaveActions>()(
           draw: { ...base.draw, ...parsed.draw },
           craps: { ...base.craps, ...parsed.craps },
           reversi: { ...base.reversi, ...parsed.reversi },
+          connect4: { ...base.connect4, ...parsed.connect4 },
+          tictactoe: { ...base.tictactoe, ...parsed.tictactoe },
+          roulette: { ...base.roulette, ...parsed.roulette },
         })
         return { ok: true }
       },
@@ -288,6 +325,9 @@ export const useSave = create<SaveData & SaveActions>()(
           draw: { ...current.draw, ...p.draw },
           craps: { ...current.craps, ...p.craps },
           reversi: { ...current.reversi, ...p.reversi },
+          connect4: { ...current.connect4, ...p.connect4 },
+          tictactoe: { ...current.tictactoe, ...p.tictactoe },
+          roulette: { ...current.roulette, ...p.roulette },
         }
       },
     },

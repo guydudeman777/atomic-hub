@@ -10,7 +10,8 @@
  * sit/stand:  a lighter push between a game's lobby and its table.
  *
  * Each game's room: .cv (Caravan), .bj (Blackjack), .dw (Five-Card Draw),
- * .cr (Craps) or .rv (Reversi).
+ * .cr (Craps), .rv (Reversi), .c4 (Connect Four), .tt (Tic-Tac-Toe) or
+ * .rl (Roulette).
  */
 
 :root[data-leaving] body,
@@ -32,7 +33,7 @@
   animation: go-dark 220ms ease-in 340ms forwards;
 }
 
-:root[data-entering='enter-game'] :is(.cv, .bj, .dw, .cr, .rv) {
+:root[data-entering='enter-game'] :is(.cv, .bj, .dw, .cr, .rv, .c4, .tt, .rl) {
   animation: lamp-on 650ms ease-out backwards;
 }
 
@@ -137,7 +138,7 @@
 
 /* ---- Leaving a game ------------------------------------------------------- */
 
-:root[data-leaving='exit-game'] :is(.cv, .bj, .dw, .cr, .rv) {
+:root[data-leaving='exit-game'] :is(.cv, .bj, .dw, .cr, .rv, .c4, .tt, .rl) {
   animation: lamp-off 380ms ease-in forwards;
 }
 
@@ -192,19 +193,19 @@
 
 /* ---- Sitting down at a table and getting up ------------------------------- */
 
-:root[data-leaving='sit'] :is(.cv, .bj, .dw, .cr, .rv) {
+:root[data-leaving='sit'] :is(.cv, .bj, .dw, .cr, .rv, .c4, .tt, .rl) {
   animation: sit-out 300ms ease-in forwards;
 }
 
-:root[data-entering='sit'] :is(.cv, .bj, .dw, .cr, .rv) {
+:root[data-entering='sit'] :is(.cv, .bj, .dw, .cr, .rv, .c4, .tt, .rl) {
   animation: sit-in 560ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
 }
 
-:root[data-leaving='stand'] :is(.cv, .bj, .dw, .cr, .rv) {
+:root[data-leaving='stand'] :is(.cv, .bj, .dw, .cr, .rv, .c4, .tt, .rl) {
   animation: stand-out 300ms ease-in forwards;
 }
 
-:root[data-entering='stand'] :is(.cv, .bj, .dw, .cr, .rv) {
+:root[data-entering='stand'] :is(.cv, .bj, .dw, .cr, .rv, .c4, .tt, .rl) {
   animation: stand-in 480ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
 }
 

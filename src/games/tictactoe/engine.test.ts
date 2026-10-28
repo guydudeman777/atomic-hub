@@ -4,6 +4,7 @@ import {
   type GameEvent,
   type GameState,
   type Variant,
+  LINES,
   O,
   X,
   apply,
@@ -13,6 +14,7 @@ import {
   gridsWon,
   isLegal,
   legalMoves,
+  lineName,
   playableGrids,
   position,
   squareAt,
@@ -87,9 +89,19 @@ describe('Classic', () => {
     expect(fromDiagram('xxx oo. ...').winner).toBe(X)
   })
 
-  it('names squares', () => {
+  it('names squares, and where a line runs', () => {
     expect(squareName('classic', 4)).toBe('the center')
     expect(squareName('classic', 2)).toBe('the top right')
+    expect(LINES.map(lineName)).toEqual([
+      'across the top',
+      'across the middle',
+      'across the bottom',
+      'down the left',
+      'down the middle',
+      'down the right',
+      'corner to corner',
+      'corner to corner',
+    ])
   })
 })
 

@@ -39,6 +39,10 @@ export type Sfx =
   | 'coin'
   | 'win'
   | 'lose'
+  // Tic-Tac-Toe
+  | 'pencil-x'
+  | 'pencil-o'
+  | 'pencil-line'
 
 export interface SfxOptions {
   /** Stereo position, -1 (left) to 1 (right). */
@@ -165,6 +169,38 @@ function vibe(m: Mixer, out: AudioNode, t: number, midi: number, length: number,
   osc(ctx, 'triangle', f, t, length + 0.05).connect(env).connect(out)
   osc(ctx, 'sine', f * 2, t, length + 0.05).connect(amp(ctx, 0.3)).connect(env)
   osc(ctx, 'sine', f * 4, t, 0.3).connect(tine).connect(out)
+}
+
+/**
+ * Grease pencil dragged across a paper placemat: noise through a band that
+ * moves with the stroke, roughened by a grainy envelope, over the soft rasp
+ * of the paper. `back` bends the band back down, for a curve.
+ */
+function wax(m: Mixer, out: AudioNode, t: number, length: number, from: number, to: number, level: number, back?: number) {
+  const { ctx } = m
+  const steps = 96
+  const curve = new Float32Array(steps)
+  for (let i = 0; i < steps; i++) {
+    const at = i / (steps - 1)
+    const shape = Math.min(1, at * 12) * Math.min(1, (1 - at) * 5)
+    curve[i] = level * shape * (0.55 + Math.random() * 0.45)
+  }
+  curve[steps - 1] = 0
+  const env = amp(ctx)
+  env.gain.setValueCurveAtTime(curve, t, length)
+  const band = filter(ctx, 'bandpass', from, 1.4)
+  band.frequency.setValueAtTime(from, t)
+  if (back) {
+    band.frequency.linearRampToValueAtTime(to, t + length * 0.55)
+    band.frequency.linearRampToValueAtTime(back, t + length)
+  } else band.frequency.linearRampToValueAtTime(to, t + length)
+  noise(m, t, length).connect(band).connect(filter(ctx, 'lowpass', 3800)).connect(env).connect(out)
+
+  const rasp = amp(ctx)
+  swell(rasp.gain, t, level * 0.3, length * 0.3, length * 0.7)
+  noise(m, t, length, 'pink').connect(filter(ctx, 'bandpass', 420, 0.8)).connect(rasp).connect(out)
+  // The pencil touching down.
+  land(m, out, t, level * 0.18, 0.1)
 }
 
 /** Partials of a clay casino chip: lower and deader than a bottle cap. */
@@ -425,5 +461,21 @@ const EFFECTS: Record<Sfx, Effect> = {
       mute.frequency.linearRampToValueAtTime(600, start + length)
       horn.connect(mute).connect(env).connect(out)
     })
+  },
+
+  'pencil-x': (m, out, t) => {
+    // Two quick strokes of grease pencil, the second a beat after the first: in step with .tt-mark in tictactoe.css.
+    wax(m, out, t, 0.15, 1500, 2300, 0.5)
+    wax(m, out, t + 0.19, 0.15, 1700, 2500, 0.45)
+  },
+
+  'pencil-o': (m, out, t) => {
+    // One loop, the wax dragging harder round the bottom of the curve.
+    wax(m, out, t, 0.34, 1300, 2200, 0.45, 1500)
+  },
+
+  'pencil-line': (m, out, t) => {
+    // A long, hard stroke through the winning three.
+    wax(m, out, t, 0.46, 1100, 2600, 0.6)
   },
 }

@@ -130,6 +130,20 @@ export function squareName(variant: Variant, square: number): string {
   return `${placeName(square % 9)} of ${gridName(Math.floor(square / 9))}`
 }
 
+/** Where a line of three runs: "across the top", "down the middle", "corner to corner". */
+export function lineName(line: readonly number[]): string {
+  const key = line.join()
+  const names: Record<string, string> = {
+    '0,1,2': 'across the top',
+    '3,4,5': 'across the middle',
+    '6,7,8': 'across the bottom',
+    '0,3,6': 'down the left',
+    '1,4,7': 'down the middle',
+    '2,5,8': 'down the right',
+  }
+  return names[key] ?? 'corner to corner'
+}
+
 /** "the center grid". */
 export const gridName = (grid: number) => `${placeName(grid)} grid`
 

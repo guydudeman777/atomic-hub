@@ -1,5 +1,5 @@
 import { type Browser, type Page, expect, test } from '@playwright/test'
-import { finishBlackjackRound, watchErrors } from './helpers.ts'
+import { finishBlackjackRound, finishDrawHand, watchErrors } from './helpers.ts'
 
 /**
  * Online tables, with two tabs of one browser talking over a
@@ -167,6 +167,43 @@ test('two players share a Blackjack table online, with the regulars', async ({ b
   await expect(host.getByRole('list', { name: 'Table log' })).toContainText('Guesty gets up from the table.')
   await host.getByRole('button', { name: /^Deal/ }).click()
   await finishBlackjackRound(host)
+  expect(errors.flat()).toEqual([])
+  await context.close()
+})
+
+test('three players at an online Five-Card Draw table, each seeing it from their own chair', async ({ browser }) => {
+  test.setTimeout(120_000)
+  const { context, host, guest, errors } = await twoPlayers(browser)
+  const third = await context.newPage()
+  errors.push(watchErrors(third))
+  const code = await hostTable(host, 'draw', 'Hostess')
+  await joinTable(guest, 'draw', code, 'Guesty')
+  await joinTable(third, 'draw', code, 'Thirza')
+  await host.getByLabel('Regulars sitting in').selectOption('1')
+  await host.getByRole('button', { name: 'Start' }).click()
+  const pages = [host, guest, third]
+  for (const page of pages) await expect(page.getByRole('region', { name: 'Poker table' })).toBeVisible({ timeout: 10_000 })
+
+  // Three players and a regular, each with their own plate at the foot of the table.
+  for (const page of pages) {
+    await expect(page.locator('.dw-plate:not(.is-open)')).toHaveCount(4)
+    await expect(page.locator('.dw-plate.is-you')).toHaveCount(1)
+    await expect(page.locator('.dw-plate.is-player')).toHaveCount(2)
+  }
+
+  for (const page of pages) await page.getByRole('button', { name: /^Deal/ }).first().click()
+  // Each sees their own five cards, and nobody else's.
+  for (const page of pages) {
+    await expect(page.locator('.dw-card.is-yours')).toHaveCount(5, { timeout: 15_000 })
+    await expect(page.locator('.dw-card:not(.is-yours):not([data-down])')).toHaveCount(0)
+  }
+  await Promise.all(pages.map((page) => finishDrawHand(page)))
+
+  // Every table saw the same hand: the same lines about who won.
+  const wins = (page: Page) =>
+    page.getByRole('list', { name: 'Table log' }).locator('li').evaluateAll((lis) => lis.map((li) => li.textContent!).filter((t) => / wins? \d+/.test(t)).map((t) => t.replace(/^You win/, '· wins').replace(/^(Hostess|Guesty|Thirza) wins/, '· wins')))
+  await expect.poll(() => wins(guest)).toEqual(await wins(host))
+  await expect.poll(() => wins(third)).toEqual(await wins(host))
   expect(errors.flat()).toEqual([])
   await context.close()
 })

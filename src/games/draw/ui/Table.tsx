@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode, type RefObject, createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, type RefObject, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { type Card, cardName } from '../../../core/cards'
 import { PlayingCard } from '../../../components/PlayingCard'
 import { useMediaQuery } from '../../../components/useMediaQuery'
@@ -7,7 +7,9 @@ import { evaluate, scoreOf, valueOf } from '../../../core/poker'
 import { navigate } from '../../../navigation'
 import { useSave } from '../../../store/save'
 import { spoken } from '../banter'
-import { type Table as TableInfo, YOUR_SEAT } from '../content'
+import type { Table as TableInfo } from '../content'
+import { useGameLink } from '../../../net/store'
+import { LinkBanner } from '../../../net/ui/LinkBanner'
 import {
   type BetAction,
   type DrawState,
@@ -23,9 +25,10 @@ import {
 import { type DrawPlan, bookDraw } from '../strategy'
 import { ChipStack } from './Chip'
 import { Felt } from './Felt'
-import { type Layout, type Pin, type Point, WIDE_LAYOUT, tallLayout } from './layout'
+import { type Layout, type Pin, type Point, WIDE_LAYOUT, seenFrom, tallLayout } from './layout'
+import { GAME, checksumAfter, leaveOnline, yourMoves } from './online'
 import { RulesText } from './Rules'
-import { type Flight, type Move, type Occupant, type Remark, type Toss, useSession, yourStake, youreIn } from './session'
+import { type Flight, type Human, type Move, type Occupant, type Remark, type Toss, listNames, useSession, yourStake, youreIn } from './session'
 
 /**
  * Phones and small windows get the compact table in draw.css, whose media
@@ -73,34 +76,46 @@ function pace(state: DrawState, watching: boolean): number {
 }
 
 export function Table() {
-  const { sitting, state, table } = useSession()
+  const { sitting, state, table, me, humans, queue, config } = useSession()
   const step = useSession((s) => s.step)
+  const link = useGameLink(GAME)
 
   // No seat? Back to the lobby.
   useEffect(() => {
     if (!state || !table) navigate('/draw')
   }, [state, table])
 
-  // The dealer and the regulars take their turns after a beat.
+  // The dealer and the regulars take their turns after a beat. Players take theirs.
   useEffect(() => {
     if (!state) return
     const who = actor(state)
-    if (who === null || who === YOUR_SEAT) return
-    const t = window.setTimeout(step, pace(state, !youreIn(state)))
+    if (who === null || who === me || (who !== 'dealer' && humans[who] && !humans[who].gone)) return
+    const t = window.setTimeout(step, pace(state, !youreIn(state, me)))
     return () => window.clearTimeout(t)
-  }, [state, step])
+  }, [state, step, me, humans])
+
+  // Online: play the other players' moves as the table gets to them.
+  useEffect(() => {
+    if (queue.length) useSession.getState().pump(checksumAfter(link))
+  }, [state, queue, link])
 
   if (!state || !table) return null
-  return <TableView key={sitting} />
+  return (
+    <>
+      <TableView key={sitting} />
+      {config?.online && <LinkBanner link={link} waitsForOthers={false} onGone={() => void navigate('/draw', { during: leaveOnline })} />}
+    </>
+  )
 }
 
 // ---------------------------------------------------------------------------
 
 function TableView() {
-  const { state, table, seats, talk, call, result, flights, tosses, moves, marked, config } = useSession()
+  const { state, table, seats, talk, call, result, flights, tosses, moves, marked, config, me, humans } = useSession()
   const caps = useSave((s) => s.wallet.caps)
   const hints = useSave((s) => s.draw.hints)
-  const { bet, deal, mark, draw, markOnly } = useSession.getState()
+  const { mark, markOnly } = useSession.getState()
+  const { bet, deal, draw } = yourMoves
   // The shuffle as you sit down. (Deferred so a StrictMode double mount doesn't play it twice.)
   useEffect(() => {
     const t = window.setTimeout(() => playSfx('shuffle'), 200)
@@ -109,8 +124,8 @@ function TableView() {
 
   const s = state!
   const n = s.seats.length
-  const you = s.seats[YOUR_SEAT]
-  const yourTurn = actor(s) === YOUR_SEAT
+  const you = s.seats[me]
+  const yourTurn = actor(s) === me
   const yourDraw = yourTurn && s.phase === 'drawing'
   const book = yourDraw && hints && you ? bookDraw(you.cards) : null
   const legal = new Set(yourTurn && s.phase === 'betting' ? legalActions(s).map((a) => a.type) : [])
@@ -147,7 +162,9 @@ function TableView() {
   const stageRef = useRef<HTMLDivElement>(null)
   const aspect = useAspect(stageRef)
   const tall = useMediaQuery(TALL_TABLE)
-  const layout = tall ? tallLayout(aspect * 1000) : WIDE_LAYOUT
+  const base = tall ? tallLayout(aspect * 1000) : WIDE_LAYOUT
+  // Online, everyone sees the table from their own chair.
+  const layout = useMemo(() => seenFrom(base, me, n), [base, me, n])
   const { shape } = layout
   const speaker = talk && talk.seat !== 'dealer' ? seats[talk.seat] : null
 
@@ -168,13 +185,15 @@ function TableView() {
                   seat={seat}
                   state={s}
                   occupant={seats[seat] ?? null}
+                  human={seat === me ? null : (humans[seat] ?? null)}
+                  you={seat === me}
                   move={moves[seat] ?? null}
                   caps={caps}
                   talk={talk?.seat === seat && !shape.talk ? talk : null}
-                  open={seat !== YOUR_SEAT && !seats[seat] && (config?.opponents ?? 0) > 0}
-                  marked={seat === YOUR_SEAT ? marked : []}
-                  book={seat === YOUR_SEAT ? book : null}
-                  onCard={yourDraw && seat === YOUR_SEAT ? mark : undefined}
+                  open={seat !== me && !seats[seat] && !humans[seat] && (config?.opponents ?? 0) > 0}
+                  marked={seat === me ? marked : []}
+                  book={seat === me ? book : null}
+                  onCard={yourDraw && seat === me ? mark : undefined}
                 />
               ))}
               {flights.map((f) => (
@@ -266,6 +285,9 @@ interface SeatProps {
   seat: number
   state: DrawState
   occupant: Occupant | null
+  /** Another player, at an online table. */
+  human: Human | null
+  you: boolean
   move: Move | null
   caps: number
   talk: Remark | null
@@ -278,13 +300,26 @@ interface SeatProps {
   onCard?: (cardId: string) => void
 }
 
-function SeatView({ seat, state, occupant, move, caps, talk, open, marked, book, onCard }: SeatProps) {
+function SeatView({ seat, state, occupant, human, you, move, caps, talk, open, marked, book, onCard }: SeatProps) {
   const { plateOf, betOf, buttonOf, cardOf, sideOf, handNameOf, drewOf } = useLayout()
   const n = state.seats.length
   const s = state.seats[seat]
-  const you = seat === YOUR_SEAT
   const plate = plateOf(seat, n)
   const side = sideOf(seat, n)
+  if (!s && (human || you)) {
+    // A player who's yet to be dealt in.
+    return (
+      <div className={`dw-plate dw-plate--${side}${you ? ' is-you' : ' is-player'}`} data-hang={plate.hang} style={pinned(plate)}>
+        <span className="dw-plate__name">{you ? 'You' : human!.name}</span>
+        {you && (
+          <span className="dw-plate__stack">
+            {caps.toLocaleString()}
+            <span className="visually-hidden"> caps</span>
+          </span>
+        )}
+      </div>
+    )
+  }
   if (!s) {
     return open ? (
       <div className={`dw-plate is-open dw-plate--${side}`} data-hang={plate.hang} style={pinned(plate)}>
@@ -292,7 +327,7 @@ function SeatView({ seat, state, occupant, move, caps, talk, open, marked, book,
       </div>
     ) : null
   }
-  const name = you ? 'You' : (occupant?.regular.name ?? '')
+  const name = you ? 'You' : (occupant?.regular.name ?? human?.name ?? '')
   const acting = actor(state) === seat
   const won = state.payouts?.some((p) => p.seat === seat) ?? false
   const showing = s.inHand && !s.folded && s.cards.length === 5 && (s.shown || you)
@@ -309,6 +344,7 @@ function SeatView({ seat, state, occupant, move, caps, talk, open, marked, book,
             card={card}
             place={cardOf(seat, n, k)}
             depth={k}
+            seat={seat}
             you={you}
             faceDown={!you && !s.shown}
             folded={s.folded}
@@ -335,8 +371,8 @@ function SeatView({ seat, state, occupant, move, caps, talk, open, marked, book,
         </div>
       )}
       <div
-        key={occupant?.regular.id ?? 'you'}
-        className={`dw-plate dw-plate--${side}${acting ? ' is-acting' : ''}${you ? ' is-you' : ''}${s.folded ? ' is-folded' : ''}${occupant?.leaving ? ' is-leaving' : ''}`}
+        key={occupant?.regular.id ?? (human ? `player-${human.seat}` : 'you')}
+        className={`dw-plate dw-plate--${side}${acting ? ' is-acting' : ''}${you ? ' is-you' : ''}${human ? ' is-player' : ''}${s.folded ? ' is-folded' : ''}${occupant?.leaving || human?.gone ? ' is-leaving' : ''}`}
         data-hang={plate.hang}
         style={pinned(plate)}
       >
@@ -377,6 +413,7 @@ interface CardProps {
   card: Card
   place: { x: number; y: number; rot: number }
   depth: number
+  seat: number
   you: boolean
   faceDown: boolean
   /** Folded: the cards go to the muck. */
@@ -394,10 +431,10 @@ interface CardProps {
  * if it's yours; the regulars' stay face down, with no face in the page,
  * until the showdown turns them.
  */
-function TableCard({ card, place, depth, you, faceDown, folded, marked, keep, onClick, index }: CardProps) {
+function TableCard({ card, place, depth, seat, you, faceDown, folded, marked, keep, onClick, index }: CardProps) {
   const { shape, cardW } = useLayout()
   const muck = { '--mx': shape.muck.x - place.x, '--my': shape.muck.y - place.y } as CSSProperties
-  const style = { ...at(place), ...from(place, shape.deck), ...muck, '--k': depth, '--w': cardW(you ? YOUR_SEAT : 1) } as CSSProperties
+  const style = { ...at(place), ...from(place, shape.deck), ...muck, '--k': depth, '--w': cardW(seat) } as CSSProperties
   const className = `dw-card${you ? ' is-yours' : ''}${folded ? ' is-folded' : ''}${marked ? ' is-marked' : ''}${keep ? ' is-keep' : ''}`
   const inner = (
     <div className="dw-flip">
@@ -545,18 +582,46 @@ interface ControlsProps {
 }
 
 function Controls({ state, table, caps, legal, marked, book }: ControlsProps) {
-  const { bet, deal, draw, markOnly, leave } = useSession.getState()
-  const yourTurn = actor(state) === YOUR_SEAT
-  const you = state.seats[YOUR_SEAT]
+  const { markOnly, leave } = useSession.getState()
+  const { bet, deal, draw, dealNow } = yourMoves
+  const { me, ready, humans, config } = useSession()
+  const link = useGameLink(GAME)
+  const online = !!config?.online
+  const yourTurn = actor(state) === me
+  const you = state.seats[me]
 
   if (betweenHands(state)) {
+    // Online, once you've asked in you wait for the others.
+    if (online && ready[me] !== null) {
+      const waiting = humans.flatMap((h, seat) => (h && !h.gone && seat !== me && ready[seat] === null ? [h.name] : []))
+      return (
+        <div className="dw-controls">
+          <p className="dw-controls__note">
+            {ready[me] ? 'You’re dealt in.' : 'You’re sitting this hand out.'} Waiting for {listNames(waiting)}.
+          </p>
+          {link?.host && (
+            <div className="dw-controls__buttons">
+              <button className="dw-button" onClick={dealNow}>
+                Deal without them
+              </button>
+            </div>
+          )}
+        </div>
+      )
+    }
     if (caps < table.stakes.ante) {
       return (
         <div className="dw-controls dw-controls--broke">
           <p>You need {table.stakes.ante} caps to ante here and you have {caps}. Claim a refill from the hub menu once you’re under 50.</p>
-          <button className="dw-button" onClick={() => void navigate('/draw', { during: leave })}>
-            Back to the tables
-          </button>
+          {online ? (
+            <button className="dw-button" onClick={() => deal(true)}>
+              Sit this hand out
+            </button>
+          ) : (
+            <button className="dw-button" onClick={() => void navigate('/draw', { during: leave })}>
+              Back to the tables
+            </button>
+          )}
         </div>
       )
     }
@@ -566,6 +631,11 @@ function Controls({ state, table, caps, legal, marked, book }: ControlsProps) {
           Ante {table.stakes.ante}. Bets {table.stakes.small}, then {table.stakes.big} after the draw.
         </p>
         <div className="dw-controls__buttons">
+          {online && (
+            <button className="dw-button" onClick={() => deal(true)}>
+              Sit out
+            </button>
+          )}
           <button className="dw-button dw-button--primary" onClick={() => deal()}>
             {state.hand === 0 ? 'Deal' : 'Deal the next hand'} <span className="dw-key">Enter</span>
           </button>
@@ -574,7 +644,7 @@ function Controls({ state, table, caps, legal, marked, book }: ControlsProps) {
     )
   }
 
-  if (!youreIn(state)) {
+  if (!youreIn(state, me)) {
     return (
       <div className="dw-controls">
         <p className="dw-controls__note">You’re out of this hand. It plays out without you.</p>
@@ -604,7 +674,7 @@ function Controls({ state, table, caps, legal, marked, book }: ControlsProps) {
     )
   }
 
-  const owe = yourTurn && state.phase === 'betting' ? owed(state, YOUR_SEAT) : 0
+  const owe = yourTurn && state.phase === 'betting' ? owed(state, me) : 0
   const size = betSize(state)
   const level = state.bets * size + size
   const canFold = yourTurn && legal.has('fold')
@@ -629,9 +699,9 @@ function Controls({ state, table, caps, legal, marked, book }: ControlsProps) {
 
 // ---- The terminal ------------------------------------------------------------------
 
-function status(state: DrawState, seats: (Occupant | null)[], result: { committed: number; won: number } | null): string {
+function status(state: DrawState, seats: (Occupant | null)[], humans: (Human | null)[], me: number, result: { committed: number; won: number } | null): string {
   const who = actor(state)
-  const name = (seat: number) => seats[seat]?.regular.name ?? 'Someone'
+  const name = (seat: number) => seats[seat]?.regular.name ?? humans[seat]?.name ?? 'Someone'
   switch (state.phase) {
     case 'waiting':
       return 'Deal when you’re ready'
@@ -641,7 +711,7 @@ function status(state: DrawState, seats: (Occupant | null)[], result: { committe
       if (net > 0) return `You win ${net} caps`
       if (net < 0) {
         const winner = state.payouts?.[0]?.seat
-        return winner !== undefined && state.seats[YOUR_SEAT]?.folded ? `${name(winner)} takes the pot` : `You lose ${-net} caps`
+        return winner !== undefined && state.seats[me]?.folded ? `${name(winner)} takes the pot` : `You lose ${-net} caps`
       }
       return 'You break even'
     }
@@ -650,17 +720,17 @@ function status(state: DrawState, seats: (Occupant | null)[], result: { committe
     case 'showdown':
       return 'Showdown'
     case 'betting': {
-      if (who !== YOUR_SEAT) return `${name(who as number)} is thinking…`
-      const owe = owed(state, YOUR_SEAT)
+      if (who !== me) return humans[who as number] ? `${name(who as number)}’s turn` : `${name(who as number)} is thinking…`
+      const owe = owed(state, me)
       return owe > 0 ? `${owe} to call` : 'Check or bet'
     }
     case 'drawing':
-      return who === YOUR_SEAT ? 'Your draw' : `${name(who as number)} is drawing…`
+      return who === me ? 'Your draw' : `${name(who as number)} is drawing…`
   }
 }
 
 function Hud({ book }: { book: DrawPlan | null }) {
-  const { state, table, seats, log, result, leave } = useSession()
+  const { state, table, seats, log, result, leave, me, humans, config } = useSession()
   const hints = useSave((s) => s.draw.hints)
   const updateDraw = useSave((s) => s.updateDraw)
   const table3d = useSave((s) => s.settings.table3d)
@@ -687,18 +757,18 @@ function Hud({ book }: { book: DrawPlan | null }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [menuOpen])
   const s = state!
-  const inPot = yourStake(s)
-  const you = s.seats[YOUR_SEAT]
+  const inPot = yourStake(s, me)
+  const you = s.seats[me]
 
   let help: ReactNode = ''
-  const holding = you && youreIn(s) && you.cards.length === 5 ? spoken(evaluate(you.cards)) : null
+  const holding = you && youreIn(s, me) && you.cards.length === 5 ? spoken(evaluate(you.cards)) : null
   if (book) help = book.reason
-  else if (actor(s) === YOUR_SEAT && s.phase === 'drawing') help = `You hold ${holding}. Pick the cards you don’t want; standing pat is drawing none.`
+  else if (actor(s) === me && s.phase === 'drawing') help = `You hold ${holding}. Pick the cards you don’t want; standing pat is drawing none.`
   else if (betweenHands(s) && caps < table!.stakes.ante) help = 'You’re out of caps for this table.'
   else if (betweenHands(s)) help = 'Your caps are your stack: you can’t lose more than you have.'
-  else if (holding) help = `You hold ${holding}.${actor(s) === YOUR_SEAT && s.phase === 'betting' ? ` Pot ${potTotal(s)}.` : ''}`
+  else if (holding) help = `You hold ${holding}.${actor(s) === me && s.phase === 'betting' ? ` Pot ${potTotal(s)}.` : ''}`
 
-  const getUp = () => void navigate('/draw', { during: leave })
+  const getUp = () => void navigate('/draw', { during: config?.online ? leaveOnline : leave })
 
   const tableLog = (
     <ol className="dw-hud__log" ref={logRef} aria-label="Table log">
@@ -745,11 +815,13 @@ function Hud({ book }: { book: DrawPlan | null }) {
   return (
     <aside className="dw-hud screen" aria-label="Game status">
       <div className="dw-hud__head">
-        <p className="term-dim">Five-Card Draw, {table!.name.toLowerCase()}</p>
+        <p className="term-dim">
+          Five-Card Draw{config?.online ? ' online' : ''}, {table!.name.toLowerCase()}
+        </p>
         {inPot > 0 && <p className="dw-hud__stake">You’ve put in {inPot}</p>}
       </div>
       <p className="dw-hud__status" aria-live="polite">
-        {status(s, seats, result)}
+        {status(s, seats, humans, me, result)}
       </p>
       <p className="dw-hud__help" id="dw-advice">
         {help}

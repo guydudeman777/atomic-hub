@@ -1,6 +1,8 @@
+import { codeFromPath } from '../../../net/codes'
 import { Link } from '../../../router'
 import { useSave } from '../../../store/save'
 import { Lobby } from './Lobby'
+import { GAME, useDrawOnline } from './online'
 import { HandRankings, RulesText } from './Rules'
 import { Table } from './Table'
 import '@fontsource/rye/latin-400.css'
@@ -14,6 +16,7 @@ const SECTIONS = [
 ]
 
 export default function DrawApp({ path }: { path: string }) {
+  useDrawOnline(path)
   if (path === '/draw/play') {
     return (
       <div className="dw dw-room">
@@ -25,7 +28,7 @@ export default function DrawApp({ path }: { path: string }) {
   let page
   if (path === '/draw/rankings') page = <div className="dw-panel dw-page-panel"><HandRankings /></div>
   else if (path === '/draw/rules') page = <div className="dw-panel dw-page-panel"><RulesText /></div>
-  else page = <Lobby />
+  else page = <Lobby inviteCode={codeFromPath(path, GAME)} />
 
   return (
     <div className="dw dw-room dw-page">
@@ -39,7 +42,7 @@ export default function DrawApp({ path }: { path: string }) {
         </h1>
         <nav className="dw-nav" aria-label="Five-Card Draw">
           {SECTIONS.map((s) => (
-            <Link key={s.path} to={s.path} className="dw-nav__link" aria-current={path === s.path ? 'page' : undefined}>
+            <Link key={s.path} to={s.path} className="dw-nav__link" aria-current={path === s.path || (s.path === '/draw' && path.startsWith('/draw/join/')) ? 'page' : undefined}>
               <span className="wide-only">{s.label}</span>
               <span className="narrow-only">{s.short}</span>
             </Link>

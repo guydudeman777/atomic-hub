@@ -7,12 +7,85 @@ import { warmPools } from '../ai'
 import { MAX_OPPONENTS, REGULARS, TABLES } from '../content'
 import { WIDE_LAYOUT } from './layout'
 import { useSession } from './session'
+import { GAME, SEATS, startOnline } from './online'
+import { OnlinePanel } from '../../../net/ui/OnlinePanel'
+
+const ONLINE_CLASSES = { card: 'dw-panel', button: 'dw-button', primary: 'dw-button dw-button--primary', field: 'dw-field', dim: 'dw-ink-dim' }
 
 const SIZES = Array.from({ length: MAX_OPPONENTS }, (_, i) => i + 1)
 
 const sizeName = (n: number) => (n === 1 ? 'Heads up' : n === MAX_OPPONENTS ? 'Full table' : `${n + 1} players`)
 
-export function Lobby() {
+export function Lobby({ inviteCode = null }: { inviteCode?: string | null }) {
+  const [where, setWhere] = useState<'saloon' | 'online'>(inviteCode ? 'online' : 'saloon')
+  return (
+    <div className="dw-lobby">
+      <div className="dw-tabs" role="tablist" aria-label="Where to play">
+        <button role="tab" aria-selected={where === 'saloon'} className="dw-tab" onClick={() => setWhere('saloon')}>
+          In the saloon
+        </button>
+        <button role="tab" aria-selected={where === 'online'} className="dw-tab" onClick={() => setWhere('online')}>
+          Online
+        </button>
+      </div>
+      {where === 'saloon' ? <SaloonSetup /> : <OnlineSetup inviteCode={inviteCode} />}
+    </div>
+  )
+}
+
+function OnlineSetup({ inviteCode }: { inviteCode: string | null }) {
+  const caps = useSave((s) => s.wallet.caps)
+  const [tableId, setTable] = useState(TABLES[0].id)
+  const [regulars, setRegulars] = useState(2)
+  const table = TABLES.find((t) => t.id === tableId) ?? TABLES[0]
+  useEffect(warmPools, [])
+  return (
+    <OnlinePanel
+      game={GAME}
+      seats={SEATS}
+      lateJoin
+      classes={ONLINE_CLASSES}
+      inviteCode={inviteCode}
+      tablePath="/draw/play"
+      seatLabel={(seat) => `Chair ${seat + 1}`}
+      startable={(roster) =>
+        caps < table.minCaps
+          ? `You need ${table.minCaps} caps for ${table.name.toLowerCase().startsWith('the') ? table.name.toLowerCase() : `the ${table.name.toLowerCase()} table`}.`
+          : roster.length + regulars < 2
+            ? 'Poker takes two. Wait for a friend, or let a regular sit in.'
+            : true
+      }
+      roomOptions={
+        <div className="dw-online-options">
+          <label className="dw-field">
+            <span>Table</span>
+            <select value={tableId} onChange={(e) => setTable(e.target.value)}>
+              {TABLES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}: ante {t.stakes.ante}, bets {t.stakes.small}/{t.stakes.big}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="dw-field">
+            <span>Regulars sitting in</span>
+            <select value={regulars} onChange={(e) => setRegulars(Number(e.target.value))}>
+              {[0, 1, 2, 3, 4].map((n) => (
+                <option key={n} value={n}>
+                  {n === 0 ? 'None, just us' : n}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      }
+      onStart={(link) => startOnline(link, tableId, regulars)}
+      note="Everyone plays their own caps, and the hands you play go on your record. Friends can sit down between hands, up to six at the table."
+    />
+  )
+}
+
+function SaloonSetup() {
   const caps = useSave((s) => s.wallet.caps)
   const seated = useSession((s) => s.state !== null)
   const sit = useSession((s) => s.sit)
@@ -33,7 +106,7 @@ export function Lobby() {
   }
 
   return (
-    <div className="dw-lobby">
+    <>
       {seated && (
         <div className="dw-panel dw-resume">
           <p>You still have a seat at {useSession.getState().table?.name.toLowerCase()}.</p>
@@ -127,7 +200,7 @@ export function Lobby() {
           ))}
         </ul>
       </section>
-    </div>
+    </>
   )
 }
 

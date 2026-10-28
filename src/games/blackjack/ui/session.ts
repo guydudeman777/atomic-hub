@@ -512,7 +512,7 @@ export const useSession = create<SessionStore>()((set, get) => {
     // A regular in a spot a player now holds gets up too.
     const waits = get().waits.map((w, spot) => (seats[spot] === null ? Math.max(0, w - 1) : w))
     let nextSeats = seats.map((o, spot) => {
-      if (!o?.leaving && !nextHumans[spot]) return o
+      if (!o || (!o.leaving && !nextHumans[spot])) return o
       waits[spot] = vacancyRounds(rng)
       return null
     })

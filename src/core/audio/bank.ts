@@ -9,15 +9,41 @@
 export type Render = (ctx: BaseAudioContext, out: AudioNode, t: number) => void
 
 /**
+ * Offline renders allowed at once. Each one competes with the live audio for
+ * the CPU, and the first bars of music or a new table ask for dozens in a
+ * moment; all at once, they starve the speakers and the sound cuts out. The
+ * rest wait their turn.
+ */
+const MAX_RECORDING = 2
+let recording = 0
+const waiting: (() => void)[] = []
+
+/**
  * Render a sound offline into a buffer. Record at the rate it will be played
  * at: a buffer that has to be resampled on playback costs many times more.
  * Null where offline rendering isn't available.
  */
-export function record(seconds: number, rate: number, render: Render): Promise<AudioBuffer> | null {
+export function record(seconds: number, rate: number, render: Render, channels = 1): Promise<AudioBuffer> | null {
   if (typeof OfflineAudioContext === 'undefined') return null
-  const ctx = new OfflineAudioContext(1, Math.ceil(seconds * rate), rate)
-  render(ctx, ctx.destination, 0)
-  return ctx.startRendering()
+  return new Promise((resolve, reject) => {
+    const start = () => {
+      recording++
+      let rendering: Promise<AudioBuffer>
+      try {
+        const ctx = new OfflineAudioContext(channels, Math.ceil(seconds * rate), rate)
+        render(ctx, ctx.destination, 0)
+        rendering = ctx.startRendering()
+      } catch (error) {
+        rendering = Promise.reject(error)
+      }
+      rendering.then(resolve, reject).finally(() => {
+        recording--
+        waiting.shift()?.()
+      })
+    }
+    if (recording < MAX_RECORDING) start()
+    else waiting.push(start)
+  })
 }
 
 export class SampleBank {
@@ -44,9 +70,5 @@ export class SampleBank {
         () => this.recordings.delete(key),
       )
     }
-  }
-
-  clear() {
-    this.recordings.clear()
   }
 }

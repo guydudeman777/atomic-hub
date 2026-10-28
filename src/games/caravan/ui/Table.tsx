@@ -26,8 +26,11 @@ import {
   legalMoves,
   other,
 } from '../engine'
-import { LANE_NAMES, type MatchConfig, type Remark, useMatch } from './match'
+import { LANE_NAMES, type MatchConfig, type Remark, useMatch, yourSeat } from './match'
+import { type Input, GAME, leaveOnline } from './online'
 import { RulesText } from './Rules'
+import { useGameLink, useLink } from '../../../net/store'
+import { LinkBanner } from '../../../net/ui/LinkBanner'
 
 /**
  * Phones and small windows get the compact table in caravan.css, whose
@@ -67,7 +70,17 @@ export function Table() {
   }, [config, state, play])
 
   if (!config || !state) return null
-  return <TableView key={gameId} config={config} state={state} log={log} recent={recent} lastMover={lastMover} remark={remark} settled={!!settlement} />
+  return (
+    <>
+      <TableView key={gameId} config={config} state={state} log={log} recent={recent} lastMover={lastMover} remark={remark} settled={!!settlement} />
+      {config.mode === 'online' && <OnlineBanner />}
+    </>
+  )
+}
+
+function OnlineBanner() {
+  const link = useGameLink(GAME)
+  return <LinkBanner link={link} waitsForOthers onGone={() => void navigate('/caravan', { during: leaveOnline })} />
 }
 
 interface ViewProps {
@@ -83,10 +96,14 @@ interface ViewProps {
 function TableView({ config, state, log, recent, lastMover, remark, settled }: ViewProps) {
   const play = useMatch((s) => s.play)
   const hotseat = config.mode === 'hotseat'
+  const online = config.mode === 'online'
+  const link = useGameLink(GAME)
   // Hot-seat shows the table from the current player's seat; against the AI you're always seat 0.
-  const viewer: PlayerId = hotseat ? state.current : 0
+  const viewer: PlayerId = yourSeat(config) ?? state.current
   const opponent = other(viewer)
-  const myTurn = state.winner === null && state.current === viewer
+  // Online, a move counts once the table has it; one at a time.
+  const [sent, setSent] = useState<number | null>(null)
+  const myTurn = state.winner === null && state.current === viewer && !(online && sent === state.turn)
   // Cards from across the table arrive from the far side and turn over as they land.
   const playedBy: PlayedBy = lastMover === opponent ? 'them' : 'me'
   // Selection and disband confirmation belong to one game state; any move clears them.
@@ -130,7 +147,15 @@ function TableView({ config, state, log, recent, lastMover, remark, settled }: V
   const hand = state.players[viewer].hand
   const selectedCard = hand.find((c) => c.id === selected) ?? null
 
-  const doPlay = (move: Move) => play(move)
+  const doPlay = (move: Move) => {
+    if (!online) return play(move)
+    if (!link || link.status !== 'open') {
+      playSfx('error')
+      return
+    }
+    setSent(state.turn)
+    link.submit({ move } satisfies Input)
+  }
 
   const onDisband = (lane: Lane) => {
     if (confirmDisband === lane) doPlay({ type: 'disband', lane })
@@ -156,7 +181,7 @@ function TableView({ config, state, log, recent, lastMover, remark, settled }: V
 
   let status: string
   if (state.winner !== null) status = 'Game over'
-  else if (!myTurn) status = hotseat ? `${names[state.current]}’s turn` : `${names[opponent]} is thinking…`
+  else if (!myTurn) status = hotseat ? `${names[state.current]}’s turn` : online ? `${names[opponent]} to play` : `${names[opponent]} is thinking…`
   else if (opening) status = `Opening: place a number card on each caravan (${Math.min(placed + 1, OPENING_TURNS)} of ${OPENING_TURNS})`
   else status = 'Your turn'
 
@@ -176,7 +201,7 @@ function TableView({ config, state, log, recent, lastMover, remark, settled }: V
         active={state.current === opponent && state.winner === null}
         setId={config.decks[opponent][0]?.set ?? 'standard'}
         dealing={dealing}
-        talk={hotseat ? undefined : <SpeechBubble name={names[opponent]} remark={remark} />}
+        talk={config.mode === 'ai' ? <SpeechBubble name={names[opponent]} remark={remark} /> : undefined}
       />
 
       <div className="cv-board" aria-label="Caravan table">
@@ -566,9 +591,14 @@ function Hud({ config, status, help, log, canDiscard, hasSelection, onDiscard, o
       {confirmLeave ? (
         <button
           className="term-button"
-          onClick={() => void navigate('/caravan', { during: forfeit })}
+          onClick={() => {
+            if (config.mode !== 'online') return void navigate('/caravan', { during: forfeit })
+            const { state } = useMatch.getState()
+            if (state && state.winner === null) currentLink()?.submit({ resign: true } satisfies Input)
+            void navigate('/caravan', { during: leaveOnline })
+          }}
         >
-          {config.wager > 0 ? `Forfeit ${config.wager} caps` : 'Leave for real'}
+          {config.wager > 0 ? `Forfeit ${config.wager} caps` : config.mode === 'online' ? 'Resign and leave' : 'Leave for real'}
         </button>
       ) : (
         <button className="term-button" onClick={() => setConfirmLeave(true)}>
@@ -581,7 +611,9 @@ function Hud({ config, status, help, log, canDiscard, hasSelection, onDiscard, o
   return (
     <aside className="cv-hud screen" aria-label="Game status">
       <div className="cv-hud__head">
-        <p className="cv-hud__label term-dim">{config.mode === 'ai' ? `Caravan against ${opponent?.name}` : 'Caravan, hot-seat'}</p>
+        <p className="cv-hud__label term-dim">
+          {config.mode === 'ai' ? `Caravan against ${opponent?.name}` : config.mode === 'online' ? `Caravan online with ${config.names[other(yourSeat(config) ?? 0)]}` : 'Caravan, hot-seat'}
+        </p>
         {config.wager > 0 && <p className="cv-hud__pot">Pot {config.wager * 2} caps</p>}
       </div>
       <p className="cv-hud__status" aria-live="polite">
@@ -632,18 +664,22 @@ function GameOver() {
   const { config, settlement, start, leave } = useMatch()
   if (!config || !settlement) return null
   const opponent = opponentById(config.opponentId ?? '')
-  const humanWon = config.mode === 'ai' && settlement.winner === 0
-  const title = config.mode === 'hotseat' ? `${config.names[settlement.winner]} wins` : humanWon ? 'You win' : `${opponent?.name ?? 'Your opponent'} wins`
+  const online = config.mode === 'online'
+  const humanWon = config.mode !== 'hotseat' && settlement.winner === yourSeat(config)
+  const title = config.mode === 'hotseat' ? `${config.names[settlement.winner]} wins` : humanWon ? 'You win' : `${opponent?.name ?? config.names[settlement.winner]} wins`
   const quote = opponent ? (humanWon ? opponent.lines.lose : opponent.lines.win) : null
+  const resigned = settlement.resigned === undefined ? null : settlement.resigned === yourSeat(config) ? 'You resigned.' : `${config.names[settlement.resigned]} resigned.`
 
   const rematch = () => {
-    if (!start(config)) navigate('/caravan')
+    if (online) currentLink()?.submit({ again: true } satisfies Input)
+    else if (!start(config)) navigate('/caravan')
   }
 
   return (
     <div className="cv-overlay" role="dialog" aria-modal="true" aria-labelledby="gameover-title">
       <div className="cv-paper cv-gameover">
         <h2 id="gameover-title">{title}</h2>
+        {resigned && <p>{resigned}</p>}
         {quote && (
           <blockquote>
             <p>“{quote}”</p>
@@ -672,7 +708,7 @@ function GameOver() {
           </button>
           <button
             className="cv-button"
-            onClick={() => void navigate('/caravan', { during: leave })}
+            onClick={() => void navigate('/caravan', { during: online ? leaveOnline : leave })}
           >
             Back to the lobby
           </button>
@@ -680,4 +716,10 @@ function GameOver() {
       </div>
     </div>
   )
+}
+
+/** The online table, read outside of rendering. */
+function currentLink() {
+  const link = useLink.getState().link
+  return link?.game === GAME ? link : null
 }

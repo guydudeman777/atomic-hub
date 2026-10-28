@@ -7,12 +7,15 @@ import { useSave } from '../../../store/save'
 import { OPPONENTS, type SavedDeck, deckCards, isUnlocked, setInfo } from '../content'
 import { checkDeck } from '../engine'
 import { type MatchConfig, useMatch } from './match'
+import { GAME, SEATS, startOnline } from './online'
+import { OnlinePanel } from '../../../net/ui/OnlinePanel'
 
 const DIFFICULTY_LABEL = { easy: 'Easy', normal: 'Normal', hard: 'Hard' } as const
+const ONLINE_CLASSES = { card: 'cv-paper', button: 'cv-button', primary: 'cv-button cv-button--primary', field: 'cv-field', dim: 'cv-ink-dim' }
 
-export function Lobby() {
-  const [mode, setMode] = useState<'ai' | 'hotseat'>('ai')
-  const inProgress = useMatch((s) => s.state !== null && s.state.winner === null)
+export function Lobby({ inviteCode = null }: { inviteCode?: string | null }) {
+  const [mode, setMode] = useState<'ai' | 'hotseat' | 'online'>(inviteCode ? 'online' : 'ai')
+  const inProgress = useMatch((s) => s.state !== null && s.state.winner === null && s.config?.mode !== 'online')
 
   return (
     <div className="cv-lobby">
@@ -31,8 +34,11 @@ export function Lobby() {
         <button role="tab" aria-selected={mode === 'hotseat'} className="cv-tab" onClick={() => setMode('hotseat')}>
           Hot-seat
         </button>
+        <button role="tab" aria-selected={mode === 'online'} className="cv-tab" onClick={() => setMode('online')}>
+          Online
+        </button>
       </div>
-      {mode === 'ai' ? <AiSetup /> : <HotseatSetup />}
+      {mode === 'ai' ? <AiSetup /> : mode === 'hotseat' ? <HotseatSetup /> : <OnlineSetup inviteCode={inviteCode} />}
     </div>
   )
 }
@@ -234,5 +240,32 @@ function HotseatSetup() {
         Deal
       </button>
     </section>
+  )
+}
+
+function OnlineSetup({ inviteCode }: { inviteCode: string | null }) {
+  const activeDeckId = useSave((s) => s.caravan.activeDeckId)
+  const setActiveDeck = useSave((s) => s.setActiveCaravanDeck)
+  const deck = useDeck(activeDeckId)
+  const deckOk = checkDeck(deckCards(deck)).ok
+  return (
+    <div className="cv-online">
+      <section className="cv-paper cv-online__deck">
+        <DeckPicker label="Your deck" value={deck.id} onChange={setActiveDeck} />
+        {!deckOk && <p className="cv-ink-dim">That deck isn’t ready, so you’d bring the Wasteland Standard starter deck.</p>}
+      </section>
+      <OnlinePanel
+        game={GAME}
+        seats={SEATS}
+        lateJoin={false}
+        classes={ONLINE_CLASSES}
+        inviteCode={inviteCode}
+        tablePath="/caravan/play"
+        seatLabel={(seat) => (seat === 0 ? 'Host' : 'Guest')}
+        startable={(roster) => (roster.length >= 2 ? true : 'Waiting for someone to sit across from you.')}
+        onStart={startOnline}
+        note="Each of you plays your own deck. Online games don’t use caps or go on your record."
+      />
+    </div>
   )
 }

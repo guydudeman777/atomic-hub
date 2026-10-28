@@ -1786,3 +1786,11 @@
     align-self: flex-start;
   }
 }
+
+/* The Online tab: your deck above the table code. */
+.cv-online {
+  display: grid;
+  gap: 16px;
+  max-width: 560px;
+  margin-inline: auto;
+}

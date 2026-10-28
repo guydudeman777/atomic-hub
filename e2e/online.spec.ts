@@ -96,3 +96,42 @@ test('the guest’s table closes when the host closes it', async ({ browser }) =
   expect(errors.flat()).toEqual([])
   await context.close()
 })
+
+test('two players play Caravan online, each with their own hand', async ({ browser }) => {
+  const { context, host, guest, errors } = await twoPlayers(browser)
+  const code = await hostTable(host, 'caravan', 'Hostess')
+  await joinTable(guest, 'caravan', code, 'Guesty')
+  await host.getByRole('button', { name: 'Start' }).click()
+
+  const status = (page: Page) => page.locator('.cv-hud__status')
+  for (const page of [host, guest]) await expect(page.getByLabel('Your hand')).toBeVisible({ timeout: 10_000 })
+  const log = (page: Page) => page.getByRole('list', { name: 'Move log' })
+  const first = (await log(host).textContent())?.includes('You go first') ? host : guest
+  const second = first === host ? guest : host
+
+  // The opening: three number cards each, taking turns, and every move shows on both tables.
+  for (let turn = 1; turn <= 3; turn++) {
+    for (const page of [first, second]) {
+      await expect(status(page)).toHaveText(new RegExp(`Opening.*\\(${turn} of 3\\)`), { timeout: 10_000 })
+      await page.locator('.cv-hand__card:not(.is-dim)').first().click()
+      await page.locator('.cv-caravan.is-drop').first().click()
+    }
+  }
+  await expect(status(first)).toHaveText('Your turn')
+  await expect(log(first).getByText(/^You played/)).toHaveCount(3)
+  await expect(log(second).getByText(/^You played/)).toHaveCount(3)
+  const theirName = first === host ? 'Guesty' : 'Hostess'
+  await expect(log(first).getByText(new RegExp(`^${theirName} played`))).toHaveCount(3)
+  // Both tables agree on the lanes: each plaque reads theirs, then yours.
+  const lanes = (page: Page) => page.locator('.cv-plaque').evaluateAll((ps) => ps.map((p) => p.getAttribute('aria-label')!.match(/\d+/g)!.map(Number)))
+  const hostLanes = await lanes(host)
+  expect(hostLanes).toHaveLength(3)
+  expect(await lanes(guest)).toEqual(hostLanes.map((l) => [...l].reverse()))
+
+  // Getting up mid-game resigns it.
+  await second.getByRole('button', { name: 'Leave table' }).click()
+  await second.getByRole('button', { name: 'Resign and leave' }).click()
+  await expect(first.getByRole('heading', { name: 'You win' })).toBeVisible({ timeout: 10_000 })
+  expect(errors.flat()).toEqual([])
+  await context.close()
+})

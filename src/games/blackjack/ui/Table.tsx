@@ -160,13 +160,13 @@ function TableView() {
   })
 
   const occupied = SPOT_INDEXES.map((spot) => spot === YOUR_SPOT || !!seats[spot])
-  // The tall table is as deep as the stage is tall for its width. Tilted, it
-  // looks shallower, so it can go a little deeper.
+  // The tall table is as deep as the stage is tall for its width. Tilted
+  // (blackjack-3d.css), it's 4% wider than the stage and stands about 4%
+  // shorter than it's deep, so the same depth fits.
   const stageRef = useRef<HTMLDivElement>(null)
   const aspect = useAspect(stageRef)
-  const table3d = useSave((st) => st.settings.table3d)
   const tall = useMediaQuery(TALL_TABLE)
-  const layout = tall ? tallLayout(aspect * 1000 * (table3d ? 1.06 : 1)) : WIDE_LAYOUT
+  const layout = tall ? tallLayout(aspect * 1000) : WIDE_LAYOUT
   const { shape } = layout
 
   return (

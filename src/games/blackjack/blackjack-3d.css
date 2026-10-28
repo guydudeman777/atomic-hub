@@ -9,9 +9,13 @@
  * - Chip stacks rise off the felt, a little over 2 units per chip.
  */
 
+/*
+ * Seen from straight above the top of the stage: the far edge shrinks
+ * toward it but never past it, so the table stays under the dealer.
+ */
 :root[data-table3d='on'] .bj-stage {
   perspective: 1500px;
-  perspective-origin: 50% -20%;
+  perspective-origin: 50% 0;
 }
 
 /*
@@ -21,8 +25,12 @@
  */
 :root[data-table3d='on'] .bj-felt {
   --tilt: 27deg;
-  /* The far edge, the widest part of the table, shrinks into the distance; so does its height. */
-  --u: calc(min(104cqw, 115cqh * 1000 / var(--felt-h, 500)) / 1000);
+  /*
+   * The far edge, the widest part of the table, shrinks into the distance,
+   * so the felt can be a little wider than the stage. Tilted back, it
+   * stands cos(tilt) as tall as it's deep, so it can be that much deeper.
+   */
+  --u: calc(min(104cqw, (100cqh - 4px) / cos(var(--tilt)) * 1000 / var(--felt-h, 500)) / 1000);
   position: absolute;
   left: 50%;
   bottom: 4px;

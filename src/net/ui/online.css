@@ -88,7 +88,8 @@
 /* A word over the table: someone left, or the line dropped. */
 .net-banner {
   position: fixed;
-  z-index: 60;
+  /* Above every table's dialogs, so it can always be read and answered. */
+  z-index: 1000;
   left: 50%;
   top: max(10px, env(safe-area-inset-top));
   transform: translateX(-50%);

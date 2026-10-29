@@ -51,6 +51,7 @@ export const GAME_SCREENS: readonly GameScreen[] = [
   gameScreen('/connect4', () => import('./games/connect4/ui/Connect4App')),
   gameScreen('/tictactoe', () => import('./games/tictactoe/ui/TicTacToeApp')),
   gameScreen('/roulette', () => import('./games/roulette/ui/RouletteApp')),
+  gameScreen('/slots', () => import('./games/slots/ui/SlotsApp')),
 ]
 
 export function screenFor(path: string): GameScreen | undefined {

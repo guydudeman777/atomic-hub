@@ -1,0 +1,58 @@
+/*
+ * Slots in 3D (on unless Settings or the HUD turns it off): the reels are
+ * drums seen in perspective, the machines either side of yours turn in
+ * toward you down the row, and the handle swings down toward you on its
+ * hub instead of shortening. Flat, the drums are drawn without perspective
+ * and the row faces straight out.
+ */
+
+/* Each drum has its own vanishing point, straight ahead of it. In the window's cqh: four of its radii back. */
+:root[data-table3d='on'] .sl-reel {
+  perspective: 440cqh;
+}
+
+/* The row, seen from your stool: the machines either side run away from you. */
+:root[data-table3d='on'] .sl-row {
+  perspective: calc(var(--w) * 3.2);
+  perspective-origin: 50% 40%;
+}
+
+:root[data-table3d='on'] .sl-spot--left {
+  transform: rotateY(-24deg);
+  transform-origin: 100% 50%;
+}
+
+:root[data-table3d='on'] .sl-spot--right {
+  transform: rotateY(24deg);
+  transform-origin: 0% 50%;
+}
+
+/* The handle pivots on its hub and comes down toward you. */
+:root[data-table3d='on'] .sl-handle {
+  perspective: calc(var(--m) * 90);
+}
+
+:root[data-table3d='on'] .sl-handle__arm[data-pulled] {
+  animation-name: sl-pull-3d;
+}
+
+@keyframes sl-pull-3d {
+  35%,
+  48% {
+    transform: rotateX(-118deg);
+  }
+  78% {
+    transform: rotateX(8deg);
+  }
+}
+
+/* On phones the neighbors are a strip of plates: they face straight out. */
+@media (max-width: 900px), (max-height: 560px) {
+  :root[data-table3d='on'] .sl-row {
+    perspective: none;
+  }
+
+  :root[data-table3d='on'] :is(.sl-spot--left, .sl-spot--right) {
+    transform: none;
+  }
+}

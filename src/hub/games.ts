@@ -67,9 +67,9 @@ export const GAMES: readonly GameInfo[] = [
     blurb: 'Pass line, come bets, full odds, place bets, the field and the hardways, on a green felt layout under the marquee lights.',
   },
   {
-    id: 'slots', name: 'Slots', category: 'casino', ready: false, path: '/slots', icon: 'slots',
-    modes: 'Solo',
-    blurb: 'Three reels of wasteland junk with a published paytable.',
+    id: 'slots', name: 'Slots', category: 'casino', ready: true, path: '/slots', icon: 'slots',
+    modes: 'Three machines, with regulars pulling beside you, or online with friends',
+    blurb: 'Three chrome one-armed bandits on Rocket Row: wasteland junk and cherries, sevens round a wild atom, and a moon rocket chasing a jackpot. Every paytable published.',
   },
   {
     id: 'connect4', name: 'Connect Four', category: 'board', ready: true, path: '/connect4', icon: 'connect4',

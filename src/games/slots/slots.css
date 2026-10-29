@@ -1,0 +1,2394 @@
+/*
+ * Slots: Rocket Row, a slot parlor on the edge of the desert. Midnight
+ * walls scattered with atomic starbursts, pink neon from the sign overhead
+ * and turquoise off the terrazzo, and a row of chrome one-armed bandits in
+ * enamel: cherry red for Bottle Caps, turquoise for Atomic Sevens, midnight
+ * and gold for Moon Rocket. The lettering is Atomic Age, a 1950s
+ * space-race face. The in-game HUD reuses the hub's terminal screen. The 3D
+ * view is in slots-3d.css.
+ *
+ * A cabinet is drawn in machine units (--m, a hundredth of its width), so
+ * the machines either side of yours are the same cabinet at a smaller --m.
+ * The stage is a size container and --w, your cabinet's width, comes from
+ * it. The reel window is a size container of its own, and everything in it
+ * is sized in its cqh: don't use --m in there.
+ *
+ * Each reel is a drum of 22 faces: face i sits at rotateX(-i·STEP) out at
+ * the drum's radius, and the drum turns to rotateX(stop·STEP) (ui/reels.ts).
+ * No filter on .sl-reel or .sl-drum: filters flatten 3D.
+ */
+
+.sl {
+  --cream: #f3ead8;
+  --cream-dim: #a9b7bd;
+  --night: #08141c;
+  --night-hi: #12303b;
+  --teal-glass: #0d1f28;
+  --chrome: #dfe5ea;
+  --chrome-mid: #9aa6b0;
+  --chrome-deep: #56626c;
+  --coral: #ff6f91;
+  --coral-deep: #d9446a;
+  --aqua: #3fe0d0;
+  --lemon: #ffe066;
+  --led: #ff8a2a;
+  --led-glow: rgba(255, 138, 42, 0.55);
+  --font-row: 'Atomic Age', 'Futura', 'Century Gothic', sans-serif;
+
+  color: var(--cream);
+  min-height: var(--app-height);
+  font-family: var(--font-body);
+}
+
+/* Each machine's enamel, its trim and the color of its lights. */
+[data-machine='caps'] {
+  --enamel: #c8242f;
+  --enamel-hi: #e2434c;
+  --enamel-deep: #7d111b;
+  --trim: #f3e7cf;
+  --lights: #ffe8a3;
+  --glow: #ff5d73;
+}
+
+[data-machine='sevens'] {
+  --enamel: #1f9e93;
+  --enamel-hi: #39c2b5;
+  --enamel-deep: #0c524c;
+  --trim: #f3e7cf;
+  --lights: #c6fff7;
+  --glow: #3fe0d0;
+}
+
+[data-machine='rocket'] {
+  --enamel: #263a78;
+  --enamel-hi: #3b55a3;
+  --enamel-deep: #111a3d;
+  --trim: #e9be55;
+  --lights: #ffe680;
+  --glow: #ffb02e;
+}
+
+/* The parlor: midnight with starbursts, the sign's pink glow from above and the floor's turquoise from below. */
+.sl-parlor {
+  background-color: var(--night);
+  background-image:
+    radial-gradient(ellipse 60% 38% at 50% 0%, rgba(255, 111, 145, 0.2), transparent 72%),
+    radial-gradient(ellipse 70% 30% at 50% 100%, rgba(63, 224, 208, 0.13), transparent 72%),
+    radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0, 0, 0, 0.72) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M30 18v20M20 28h20M23 21l14 14M37 21L23 35' stroke='%233fe0d0' stroke-opacity='.2' stroke-width='1.6'/%3E%3Cpath d='M104 86v14M97 93h14' stroke='%23ff6f91' stroke-opacity='.22' stroke-width='1.6'/%3E%3Cpath d='M70 120q14-18 30-4' stroke='%23ffe066' stroke-opacity='.12' stroke-width='2'/%3E%3Cpath d='M112 22q-10 14 6 22' stroke='%233fe0d0' stroke-opacity='.12' stroke-width='2'/%3E%3C/g%3E%3Cg fill='%23f3ead8' fill-opacity='.18'%3E%3Ccircle cx='62' cy='54' r='1.4'/%3E%3Ccircle cx='12' cy='96' r='1.1'/%3E%3Ccircle cx='128' cy='130' r='1.2'/%3E%3Ccircle cx='88' cy='12' r='1'/%3E%3C/g%3E%3C/svg%3E");
+  background-attachment: fixed;
+}
+
+/* Phones don't keep fixed backgrounds still, and repaint them on every scroll. */
+@media (hover: none) {
+  .sl-parlor {
+    background-attachment: scroll;
+  }
+}
+
+.sl-ink-dim {
+  color: var(--cream-dim);
+}
+
+.sl-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.sl-symbol {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sl-symbol--any {
+  color: var(--cream-dim);
+  font-family: var(--font-row);
+}
+
+/* ---- Panels, buttons, fields ---------------------------------------------- */
+
+/* Smoked glass in a chrome frame, with a boomerang's swept corners. */
+.sl-panel {
+  position: relative;
+  background:
+    radial-gradient(ellipse at 15% 0%, rgba(63, 224, 208, 0.08), transparent 55%),
+    linear-gradient(180deg, var(--night-hi), var(--teal-glass) 35%, #071116);
+  border: 2px solid rgba(223, 229, 234, 0.45);
+  border-radius: 22px 6px 22px 6px;
+  box-shadow:
+    inset 0 0 0 3px #071116,
+    inset 0 0 0 4px rgba(63, 224, 208, 0.18),
+    0 18px 40px rgba(0, 0, 0, 0.55);
+  padding: clamp(18px, 2.2vw, 30px);
+}
+
+.sl-panel h2,
+.sl-panel h3 {
+  font-family: var(--font-row);
+  font-weight: 400;
+  line-height: 1.1;
+  margin: 0 0 12px;
+  letter-spacing: 0.03em;
+}
+
+.sl-panel h2 {
+  font-size: var(--step-2);
+  color: var(--coral);
+  text-shadow: 0 0 14px rgba(255, 111, 145, 0.45);
+}
+
+.sl-panel h3 {
+  font-size: var(--step-1);
+  margin-top: 20px;
+  color: var(--aqua);
+}
+
+.sl-panel p {
+  margin: 0 0 10px;
+}
+
+.sl-panel a {
+  color: var(--lemon);
+}
+
+.sl-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 9px 22px 8px;
+  border: 2px solid var(--chrome-mid);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #23495a, #10262f);
+  color: var(--cream);
+  font-family: var(--font-row);
+  font-size: var(--step-0);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 6px 14px rgba(0, 0, 0, 0.45);
+  transition:
+    translate 0.08s ease-out,
+    background-color 0.15s ease-out;
+}
+
+@media (hover: hover) {
+  .sl-button:hover:not(:disabled) {
+    background: linear-gradient(180deg, #2d5d71, #163541);
+    border-color: var(--chrome);
+  }
+}
+
+.sl-button:active:not(:disabled) {
+  translate: 0 1px;
+}
+
+/* Coral neon. */
+.sl-button--primary {
+  background: linear-gradient(180deg, #ffa3b7, var(--coral) 45%, var(--coral-deep));
+  border-color: #ffd3dc;
+  color: #2a0610;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -2px 0 rgba(120, 10, 40, 0.35),
+    0 0 18px rgba(255, 111, 145, 0.35),
+    0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+@media (hover: hover) {
+  .sl-button--primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #ffb6c6, #ff86a3 45%, #e5557a);
+  }
+}
+
+.sl-button--big {
+  font-size: var(--step-1);
+  padding: 13px 38px 12px;
+}
+
+.sl-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sl-key {
+  font-family: var(--font-body);
+  font-size: 0.7em;
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  opacity: 0.6;
+  letter-spacing: 0;
+}
+
+.sl-field {
+  display: grid;
+  gap: 4px;
+}
+
+.sl-field > span {
+  font-size: var(--step--1);
+  color: var(--cream-dim);
+}
+
+.sl-field input,
+.sl-field select {
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(223, 229, 234, 0.5);
+  border-radius: 8px;
+  background: #061015;
+  color: var(--cream);
+}
+
+.sl :focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #061015, 0 0 0 4px var(--lemon);
+}
+
+/* ---- Pages: machines, paytables, rules ----------------------------------------- */
+
+.sl-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.sl-header {
+  --gutter: clamp(16px, 3vw, 40px);
+  display: flex;
+  align-items: center;
+  gap: 10px clamp(14px, 2.4vw, 32px);
+  flex-wrap: wrap;
+  padding: max(14px, var(--safe-top)) max(var(--gutter), var(--safe-right)) 12px max(var(--gutter), var(--safe-left));
+  border-bottom: 2px solid rgba(223, 229, 234, 0.3);
+  background: linear-gradient(180deg, rgba(3, 9, 12, 0.92), rgba(3, 9, 12, 0.5));
+}
+
+.sl-back,
+.sl-caps {
+  color: var(--cream-dim);
+  text-decoration: none;
+  font-size: var(--step--1);
+}
+
+@media (hover: hover) {
+  .sl-back:hover,
+  .sl-caps:hover {
+    color: var(--cream);
+  }
+}
+
+.sl-caps {
+  margin-left: auto;
+  font-family: var(--font-row);
+  font-size: var(--step-1);
+  color: var(--lemon);
+}
+
+/* The sign: SLOTS in pink neon tubing over a starburst, and Rocket Row in turquoise script under it. */
+.sl-sign {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  margin: 0;
+  padding: 0 0.3em;
+  font-family: var(--font-row);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.sl-sign__burst {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 3.4em;
+  height: 3.4em;
+  translate: -50% -50%;
+  font-size: var(--step-3);
+  fill: var(--lemon);
+  stroke: var(--lemon);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  opacity: 0.32;
+  z-index: -1;
+}
+
+.sl-sign__text {
+  font-size: var(--step-3);
+  letter-spacing: 0.08em;
+  margin-right: -0.08em;
+  color: #ffe1e8;
+  text-shadow:
+    0 0 4px #fff,
+    0 0 12px var(--coral),
+    0 0 26px var(--coral),
+    0 0 44px rgba(255, 111, 145, 0.6);
+  animation: sl-neon 7s steps(1) infinite;
+}
+
+.sl-sign__sub {
+  margin-top: 2px;
+  font-family: var(--font-body);
+  font-size: var(--step--1);
+  letter-spacing: 0.32em;
+  margin-right: -0.32em;
+  text-transform: uppercase;
+  color: #d8fffa;
+  text-shadow: 0 0 8px var(--aqua);
+}
+
+/* A tube that catches now and then. */
+@keyframes sl-neon {
+  0%,
+  91%,
+  95%,
+  100% {
+    opacity: 1;
+  }
+  92%,
+  94% {
+    opacity: 0.55;
+  }
+}
+
+.sl-nav {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.sl-nav__link {
+  padding: 7px 14px 6px;
+  color: var(--cream);
+  text-decoration: none;
+  font-family: var(--font-row);
+  font-size: var(--step-0);
+  line-height: 1;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid transparent;
+}
+
+@media (hover: hover) {
+  .sl-nav__link:hover {
+    color: var(--aqua);
+  }
+}
+
+.sl-nav__link[aria-current='page'] {
+  color: var(--aqua);
+  border-bottom-color: var(--aqua);
+  text-shadow: 0 0 10px rgba(63, 224, 208, 0.6);
+}
+
+.sl-main {
+  --gutter: clamp(16px, 3vw, 40px);
+  flex: 1;
+  padding: clamp(16px, 2.6vw, 34px) max(var(--gutter), var(--safe-right)) max(40px, var(--safe-bottom)) max(var(--gutter), var(--safe-left));
+}
+
+.sl-page-panel {
+  max-width: 96ch;
+  margin: 0 auto;
+}
+
+.sl-lobby {
+  display: grid;
+  gap: 22px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.sl-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.sl-tab {
+  padding: 8px 18px 7px;
+  border: 2px solid rgba(223, 229, 234, 0.4);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--cream);
+  font-family: var(--font-row);
+  font-size: var(--step-0);
+  line-height: 1;
+}
+
+.sl-tab[aria-selected='true'] {
+  background: linear-gradient(180deg, #8ff3e8, var(--aqua));
+  border-color: #d8fffa;
+  color: #062a27;
+}
+
+.sl-resume {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+}
+
+.sl-resume p {
+  margin: 0;
+}
+
+/* The machines: three cards, each with a little cabinet. */
+.sl-machines {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sl-machine-pick {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  grid-template-areas:
+    'glyph name'
+    'glyph coin'
+    'blurb blurb'
+    'feel feel'
+    'return return'
+    'top top'
+    'short short';
+  align-content: start;
+  gap: 2px 14px;
+  padding: 16px;
+  border: 2px solid rgba(223, 229, 234, 0.25);
+  border-radius: 18px 5px 18px 5px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.3));
+  color: var(--cream);
+  text-align: left;
+  transition:
+    border-color 0.15s ease-out,
+    background-color 0.15s ease-out;
+}
+
+@media (hover: hover) {
+  .sl-machine-pick:hover {
+    border-color: rgba(223, 229, 234, 0.6);
+  }
+}
+
+.sl-machine-pick[aria-checked='true'] {
+  border-color: var(--glow);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--enamel) 30%, transparent), rgba(0, 0, 0, 0.35));
+  box-shadow: 0 0 0 1px var(--glow), 0 0 22px color-mix(in srgb, var(--glow) 35%, transparent);
+}
+
+.sl-machine-pick.is-short {
+  opacity: 0.6;
+}
+
+.sl-machine-pick .sl-glyph {
+  grid-area: glyph;
+  align-self: start;
+}
+
+.sl-machine-pick__name {
+  grid-area: name;
+  align-self: end;
+  font-family: var(--font-row);
+  font-size: var(--step-1);
+  line-height: 1.05;
+  color: var(--lights);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--glow) 60%, transparent);
+}
+
+.sl-machine-pick__coin {
+  grid-area: coin;
+  color: var(--cream-dim);
+  font-size: var(--step--1);
+}
+
+.sl-machine-pick__blurb {
+  grid-area: blurb;
+  margin-top: 10px;
+}
+
+.sl-machine-pick__feel {
+  grid-area: feel;
+  margin-top: 6px;
+  color: var(--cream-dim);
+  font-size: var(--step--1);
+}
+
+.sl-machine-pick__return {
+  grid-area: return;
+  margin-top: 8px;
+  color: var(--aqua);
+  font-size: var(--step--1);
+}
+
+.sl-machine-pick__top {
+  grid-area: top;
+  color: var(--lemon);
+  font-size: var(--step--1);
+}
+
+.sl-machine-pick__short {
+  grid-area: short;
+  margin-top: 6px;
+  color: var(--coral);
+  font-size: var(--step--1);
+}
+
+/* The little cabinet: enamel and chrome, a strip of lights, three reels. */
+.sl-glyph {
+  position: relative;
+  display: grid;
+  grid-template-rows: 14px auto 12px;
+  gap: 4px;
+  width: 74px;
+  padding: 6px 6px 7px;
+  border-radius: 14px 14px 6px 6px;
+  background: linear-gradient(90deg, var(--enamel-deep), var(--enamel) 25%, var(--enamel-hi) 50%, var(--enamel) 75%, var(--enamel-deep));
+  box-shadow:
+    inset 0 0 0 2px var(--chrome-mid),
+    0 6px 12px rgba(0, 0, 0, 0.5);
+}
+
+.sl-glyph__top {
+  border-radius: 8px 8px 2px 2px;
+  background: repeating-linear-gradient(90deg, var(--lights) 0 4px, transparent 4px 8px), #20140c;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--glow) 70%, transparent);
+}
+
+.sl-glyph__window {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #8c949b, #eef1f3 50%, #8c949b);
+}
+
+.sl-glyph__reel {
+  aspect-ratio: 3 / 4;
+  padding: 2px;
+  background: linear-gradient(180deg, #c9bfa8, #fbf6ea 50%, #c9bfa8);
+}
+
+.sl-glyph__deck {
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--chrome), var(--chrome-mid));
+}
+
+.sl-lobby__go {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.sl-lobby__go p {
+  margin: 0;
+  max-width: 64ch;
+}
+
+.sl-regulars ul,
+.sl-primer ol {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 28px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sl-regulars li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.sl-regulars strong,
+.sl-primer strong {
+  color: var(--lemon);
+  font-weight: 400;
+}
+
+.sl-plate__dot {
+  width: 14px;
+  height: 14px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow:
+    0 0 0 2px var(--chrome-mid),
+    0 0 8px var(--c);
+}
+
+.sl-primer ol {
+  counter-reset: primer;
+}
+
+.sl-primer li {
+  counter-increment: primer;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+}
+
+.sl-primer li::before {
+  content: counter(primer);
+  font-family: var(--font-row);
+  font-size: var(--step-3);
+  line-height: 1;
+  color: var(--coral);
+  text-shadow: 0 0 10px rgba(255, 111, 145, 0.5);
+}
+
+.sl-primer > p {
+  margin-top: 14px;
+}
+
+.sl-room-options {
+  display: grid;
+  gap: 12px;
+  margin: 4px 0 12px;
+}
+
+/* Rules */
+
+.sl-rules ul {
+  margin: 0 0 10px;
+  padding-left: 1.2em;
+}
+
+.sl-rules li {
+  margin-bottom: 6px;
+}
+
+.sl-rules strong {
+  color: var(--lemon);
+  font-weight: 400;
+}
+
+.sl-rules__keys {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.sl-rules__keys dt {
+  color: var(--aqua);
+}
+
+.sl-rules__keys dd {
+  margin: 0;
+}
+
+/* Paytables: one table a machine, in its colors. */
+
+.sl-pays__machine {
+  margin-top: 26px;
+  padding-top: 4px;
+  border-top: 2px solid color-mix(in srgb, var(--glow) 45%, transparent);
+}
+
+.sl-pays__machine h3 {
+  color: var(--lights);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--glow) 55%, transparent);
+}
+
+.sl-pays__machine h3 .sl-ink-dim {
+  font-family: var(--font-body);
+  font-size: var(--step--1);
+  text-shadow: none;
+}
+
+.sl-pays__scroll {
+  /* Positioned, so the table's visually hidden header scrolls inside it rather than widening the page. */
+  position: relative;
+  margin: 10px 0 8px;
+  overflow-x: auto;
+}
+
+.sl-paytable {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-paytable th,
+.sl-paytable td {
+  padding: 5px 12px 5px 0;
+  text-align: left;
+  border-bottom: 1px solid rgba(223, 229, 234, 0.12);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.sl-paytable thead th {
+  font-weight: 400;
+  color: var(--cream-dim);
+  font-size: var(--step--1);
+}
+
+.sl-paytable tbody th,
+.sl-paytable tfoot th {
+  font-weight: 400;
+}
+
+.sl-paytable .sl-num {
+  text-align: right;
+}
+
+.sl-paytable tfoot th,
+.sl-paytable tfoot td {
+  border-bottom: 0;
+  color: var(--cream-dim);
+}
+
+.sl-pays__total {
+  color: var(--aqua) !important;
+}
+
+.sl-pays__pic {
+  display: inline-flex;
+  gap: 2px;
+  margin-right: 10px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #d9cfb8, #fbf6ea 50%, #d9cfb8);
+  vertical-align: middle;
+}
+
+.sl-pays__pic .sl-symbol {
+  width: 24px;
+  height: 24px;
+}
+
+.sl-pays__pic .sl-symbol--any {
+  color: #6b6252;
+}
+
+.sl-strips summary {
+  cursor: pointer;
+  color: var(--aqua);
+  font-family: var(--font-row);
+}
+
+.sl-strips__reels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sl-strip {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #c9bfa8, #fbf6ea 50%, #c9bfa8);
+  color: #2a241b;
+  font-size: var(--step--1);
+}
+
+.sl-strip li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  padding: 1px 4px;
+  border-bottom: 1px dashed rgba(42, 36, 27, 0.2);
+}
+
+.sl-strip li[data-blank] {
+  color: rgba(42, 36, 27, 0.55);
+}
+
+.sl-strip__pic {
+  width: 22px;
+  height: 22px;
+}
+
+.sl-strip__weight {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- The row ------------------------------------------------------------------ */
+
+.sl-game {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 22vw, 340px);
+  height: var(--app-height);
+  /* Clip rather than hide, so nothing can scroll the row out of place. */
+  overflow: hidden;
+  overflow: clip;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* No pull-to-refresh or rubber-banding mid-game. */
+:root:has(.sl-game) {
+  overscroll-behavior: none;
+}
+
+.sl-floor {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  min-height: 0;
+  padding: max(10px, var(--safe-top)) clamp(10px, 1.6vw, 24px) max(12px, var(--safe-bottom)) max(clamp(10px, 1.6vw, 24px), var(--safe-left));
+}
+
+/* Dottie walks the row; the machine's placard hangs off to the side. */
+.sl-attendant {
+  position: relative;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 2px 6px;
+}
+
+.sl-attendant__who {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sl-portrait {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid var(--chrome-mid);
+  background: radial-gradient(circle at 40% 35%, #ff8fa8, var(--coral-deep));
+  color: #2a0610;
+  box-shadow: 0 0 12px rgba(255, 111, 145, 0.4);
+}
+
+.sl-portrait svg {
+  width: 64%;
+  height: 64%;
+}
+
+.sl-attendant__name {
+  font-family: var(--font-row);
+  font-size: var(--step-1);
+  line-height: 1;
+  color: var(--cream);
+}
+
+.sl-placard {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  justify-items: start;
+  padding: 5px 14px 4px;
+  border: 2px solid var(--chrome-mid);
+  border-radius: 14px 4px 14px 4px;
+  background: linear-gradient(180deg, var(--enamel-hi), var(--enamel-deep));
+  line-height: 1.2;
+}
+
+.sl-placard__machine {
+  font-family: var(--font-row);
+  color: var(--lights);
+  text-shadow: 0 0 8px var(--glow);
+}
+
+.sl-placard__coin {
+  font-size: var(--step--1);
+  color: var(--trim);
+}
+
+/*
+ * The stage holds the row, as big as fits: your machine in the middle and
+ * the machines either side of it, smaller. Its own stacking order keeps
+ * the cabinets' z-indexes inside it, under the HUD and its menus.
+ */
+.sl-stage {
+  position: relative;
+  z-index: 0;
+  min-height: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+}
+
+.sl-row {
+  /* Your cabinet's width: a cabinet is about 1.6 of its widths tall, with its plate. The row is 2.26 of them across. */
+  --w: min(100cqh / 1.62, 43cqw);
+  --side: 0.56;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: calc(var(--w) * 0.07);
+  width: 100%;
+}
+
+.sl-spot {
+  position: relative;
+  flex: none;
+}
+
+.sl-spot--you {
+  width: var(--w);
+  z-index: 2;
+}
+
+.sl-spot--left,
+.sl-spot--right {
+  width: calc(var(--w) * var(--side));
+  z-index: 1;
+  /* Room for their plate under the machine. */
+  margin-bottom: 64px;
+}
+
+/* ---- Talk: Dottie's calls, and the regulars' remarks ------------------------- */
+
+.sl-talk {
+  pointer-events: none;
+  z-index: 70;
+}
+
+.sl-talk--attendant {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%;
+}
+
+.sl-talk__bubble {
+  position: absolute;
+  width: max-content;
+  max-width: min(360px, 32vw);
+  margin: 0;
+  padding: 7px 13px 8px;
+  border-radius: 14px 14px 14px 4px;
+  translate: 0 -50%;
+  transform-origin: 0 50%;
+  background: linear-gradient(180deg, #fffaf0, var(--cream));
+  color: #1d1612;
+  font-size: var(--step--1);
+  line-height: 1.35;
+  box-shadow:
+    inset 0 0 0 1px rgba(86, 98, 108, 0.5),
+    0 6px 14px rgba(0, 0, 0, 0.5);
+  animation:
+    sl-talk-in 0.24s cubic-bezier(0.3, 1.5, 0.5, 1) backwards,
+    sl-talk-out 0.3s ease-in var(--hold) forwards;
+}
+
+.sl-talk__bubble::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  margin-top: -6px;
+  border: 6px solid transparent;
+  border-right: 9px solid var(--cream);
+  border-left-width: 0;
+}
+
+/* A regular's remark rises over their machine, pointing down at it. */
+.sl-talk--seat {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + var(--m) * 12);
+  width: 0;
+  height: 0;
+}
+
+.sl-talk--seat .sl-talk__bubble {
+  bottom: 0;
+  translate: -50% 0;
+  min-width: 130px;
+  max-width: min(260px, 30cqw, 80vw);
+  border-radius: 14px;
+  transform-origin: 50% 100%;
+}
+
+.sl-talk--seat .sl-talk__bubble::before {
+  right: auto;
+  left: 50%;
+  top: 100%;
+  margin: 0 0 0 -6px;
+  border: 6px solid transparent;
+  border-top: 9px solid var(--cream);
+  border-bottom-width: 0;
+}
+
+@keyframes sl-talk-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@keyframes sl-talk-out {
+  to {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+
+/* ---- A cabinet ------------------------------------------------------------------ */
+
+.sl-cabinet {
+  --m: calc(var(--w) / 100);
+  position: relative;
+  display: grid;
+  gap: calc(var(--m) * 2.2);
+  padding: calc(var(--m) * 3) calc(var(--m) * 4.5) calc(var(--m) * 4);
+  border-radius: calc(var(--m) * 12) calc(var(--m) * 12) calc(var(--m) * 4) calc(var(--m) * 4);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.3)),
+    linear-gradient(90deg, var(--enamel-deep), var(--enamel) 18%, var(--enamel-hi) 46%, var(--enamel) 72%, var(--enamel-deep));
+  box-shadow:
+    inset 0 0 0 calc(var(--m) * 0.8) var(--chrome-mid),
+    inset 0 0 0 calc(var(--m) * 1.3) var(--chrome-deep),
+    inset 0 calc(var(--m) * 1.6) 0 calc(var(--m) * 0.8) rgba(255, 255, 255, 0.15),
+    0 calc(var(--m) * 3) calc(var(--m) * 6) rgba(0, 0, 0, 0.6);
+}
+
+.sl-cabinet.is-neighbor {
+  --m: calc(var(--w) * var(--side) / 100);
+}
+
+/* The top: the candle light and the marquee. */
+.sl-topper {
+  position: relative;
+  display: grid;
+  justify-items: center;
+}
+
+/* The light on top that spins when someone hits. */
+.sl-candle {
+  position: absolute;
+  top: calc(var(--m) * -9);
+  width: calc(var(--m) * 9);
+  height: calc(var(--m) * 7);
+  border-radius: calc(var(--m) * 5) calc(var(--m) * 5) calc(var(--m) * 1) calc(var(--m) * 1);
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.7), transparent 45%),
+    linear-gradient(180deg, color-mix(in srgb, var(--glow) 55%, #fff), var(--glow));
+  box-shadow:
+    inset 0 calc(var(--m) * -1.2) 0 rgba(0, 0, 0, 0.25),
+    0 calc(var(--m) * 0.6) 0 var(--chrome-mid);
+  opacity: 0.55;
+}
+
+.sl-topper[data-jackpot] .sl-candle {
+  opacity: 1;
+  animation: sl-candle 0.42s linear infinite;
+}
+
+@keyframes sl-candle {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 calc(var(--m) * -1.2) 0 rgba(0, 0, 0, 0.25),
+      0 0 calc(var(--m) * 6) calc(var(--m) * 2) var(--glow);
+  }
+  50% {
+    box-shadow:
+      inset 0 calc(var(--m) * -1.2) 0 rgba(0, 0, 0, 0.25),
+      0 0 calc(var(--m) * 2) 0 var(--glow);
+    filter: brightness(1.4);
+  }
+}
+
+/* The name in lights, framed by chasing bulbs. */
+.sl-marquee {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: calc(var(--m) * 1);
+  width: 100%;
+  min-height: calc(var(--m) * 15);
+  padding: calc(var(--m) * 2.6) calc(var(--m) * 4);
+  border-radius: calc(var(--m) * 9) calc(var(--m) * 9) calc(var(--m) * 2) calc(var(--m) * 2);
+  background: radial-gradient(ellipse at 50% 120%, color-mix(in srgb, var(--glow) 40%, #1a0f0a), #120a07 70%);
+  box-shadow:
+    inset 0 0 0 calc(var(--m) * 0.9) var(--chrome),
+    inset 0 0 0 calc(var(--m) * 1.6) #5d4a3a,
+    inset 0 0 calc(var(--m) * 6) rgba(0, 0, 0, 0.8);
+}
+
+.sl-marquee::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--m) * 1.8);
+  border-radius: inherit;
+  padding: calc(var(--m) * 1);
+  background: repeating-linear-gradient(90deg, var(--lights) 0 calc(var(--m) * 1.4), transparent calc(var(--m) * 1.4) calc(var(--m) * 3.2));
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  opacity: 0.85;
+  animation: sl-chase 1.2s steps(2) infinite;
+}
+
+/* The bulbs chase: odd ones, then even. */
+@keyframes sl-chase {
+  to {
+    background-position: calc(var(--m) * 3.2) 0;
+  }
+}
+
+.sl-marquee__name {
+  position: relative;
+  font-family: var(--font-row);
+  font-size: calc(var(--m) * 7.4);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #fff8e8;
+  text-shadow:
+    0 0 calc(var(--m) * 0.6) #fff,
+    0 0 calc(var(--m) * 2) var(--glow),
+    0 0 calc(var(--m) * 5) var(--glow);
+}
+
+.sl-marquee__meter {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--m) * 2);
+}
+
+.sl-marquee__label {
+  font-family: var(--font-row);
+  font-size: calc(var(--m) * 4);
+  letter-spacing: 0.06em;
+  color: var(--lights);
+}
+
+.sl-topper[data-jackpot] .sl-marquee__name {
+  animation: sl-flash 0.3s steps(1) infinite;
+}
+
+@keyframes sl-flash {
+  50% {
+    color: var(--glow);
+    text-shadow: 0 0 calc(var(--m) * 6) #fff;
+  }
+}
+
+/* LED digits: orange on black, like the meters in the old cabinets. */
+.sl-digits {
+  display: inline-block;
+  min-width: 4ch;
+  padding: calc(var(--m) * 0.6) calc(var(--m) * 1.6) calc(var(--m) * 0.2);
+  border-radius: calc(var(--m) * 1);
+  background: #0d0503;
+  box-shadow: inset 0 calc(var(--m) * 0.5) calc(var(--m) * 1.2) rgba(0, 0, 0, 0.9);
+  font-family: var(--font-display);
+  font-size: calc(var(--m) * 6.4);
+  line-height: 1;
+  text-align: right;
+  color: var(--led);
+  text-shadow: 0 0 calc(var(--m) * 1.2) var(--led-glow);
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-digits--meter {
+  min-width: 7ch;
+  font-size: calc(var(--m) * 7.2);
+  color: #ffd35a;
+  text-shadow: 0 0 calc(var(--m) * 1.6) rgba(255, 200, 70, 0.7);
+}
+
+/* The pay glass: the paytable silk-screened on glass above the reels. */
+.sl-glass {
+  display: grid;
+  gap: calc(var(--m) * 0.4);
+  padding: calc(var(--m) * 2) calc(var(--m) * 3);
+  border-radius: calc(var(--m) * 2);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.16), transparent 35%),
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--glow) 18%, #140f0c), #0b0806 75%);
+  box-shadow:
+    inset 0 0 0 calc(var(--m) * 0.7) var(--chrome-mid),
+    inset 0 0 calc(var(--m) * 4) rgba(0, 0, 0, 0.7);
+  font-size: calc(var(--m) * 3.6);
+  line-height: 1;
+}
+
+.sl-glass__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: calc(var(--m) * 1.5);
+  min-height: calc(var(--m) * 5.4);
+  padding: 0 calc(var(--m) * 1);
+  border-radius: calc(var(--m) * 1);
+  color: var(--lights);
+}
+
+.sl-glass__row > [role='cell'] {
+  text-align: right;
+  font-family: var(--font-row);
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-glass__row > [data-current] {
+  opacity: 1;
+  text-shadow: 0 0 calc(var(--m) * 1.5) var(--glow);
+}
+
+.sl-glass__row > [data-meter] {
+  color: #ffd35a;
+  font-size: 0.82em;
+}
+
+.sl-glass__row--head {
+  min-height: calc(var(--m) * 4);
+  font-size: calc(var(--m) * 2.6);
+  color: var(--cream-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.sl-glass__row--head > span:not(:first-child) {
+  text-align: right;
+}
+
+.sl-glass__row--head > [data-current] {
+  color: var(--lights);
+}
+
+.sl-glass__pic {
+  display: flex;
+  gap: calc(var(--m) * 0.5);
+  height: calc(var(--m) * 4.8);
+}
+
+.sl-glass__pic .sl-symbol {
+  width: calc(var(--m) * 4.8);
+  height: calc(var(--m) * 4.8);
+  filter: drop-shadow(0 0 calc(var(--m) * 0.4) rgba(255, 255, 255, 0.25));
+}
+
+.sl-glass__pic .sl-symbol--any {
+  color: var(--cream-dim);
+}
+
+/* A winning line on the glass flashes. */
+.sl-glass__row[data-lit] {
+  background: color-mix(in srgb, var(--glow) 35%, transparent);
+  box-shadow: 0 0 calc(var(--m) * 2) color-mix(in srgb, var(--glow) 70%, transparent);
+  animation: sl-glass-lit 0.5s steps(1) 6;
+}
+
+@keyframes sl-glass-lit {
+  50% {
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+.sl-glass__note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--m) * 1);
+  margin: calc(var(--m) * 0.6) 0 0;
+  font-size: calc(var(--m) * 2.8);
+  color: var(--cream-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sl-glass__note .sl-symbol {
+  width: calc(var(--m) * 3.6);
+  height: calc(var(--m) * 3.6);
+}
+
+/* The window: a chrome bezel round three reels and the pay line. */
+.sl-window-frame {
+  padding: calc(var(--m) * 1.6);
+  border-radius: calc(var(--m) * 3);
+  background: linear-gradient(180deg, #f6f8fa, var(--chrome-mid) 30%, #eef1f4 55%, var(--chrome-deep));
+  box-shadow:
+    0 calc(var(--m) * 0.6) calc(var(--m) * 1.4) rgba(0, 0, 0, 0.5),
+    inset 0 calc(var(--m) * 0.4) 0 rgba(255, 255, 255, 0.8);
+}
+
+.sl-window {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* In machine units: the window's own cqh are for what's inside it. */
+  gap: calc(var(--m) * 1.8);
+  aspect-ratio: 100 / 58;
+  padding: 0 calc(var(--m) * 1.8);
+  overflow: hidden;
+  border-radius: calc(var(--m) * 1.6);
+  background: linear-gradient(180deg, #2a2d30, #6c7379 50%, #2a2d30);
+  container-type: size;
+}
+
+/* The light behind the glass falls off toward the top and bottom of the drums. */
+.sl-window__shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.12) 22%, transparent 38%, transparent 62%, rgba(0, 0, 0, 0.12) 78%, rgba(0, 0, 0, 0.7)),
+    linear-gradient(165deg, rgba(255, 255, 255, 0.26), transparent 30%);
+}
+
+/* The pay line, with its arrows at each end. */
+.sl-payline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1.4cqh;
+  margin-top: -0.7cqh;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 0 2.2cqh, rgba(225, 38, 47, 0.75) 2.2cqh calc(100% - 2.2cqh), transparent calc(100% - 2.2cqh));
+  box-shadow: 0 0 2cqh rgba(255, 60, 70, 0.3);
+}
+
+.sl-payline::before,
+.sl-payline::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  margin-top: -3.4cqh;
+  border: 3.4cqh solid transparent;
+}
+
+.sl-payline::before {
+  left: 0;
+  border-left: 3cqh solid #e1262f;
+  border-right-width: 0;
+}
+
+.sl-payline::after {
+  right: 0;
+  border-right: 3cqh solid #e1262f;
+  border-left-width: 0;
+}
+
+.sl-window[data-won] .sl-payline {
+  background: linear-gradient(90deg, transparent 0 2.2cqh, #ffe066 2.2cqh calc(100% - 2.2cqh), transparent calc(100% - 2.2cqh));
+  box-shadow: 0 0 3cqh rgba(255, 224, 102, 0.8);
+  animation: sl-payline 0.5s steps(1) 6;
+}
+
+@keyframes sl-payline {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/*
+ * A reel: a drum of 22 faces, 32cqh tall each, at the radius where they
+ * meet round a circle (32cqh / 2 tan(π/22)). The window shows three stops
+ * and a little of the next ones. The drum sits back by its radius, so the
+ * face on the line is at the glass and the rest curve away from it.
+ */
+.sl-reel {
+  --face: 32cqh;
+  --radius: calc(var(--face) * 3.4845);
+  --step: calc(360deg / 22);
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background: linear-gradient(90deg, #b3a98f, #fbf6ea 30%, #fffdf6 50%, #fbf6ea 70%, #b3a98f);
+}
+
+.sl-drum {
+  --back: translateZ(calc(var(--radius) * -1));
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: var(--back) rotateX(var(--rest));
+}
+
+/*
+ * The turn: a little jerk backwards as the handle comes down, then round
+ * at speed, past the stop as the brake catches it (90%, with the clunk),
+ * and back onto it. --late picks a turn up part way through.
+ */
+.sl-drum[data-moving] {
+  animation: sl-turn var(--turn-ms) linear var(--late, 0ms) both;
+}
+
+@keyframes sl-turn {
+  0% {
+    transform: var(--back) rotateX(var(--from));
+    animation-timing-function: ease-out;
+  }
+  5% {
+    transform: var(--back) rotateX(calc(var(--from) + 6deg));
+    animation-timing-function: cubic-bezier(0.32, 0, 0.92, 0.88);
+  }
+  90% {
+    transform: var(--back) rotateX(calc(var(--to) - 5deg));
+    animation-timing-function: cubic-bezier(0.25, 1.6, 0.5, 1);
+  }
+  100% {
+    transform: var(--back) rotateX(var(--to));
+  }
+}
+
+.sl-face {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  /* A touch taller than the drum's facets, so no seam shows between them. */
+  height: calc(var(--face) * 1.03);
+  margin-top: calc(var(--face) * -0.515);
+  display: grid;
+  place-items: center;
+  padding: 3cqh 8%;
+  backface-visibility: hidden;
+  transform: rotateX(calc(var(--i) * -1 * var(--step))) translateZ(var(--radius));
+  background: linear-gradient(90deg, #b3a98f, #fbf6ea 28%, #fffdf6 50%, #fbf6ea 72%, #b3a98f);
+}
+
+.sl-face .sl-symbol {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+}
+
+/* The winners on the line, once the reels stop. */
+.sl-face.is-lit {
+  background: linear-gradient(90deg, #d8b56a, #fff3c4 30%, #fffbe8 50%, #fff3c4 70%, #d8b56a);
+}
+
+.sl-face.is-lit .sl-symbol {
+  animation: sl-winner 0.5s ease-in-out 6 alternate;
+}
+
+@keyframes sl-winner {
+  to {
+    scale: 1.12;
+  }
+}
+
+/* Meters: credits, the bet and what the last pull paid. */
+.sl-meters {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr) minmax(0, 1.3fr);
+  gap: calc(var(--m) * 2);
+  padding: calc(var(--m) * 1.6) calc(var(--m) * 2);
+  border-radius: calc(var(--m) * 2);
+  background: linear-gradient(180deg, #1b1210, #0b0706);
+  box-shadow: inset 0 0 0 calc(var(--m) * 0.6) var(--chrome-mid);
+}
+
+.sl-meter {
+  display: grid;
+  gap: calc(var(--m) * 0.6);
+  justify-items: stretch;
+}
+
+.sl-meter__label {
+  font-family: var(--font-row);
+  font-size: calc(var(--m) * 3.2);
+  letter-spacing: 0.04em;
+  color: var(--trim);
+  text-align: center;
+}
+
+.sl-meter .sl-digits {
+  min-width: 0;
+}
+
+/* The button deck: chrome rail, plastic keys that light from within. */
+.sl-deck {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: calc(var(--m) * 2.4);
+  padding: calc(var(--m) * 2) calc(var(--m) * 2.4);
+  border-radius: calc(var(--m) * 2.4);
+  background: linear-gradient(180deg, #f2f5f7, var(--chrome-mid) 60%, var(--chrome-deep));
+  box-shadow: inset 0 calc(var(--m) * 0.4) 0 #fff, 0 calc(var(--m) * 1) calc(var(--m) * 2) rgba(0, 0, 0, 0.45);
+}
+
+.sl-key-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--m) * 1.4);
+  /* Never smaller than a thumb, however small the machine. */
+  min-height: max(calc(var(--m) * 10), 40px);
+  padding: 0 calc(var(--m) * 1.5);
+  border: 0;
+  border-radius: calc(var(--m) * 2);
+  background: linear-gradient(180deg, #fff6d8, #f0d38a);
+  color: #3a2a0c;
+  font-family: var(--font-row);
+  font-size: calc(var(--m) * 4.2);
+  line-height: 1;
+  box-shadow:
+    inset 0 calc(var(--m) * -0.8) 0 rgba(120, 80, 10, 0.35),
+    0 calc(var(--m) * 0.8) 0 #6b5a3a,
+    0 calc(var(--m) * 1.2) calc(var(--m) * 2) rgba(0, 0, 0, 0.4);
+  transition: translate 0.06s ease-out;
+}
+
+.sl-key-button--spin {
+  background: linear-gradient(180deg, #ff9aa8, #e1262f);
+  color: #fff;
+  font-size: calc(var(--m) * 5.2);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 calc(var(--m) * -0.8) 0 rgba(90, 0, 10, 0.35),
+    0 calc(var(--m) * 0.8) 0 #7a1018,
+    0 0 calc(var(--m) * 3) rgba(255, 70, 80, 0.45);
+}
+
+.sl-key-button:active:not(:disabled) {
+  translate: 0 calc(var(--m) * 0.6);
+}
+
+.sl-key-button:disabled {
+  filter: saturate(0.4) brightness(0.8);
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .sl-key-button:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+}
+
+/* The handle: a chrome arm on the cabinet's right side with a red knob, pivoting at its hub. */
+.sl-handle {
+  position: absolute;
+  left: 100%;
+  top: 34%;
+  width: calc(var(--m) * 10);
+  height: calc(var(--m) * 48);
+  padding: 0;
+  border: 0;
+  background: none;
+  touch-action: none;
+  cursor: grab;
+}
+
+.sl-handle:disabled {
+  cursor: default;
+}
+
+.sl-handle__hub {
+  position: absolute;
+  left: calc(var(--m) * -1);
+  bottom: 0;
+  width: calc(var(--m) * 7);
+  height: calc(var(--m) * 11);
+  border-radius: 0 calc(var(--m) * 3) calc(var(--m) * 3) 0;
+  background: linear-gradient(90deg, var(--chrome-deep), #f6f8fa 45%, var(--chrome-mid));
+  box-shadow: calc(var(--m) * 0.6) calc(var(--m) * 0.8) calc(var(--m) * 1.4) rgba(0, 0, 0, 0.5);
+}
+
+.sl-handle__arm {
+  position: absolute;
+  left: calc(var(--m) * 1.6);
+  bottom: calc(var(--m) * 4);
+  width: calc(var(--m) * 2.6);
+  height: calc(100% - var(--m) * 6);
+  border-radius: calc(var(--m) * 1.3);
+  background: linear-gradient(90deg, var(--chrome-deep), #fdfeff 40%, var(--chrome-mid));
+  transform-origin: 50% 100%;
+}
+
+.sl-handle__knob {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--m) * -4.6);
+  width: calc(var(--m) * 8);
+  height: calc(var(--m) * 8);
+  margin-left: calc(var(--m) * -4);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffb3b8, #e1262f 45%, #7a1018);
+  box-shadow: 0 calc(var(--m) * 0.8) calc(var(--m) * 1.6) rgba(0, 0, 0, 0.5);
+}
+
+/* Flat, the arm swings down by shortening, as if seen head on; slots-3d.css turns it for real. */
+.sl-handle__arm[data-pulled] {
+  animation: sl-pull 0.62s cubic-bezier(0.3, 0, 0.3, 1);
+}
+
+@keyframes sl-pull {
+  35% {
+    scale: 1 -0.55;
+  }
+  48% {
+    scale: 1 -0.55;
+  }
+  78% {
+    scale: 1 1.06;
+  }
+}
+
+@media (hover: hover) {
+  .sl-handle:hover:not(:disabled) .sl-handle__knob {
+    filter: brightness(1.15);
+  }
+}
+
+.sl-handle--still {
+  pointer-events: none;
+}
+
+/* ---- The machines either side ---------------------------------------------------- */
+
+.sl-cabinet.is-neighbor .sl-glass {
+  pointer-events: none;
+}
+
+.sl-cabinet.is-empty {
+  filter: saturate(0.7) brightness(0.8);
+}
+
+/* Their plate, under the machine: name, caps and coins in. */
+.sl-plate {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: calc(100% + var(--m) * 3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name stack'
+    'coins coins';
+  gap: 2px 8px;
+  padding: 5px 10px 6px;
+  border: 2px solid var(--chrome-mid);
+  border-radius: 12px 4px 12px 4px;
+  background: linear-gradient(180deg, #12303b, #08161c);
+  box-shadow:
+    inset 4px 0 0 var(--c, var(--chrome-mid)),
+    0 6px 14px rgba(0, 0, 0, 0.5);
+  font-size: var(--step--1);
+  line-height: 1.2;
+}
+
+.sl-plate__name {
+  grid-area: name;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--cream);
+}
+
+.sl-plate__short {
+  display: none;
+}
+
+.sl-plate__stack {
+  grid-area: stack;
+  color: var(--lemon);
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-plate__coins {
+  grid-area: coins;
+  display: flex;
+  gap: 4px;
+}
+
+.sl-plate__coins > span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sl-plate__coins > [data-on] {
+  background: var(--c, var(--lemon));
+  box-shadow: 0 0 6px var(--c, var(--lemon));
+}
+
+.sl-plate.is-empty {
+  grid-template-areas: 'name';
+  grid-template-columns: minmax(0, 1fr);
+  color: var(--cream-dim);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+}
+
+.sl-plate.is-empty .sl-plate__name {
+  color: var(--cream-dim);
+}
+
+/* ---- HUD: the terminal by the row ------------------------------------------------- */
+
+/* Above the stage and Dottie's calls, so the menus it opens cover the row. */
+.sl-hud.screen {
+  z-index: 100;
+  margin: max(12px, var(--safe-top)) max(12px, var(--safe-right)) max(12px, var(--safe-bottom)) 0;
+  border-radius: 12px;
+  padding: 16px 16px 14px;
+  gap: 10px;
+  color: var(--ph);
+  font-size: var(--step--1);
+}
+
+.sl-hud p {
+  margin: 0;
+}
+
+.sl-hud__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sl-hud__net {
+  color: var(--ph-strong);
+  white-space: nowrap;
+}
+
+.sl-hud__status {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  line-height: 1.05;
+  color: var(--ph-strong);
+}
+
+.sl-hud__help {
+  min-height: 4.4em;
+  line-height: 1.45;
+}
+
+.sl-hud__broke {
+  align-self: flex-start;
+}
+
+.sl-hud__log {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 4px 0 0;
+  padding: 8px 0 0;
+  list-style: none;
+  border-top: 2px solid var(--ph-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.4;
+  color: var(--ph-dim);
+}
+
+.sl-hud__log li::before {
+  content: '> ';
+}
+
+.sl-hud__log li[data-mine] {
+  color: var(--ph);
+}
+
+.sl-hud__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sl-hud .term-button {
+  font-size: var(--step-0);
+  padding: 4px 10px;
+}
+
+/* ---- Overlays ----------------------------------------------------------------- */
+
+.sl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(20px, var(--safe-top)) max(20px, var(--safe-right)) max(20px, var(--safe-bottom)) max(20px, var(--safe-left));
+  background: rgba(3, 9, 12, 0.8);
+  backdrop-filter: blur(2px);
+}
+
+/* Centered, or from the top and scrolling when it's taller than a phone held sideways. */
+.sl-overlay > * {
+  margin: auto;
+}
+
+.sl-rules-modal {
+  max-width: 80ch;
+  max-height: calc(var(--app-height) * 0.86);
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  color: var(--cream);
+  font-size: var(--step-0);
+}
+
+/* The machine menu on phones. */
+.sl-menu.screen {
+  width: min(100%, 460px);
+  max-height: min(560px, calc(var(--app-height) - 40px));
+  padding: 14px 16px 16px;
+  gap: 12px;
+  border-radius: 12px;
+  color: var(--ph);
+  font-size: var(--step--1);
+}
+
+.sl-menu .sl-hud__log {
+  min-height: 4.5em;
+  margin: 0;
+  padding: 0 0 8px;
+  border-top: 0;
+  border-bottom: 2px solid var(--ph-faint);
+}
+
+.sl-menu .term-button {
+  font-size: var(--step-0);
+  padding: 6px 12px;
+}
+
+.sl-menu > .term-button--primary {
+  align-self: flex-start;
+}
+
+/* ---- Pages on narrow screens ------------------------------------------------------ */
+
+@media (max-width: 900px) {
+  .sl-machines {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sl-regulars ul,
+  .sl-primer ol {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .sl-header {
+    gap: 8px 12px;
+  }
+
+  .sl-nav {
+    order: 1;
+    flex-basis: 100%;
+  }
+
+  .sl-sign__text {
+    font-size: var(--step-2);
+  }
+
+  .sl-strips__reels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* No keys to press on a touch screen. */
+@media (hover: none) and (pointer: coarse) {
+  .sl-key {
+    display: none;
+  }
+}
+
+/* ---- The row on phones and small windows -------------------------------------------
+ * Keep these queries in step with COMPACT_TABLE in Table.tsx.
+ *
+ * Upright, the machines either side shrink to a strip along the top, each
+ * its plate and its reels; then your machine as wide as the screen, and
+ * the HUD under it. Sideways, your machine turns on its side, the glass
+ * beside the reels, with the neighbors' plates above it and the HUD in a
+ * column on the right.
+ */
+
+@media (max-width: 900px), (max-height: 560px) {
+  .sl-game {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .sl-floor {
+    gap: 4px;
+    padding: max(6px, var(--safe-top)) max(8px, var(--safe-right)) 4px max(8px, var(--safe-left));
+  }
+
+  .sl-attendant {
+    justify-content: space-between;
+    min-height: 40px;
+    padding: 0 2px;
+  }
+
+  .sl-placard {
+    position: static;
+    translate: none;
+    order: 1;
+    padding: 3px 10px;
+  }
+
+  .sl-placard__coin {
+    display: none;
+  }
+
+  .sl-portrait {
+    width: 30px;
+    height: 30px;
+  }
+
+  .sl-attendant__name {
+    font-size: var(--step-0);
+  }
+
+  /* Hung from the top of the bar, so a long call grows down over the row instead of off the screen. */
+  .sl-talk--attendant {
+    top: 0;
+  }
+
+  .sl-talk--attendant .sl-talk__bubble {
+    max-width: min(300px, calc(100vw - 130px));
+    translate: 0 0;
+    transform-origin: 0 20px;
+  }
+
+  .sl-talk--attendant .sl-talk__bubble::before {
+    top: 20px;
+  }
+
+  /* The HUD: status and how you're doing, the hint and the Menu. */
+  .sl-hud.screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'status net'
+      'help menu';
+    align-content: start;
+    gap: 4px 10px;
+    margin: 0 max(8px, var(--safe-right)) max(8px, var(--safe-bottom)) max(8px, var(--safe-left));
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .sl-hud__head {
+    display: contents;
+  }
+
+  .sl-hud__head > .term-dim {
+    display: none;
+  }
+
+  .sl-hud__net {
+    grid-area: net;
+    align-self: center;
+  }
+
+  .sl-hud__status {
+    grid-area: status;
+    font-size: var(--step-1);
+  }
+
+  /* Always three lines high, so the machine above doesn't jump as the hint changes. */
+  .sl-hud__help {
+    grid-area: help;
+    height: 4.2em;
+    min-height: 0;
+    line-height: 1.4;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+
+  .sl-hud__menu {
+    grid-area: menu;
+    align-self: end;
+  }
+
+  .sl-hud .term-button {
+    padding: 6px 12px;
+  }
+
+  .sl-talk--seat .sl-talk__bubble {
+    min-width: 110px;
+    max-width: min(240px, 60vw);
+  }
+}
+
+/*
+ * Upright: the neighbors in a strip along the top, each a plate over a
+ * little window of reels; your machine under them, as wide as fits, its
+ * handle tucked inside the right edge.
+ */
+@media (max-width: 900px) and (orientation: portrait) {
+  .sl-row {
+    /* The neighbors' strip takes 104px; your cabinet is about 1.66 of its widths tall. */
+    --w: min(86cqw, (100cqh - 104px) / 1.66);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      'left right'
+      'you you';
+    align-items: start;
+    justify-items: center;
+    gap: 8px 10px;
+    height: 100cqh;
+  }
+
+  .sl-spot--left {
+    grid-area: left;
+  }
+
+  .sl-spot--right {
+    grid-area: right;
+  }
+
+  .sl-spot--you {
+    grid-area: you;
+    align-self: end;
+    margin-right: calc(var(--w) * 0.08);
+  }
+
+  .sl-spot--left,
+  .sl-spot--right {
+    width: 100%;
+    margin: 0;
+    /* Over your machine, so their remarks hang down across its marquee. */
+    z-index: 3;
+  }
+
+  /* A neighbor shrinks to its plate and a strip of reels. */
+  .sl-cabinet.is-neighbor {
+    --m: calc(min(43cqw, 220px) / 100);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    padding: 4px;
+    border-radius: 10px;
+  }
+
+  .sl-cabinet.is-neighbor :is(.sl-topper, .sl-neighbor-glass, .sl-handle) {
+    display: none;
+  }
+
+  .sl-cabinet.is-neighbor .sl-window-frame {
+    order: 1;
+    padding: 3px;
+    border-radius: 6px;
+  }
+
+  .sl-cabinet.is-neighbor .sl-window {
+    aspect-ratio: 100 / 30;
+    border-radius: 4px;
+  }
+
+  .sl-cabinet.is-neighbor .sl-plate {
+    position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    padding: 3px 8px 4px;
+  }
+
+  .sl-cabinet.is-neighbor .sl-talk--seat {
+    bottom: auto;
+    top: calc(100% + 6px);
+  }
+
+  .sl-cabinet.is-neighbor .sl-talk--seat .sl-talk__bubble {
+    bottom: auto;
+    top: 0;
+    transform-origin: 50% 0;
+    z-index: 80;
+  }
+
+  .sl-cabinet.is-neighbor .sl-talk--seat .sl-talk__bubble::before {
+    top: auto;
+    bottom: 100%;
+    border-top: 0;
+    border-bottom: 9px solid var(--cream);
+  }
+
+  .sl-spot--left .sl-talk--seat .sl-talk__bubble {
+    translate: -25% 0;
+  }
+
+  .sl-spot--right .sl-talk--seat .sl-talk__bubble {
+    translate: -75% 0;
+  }
+
+  .sl-plate__full {
+    display: none;
+  }
+
+  .sl-plate__short {
+    display: inline;
+  }
+
+  .sl-cabinet.is-yours {
+    gap: calc(var(--m) * 1.6);
+    padding: calc(var(--m) * 2.4) calc(var(--m) * 3.4) calc(var(--m) * 3);
+  }
+
+  .sl-cabinet.is-yours .sl-candle {
+    display: none;
+  }
+
+  .sl-cabinet.is-yours .sl-marquee {
+    min-height: calc(var(--m) * 12);
+  }
+
+  .sl-cabinet.is-yours .sl-handle {
+    width: calc(var(--m) * 9);
+    height: calc(var(--m) * 40);
+  }
+}
+
+/* Short phones held upright: a slimmer glass and HUD leave the reels more room. */
+@media (max-width: 900px) and (orientation: portrait) and (max-height: 700px) {
+  .sl-attendant {
+    min-height: 34px;
+  }
+
+  .sl-portrait {
+    width: 26px;
+    height: 26px;
+  }
+
+  .sl-hud.screen {
+    padding: 6px 10px;
+  }
+
+  .sl-hud__status {
+    font-size: var(--step-0);
+  }
+
+  .sl-hud__help {
+    height: 2.8em;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .sl-cabinet.is-yours .sl-glass__row--head,
+  .sl-cabinet.is-yours .sl-glass__note {
+    display: none;
+  }
+
+  /* The neighbors are just their plates, and your cabinet, without the glass's header, about 1.56 of its widths tall. */
+  .sl-row {
+    --w: min(86cqw, (100cqh - 74px) / 1.6);
+  }
+
+  .sl-cabinet.is-neighbor .sl-window-frame {
+    display: none;
+  }
+
+  .sl-cabinet.is-neighbor .sl-talk--seat {
+    top: calc(100% + 8px);
+  }
+}
+
+/*
+ * Sideways: the HUD in a column on the right. Your machine lies on its side,
+ * the glass on the left and the reels, meters and buttons on the right, so
+ * it fits the short screen. The neighbors' plates sit above it.
+ */
+@media (max-height: 560px) and (orientation: landscape) {
+  .sl-game {
+    --hud-w: clamp(200px, 28vw, 260px);
+    grid-template-columns: minmax(0, 1fr) var(--hud-w);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .sl-floor {
+    padding: max(4px, var(--safe-top)) 6px max(6px, var(--safe-bottom)) max(8px, var(--safe-left));
+  }
+
+  .sl-attendant {
+    min-height: 34px;
+  }
+
+  .sl-row {
+    /* Wide, the cabinet is 1.62 of its height across: glass and reels side by side. */
+    --w: min(88cqw, (100cqh - 46px) * 1.75);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      'left right'
+      'you you';
+    gap: 4px 10px;
+    height: 100cqh;
+    align-items: start;
+    justify-items: center;
+  }
+
+  .sl-spot--left {
+    grid-area: left;
+    justify-self: end;
+  }
+
+  .sl-spot--right {
+    grid-area: right;
+    justify-self: start;
+  }
+
+  .sl-spot--left,
+  .sl-spot--right {
+    width: min(100%, 230px);
+    margin: 0;
+    /* Over your machine, so their remarks hang down across it. */
+    z-index: 3;
+  }
+
+  .sl-spot--you {
+    grid-area: you;
+    align-self: center;
+    margin-right: calc(var(--w) * 0.06);
+  }
+
+  /* A neighbor is just its plate. */
+  .sl-cabinet.is-neighbor {
+    display: block;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .sl-cabinet.is-neighbor :is(.sl-topper, .sl-neighbor-glass, .sl-window-frame, .sl-handle) {
+    display: none;
+  }
+
+  .sl-cabinet.is-neighbor .sl-plate {
+    position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    grid-template-areas: 'name stack coins';
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    padding: 2px 8px;
+  }
+
+  .sl-cabinet.is-neighbor .sl-talk--seat {
+    bottom: auto;
+    top: calc(100% + 8px);
+  }
+
+  .sl-cabinet.is-neighbor .sl-talk--seat .sl-talk__bubble {
+    bottom: auto;
+    top: 0;
+    transform-origin: 50% 0;
+  }
+
+  .sl-cabinet.is-neighbor .sl-talk--seat .sl-talk__bubble::before {
+    top: auto;
+    bottom: 100%;
+    border-top: 0;
+    border-bottom: 9px solid var(--cream);
+  }
+
+  .sl-plate__full {
+    display: none;
+  }
+
+  .sl-plate__short {
+    display: inline;
+  }
+
+  .sl-cabinet.is-yours {
+    --m: calc(var(--w) / 100 * 0.62);
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+    grid-template-areas:
+      'top top'
+      'glass window'
+      'glass meters'
+      'glass deck';
+    column-gap: calc(var(--m) * 3);
+    row-gap: calc(var(--m) * 1.6);
+    padding: calc(var(--m) * 2) calc(var(--m) * 3);
+    border-radius: calc(var(--m) * 5);
+  }
+
+  .sl-cabinet.is-yours .sl-topper {
+    grid-area: top;
+  }
+
+  .sl-cabinet.is-yours .sl-candle {
+    display: none;
+  }
+
+  .sl-cabinet.is-yours .sl-marquee {
+    min-height: 0;
+    padding: calc(var(--m) * 1.2) calc(var(--m) * 4);
+    grid-auto-flow: column;
+    gap: calc(var(--m) * 4);
+    border-radius: calc(var(--m) * 4) calc(var(--m) * 4) calc(var(--m) * 1) calc(var(--m) * 1);
+  }
+
+  .sl-cabinet.is-yours .sl-marquee__name {
+    font-size: calc(var(--m) * 6);
+  }
+
+  .sl-cabinet.is-yours .sl-glass {
+    grid-area: glass;
+    align-content: center;
+  }
+
+  .sl-cabinet.is-yours .sl-window-frame {
+    grid-area: window;
+  }
+
+  .sl-cabinet.is-yours .sl-meters {
+    grid-area: meters;
+  }
+
+  .sl-cabinet.is-yours .sl-deck {
+    grid-area: deck;
+  }
+
+  .sl-cabinet.is-yours .sl-key-button {
+    min-height: max(calc(var(--m) * 8), 36px);
+  }
+
+  .sl-cabinet.is-yours .sl-handle {
+    top: 18%;
+    height: calc(var(--m) * 60);
+    width: calc(var(--m) * 10);
+  }
+
+  /* A column of its own on the right: status, how you're doing, hint, then the Menu. */
+  .sl-hud.screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'status' 'net' 'help' 'menu';
+    margin: max(6px, var(--safe-top)) max(8px, var(--safe-right)) max(6px, var(--safe-bottom)) 0;
+  }
+
+  .sl-hud__net {
+    align-self: start;
+  }
+
+  .sl-hud__help {
+    height: auto;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+  }
+
+  .sl-hud__menu {
+    justify-self: start;
+  }
+}

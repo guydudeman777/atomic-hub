@@ -1,5 +1,5 @@
 import { type Locator, type Page, expect, test } from '@playwright/test'
-import { skipBoot, watchErrors } from './helpers.ts'
+import { hostTable, joinTable, skipBoot, watchErrors } from './helpers.ts'
 
 // Runs in the "phone" project (playwright.config.ts): a touch phone held upright, unless a test turns it.
 
@@ -48,9 +48,14 @@ async function sitDown(page: Page, machine = 'Bottle Caps') {
   await expect(page.locator('html')).not.toHaveAttribute('data-entering')
 }
 
-/** Neither neighbor's plate runs into your machine. */
+/** Neither friend's plate runs into your machine. */
 async function expectNeighborsClear(page: Page) {
   for (const plate of await neighbors(page).all()) await expectApart(plate, yours(page))
+}
+
+/** Offline your machine has the row to itself. */
+async function expectAlone(page: Page) {
+  await expect(page.locator('.sl-cabinet.is-neighbor')).toHaveCount(0)
 }
 
 test.describe('on the narrowest phones', () => {
@@ -76,7 +81,7 @@ test.describe('on the narrowest phones', () => {
     await sitDown(page)
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
     for (const part of PARTS) await expectSettledOnScreen(page, page.locator(part))
-    await expectNeighborsClear(page)
+    await expectAlone(page)
     // The Spin button is big enough for a thumb.
     const spin = await page.getByRole('button', { name: /^Spin/ }).boundingBox()
     expect(spin!.height).toBeGreaterThanOrEqual(28)
@@ -93,10 +98,7 @@ for (const view of ['3D', 'flat'] as const) {
     }
     await sitDown(page)
     for (const part of PARTS) await expectSettledOnScreen(page, page.locator(part))
-    await expectNeighborsClear(page)
-    // The neighbors sit in a strip above your machine.
-    const plate = (await neighbors(page).first().boundingBox())!
-    expect(plate.y + plate.height).toBeLessThanOrEqual((await yours(page).boundingBox())!.y + 1)
+    await expectAlone(page)
 
     await page.getByRole('button', { name: 'Bet max' }).tap()
     await expect(status(page)).toHaveText(/^(No win|Winner: \d+ caps|Top award!)$/, { timeout: SPIN })
@@ -118,7 +120,7 @@ test.describe('held sideways', () => {
     const errors = watchErrors(page)
     await sitDown(page, 'Moon Rocket')
     for (const part of PARTS) await expectSettledOnScreen(page, page.locator(part))
-    await expectNeighborsClear(page)
+    await expectAlone(page)
     const glass = (await yours(page).locator('.sl-glass').boundingBox())!
     const reels = (await yours(page).locator('.sl-window').boundingBox())!
     const hud = (await page.locator('.sl-hud').boundingBox())!
@@ -144,8 +146,33 @@ test('the machine stays on screen on any phone, either way up', async ({ page })
       await expect(async () => {
         for (const part of PARTS) await expectOnScreen(page, page.locator(part))
         await expectApart(yours(page), page.locator('.sl-hud'))
-        await expectNeighborsClear(page)
       }, `${view} at ${width}×${height}`).toPass({ timeout: 2000 })
     }
   }
+})
+
+test('online, your friends’ plates sit in a strip above your machine, clear of it, either way up', async ({ page }) => {
+  test.setTimeout(60_000)
+  const guest = await page.context().newPage()
+  await skipBoot(guest)
+  const errors = [watchErrors(page), watchErrors(guest)]
+  const code = await hostTable(page, 'slots', 'Hostess')
+  await joinTable(guest, 'slots', code, 'Guesty')
+  await expect(page.getByRole('list', { name: 'Players' })).toContainText('Guesty')
+  await page.getByRole('button', { name: 'Start' }).tap()
+  await expect(page.getByRole('region', { name: /^Your machine/ })).toBeVisible()
+  await expect(page.locator('html')).not.toHaveAttribute('data-entering')
+  // The friend next door, and an open machine.
+  await expect(neighbors(page)).toHaveCount(2)
+  await expect(page.locator('.sl-plate:not(.is-empty)')).toHaveText(/Guesty/)
+  for (const [width, height] of [[412, 839], [360, 640], [863, 360]]) {
+    await page.setViewportSize({ width, height })
+    await expect(async () => {
+      for (const part of PARTS) await expectOnScreen(page, page.locator(part))
+      await expectNeighborsClear(page)
+      const plate = (await neighbors(page).first().boundingBox())!
+      expect(plate.y + plate.height).toBeLessThanOrEqual((await yours(page).boundingBox())!.y + 1)
+    }, `${width}×${height}`).toPass({ timeout: 2000 })
+  }
+  expect(errors.flat()).toEqual([])
 })

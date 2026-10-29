@@ -68,7 +68,7 @@ export const GAMES: readonly GameInfo[] = [
   },
   {
     id: 'slots', name: 'Slots', category: 'casino', ready: true, path: '/slots', icon: 'slots',
-    modes: 'Three machines, with regulars pulling beside you, or online with friends',
+    modes: 'Three machines on your own, or side by side online with friends',
     blurb: 'Three chrome one-armed bandits on Rocket Row: wasteland junk and cherries, sevens round a wild atom, and a moon rocket chasing a jackpot. Every paytable published.',
   },
   {

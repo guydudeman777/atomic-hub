@@ -1,4 +1,4 @@
-import { type CSSProperties, useState } from 'react'
+import { useState } from 'react'
 import { playSfx } from '../../../core/audio/sfx'
 import { navigate } from '../../../navigation'
 import { OnlinePanel } from '../../../net/ui/OnlinePanel'
@@ -8,7 +8,6 @@ import { MACHINE_INFO, buyInOf, formatChance, machineInfo, payName, returnText }
 import { type SymbolId, MAX_COINS, meterCaps, meterReset } from '../engine'
 import { MACHINES, type MachineId } from '../machines'
 import { report } from '../odds'
-import { REGULARS } from '../regulars'
 import { GAME, SEATS, startOnline } from './online'
 import { useSession } from './session'
 import { SymbolArt } from './Symbols'
@@ -167,21 +166,6 @@ function RowSetup() {
                 : 'Pick a machine you can cover.'}
         </p>
       </div>
-
-      <section className="sl-panel sl-lobby__section sl-regulars" aria-labelledby="sl-regulars-title">
-        <h2 id="sl-regulars-title">On the row</h2>
-        <p className="sl-ink-dim">Two regulars play the machines either side of yours, each with caps of their own and a way of playing they swear by. When one runs dry, someone else sits down.</p>
-        <ul>
-          {REGULARS.map((r) => (
-            <li key={r.id}>
-              <span className="sl-plate__dot" style={{ '--c': r.color } as CSSProperties} aria-hidden="true" />
-              <span>
-                <strong>{r.name}</strong> {r.blurb}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
 
       <section className="sl-panel sl-lobby__section sl-primer" aria-labelledby="sl-primer-title">
         <h2 id="sl-primer-title">New to slots?</h2>

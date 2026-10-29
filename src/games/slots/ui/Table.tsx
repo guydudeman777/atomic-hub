@@ -13,7 +13,7 @@ import { NeighborMachine, YourMachine } from './Machine'
 import { GAME, checksumAfter, leaveOnline } from './online'
 import { jackpotPending } from './reels'
 import { RulesText } from './Rules'
-import { type Player, type Pull, type Remark, SEAT_COLORS, type Seat, useSession } from './session'
+import { type Player, type Pull, type Remark, SEAT_COLORS, useSession } from './session'
 import { SymbolSprite } from './Symbols'
 
 /**
@@ -57,7 +57,7 @@ function shownMeter(meter: number | null, pulls: (Pull | null)[]): number | null
 }
 
 function TableView({ machine }: { machine: MachineId }) {
-  const { pull, coins, seats, online, meter, waiting, call, talk } = useSession()
+  const { pull, coins, online, meter, waiting, call } = useSession()
   const caps = useSave((s) => s.wallet.caps)
   const { betOne, betMax, pullHandle, setCoins } = useSession.getState()
   const rules = MACHINES[machine]
@@ -91,18 +91,16 @@ function TableView({ machine }: { machine: MachineId }) {
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  // Who's beside you: the regulars offline, friends online, left and right of your machine (sideOf in session.ts).
+  // Online, your friends at the machines left and right of yours (sideOf in session.ts).
   const others = online ? online.players.flatMap((p, seat) => (p && seat !== online.me ? [p] : [])) : []
-  const left = online ? (others[0] ?? null) : (seats[0] ?? null)
-  const right = online ? (others[1] ?? null) : (seats[1] ?? null)
+  const left = others[0] ?? null
+  const right = others[1] ?? null
   const rowPulls = [pull, left?.pull ?? null, right?.pull ?? null]
   const shown = shownMeter(meter, rowPulls)
   const jackpotOn = (p: Pull | null) => !!p?.settled && p.spin.win?.pay === 0
 
-  const neighbor = (who: Seat | Player | null, side: 0 | 1) => {
+  const neighbor = (who: Player | null, side: 0 | 1) => {
     const seed = 11 + side * 6
-    const plate = who ? <Plate who={who} rules={rules} /> : <EmptyPlate online={!!online} />
-    const regular = who && isSeat(who) ? who.regular : null
     return (
       <div className={`sl-spot sl-spot--${side === 0 ? 'left' : 'right'}`}>
         <NeighborMachine
@@ -110,12 +108,11 @@ function TableView({ machine }: { machine: MachineId }) {
           name={info.name}
           rules={rules}
           pull={who?.pull ?? null}
-          coins={who ? (isSeat(who) ? who.coins : (who.pull?.spin.coins ?? 1)) : 1}
+          coins={who?.pull?.spin.coins ?? 1}
           meter={shown}
           jackpot={jackpotOn(who?.pull ?? null)}
           seed={seed}
-          plate={plate}
-          bubble={regular && <SpeechBubble name={regular.name} remark={talk?.seat === side ? talk : null} className="sl-talk--seat" />}
+          plate={who ? <Plate who={who} rules={rules} /> : <EmptyPlate />}
           empty={!who}
         />
       </div>
@@ -128,8 +125,9 @@ function TableView({ machine }: { machine: MachineId }) {
       <div className="sl-floor">
         <AttendantBar call={call} name={info.name} coinText={info.coinText} />
         <div className="sl-stage">
-          <div className="sl-row">
-            {neighbor(left, 0)}
+          {/* Offline your machine has the row to itself: nothing beside it to draw or turn. */}
+          <div className={online ? 'sl-row' : 'sl-row is-alone'}>
+            {online && neighbor(left, 0)}
             <div className="sl-spot sl-spot--you">
               <YourMachine
                 id={machine}
@@ -147,7 +145,7 @@ function TableView({ machine }: { machine: MachineId }) {
                 handlePulls={handlePulls}
               />
             </div>
-            {neighbor(right, 1)}
+            {online && neighbor(right, 1)}
           </div>
         </div>
       </div>
@@ -210,29 +208,10 @@ function SpeechBubble({ name, remark, className }: { name: string; remark: Remar
   )
 }
 
-// ---- The neighbors' plates ----------------------------------------------------------
+// ---- Your friends' plates, online ----------------------------------------------------
 
-const isSeat = (who: Seat | Player): who is Seat => 'regular' in who
-
-/** A neighbor's plate: a regular's name and caps, or a friend's name and how they're doing. */
-function Plate({ who, rules }: { who: Seat | Player; rules: Rules }) {
-  if (isSeat(who)) {
-    return (
-      <div className="sl-plate" style={{ '--c': who.regular.color } as CSSProperties} title={`${who.regular.name}: ${who.stack.toLocaleString()} caps`}>
-        <span className="sl-plate__name">
-          <span className="sl-plate__full">{who.regular.name}</span>
-          <span className="sl-plate__short" aria-hidden="true">
-            {who.regular.short}
-          </span>
-        </span>
-        <span className="sl-plate__stack">
-          {who.stack.toLocaleString()}
-          <span className="visually-hidden"> caps</span>
-        </span>
-        <Coins n={who.coins} />
-      </div>
-    )
-  }
+/** A friend's plate: their name and how they're doing. */
+function Plate({ who, rules }: { who: Player; rules: Rules }) {
   // A win in the air isn't counted until the reels stop.
   const net = who.net - (who.pull && !who.pull.settled ? who.pull.spin.paid : 0)
   return (
@@ -260,10 +239,10 @@ function Coins({ n }: { n: number }) {
   )
 }
 
-function EmptyPlate({ online }: { online: boolean }) {
+function EmptyPlate() {
   return (
     <div className="sl-plate is-empty">
-      <span className="sl-plate__name">{online ? 'Open machine' : 'Empty stool'}</span>
+      <span className="sl-plate__name">Open machine</span>
     </div>
   )
 }

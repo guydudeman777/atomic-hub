@@ -8,9 +8,16 @@
  */
 
 import { type Rng, pick } from '../../core/rng'
+import type { Spin } from './engine'
 import type { MachineId } from './machines'
 
 export const CHANGE_GIRL = 'Dottie'
+
+/** A win worth calling out: this many times the bet, or more. */
+export const BIG_WIN = 15
+
+/** The top award: the first pay on every machine. */
+export const isTopAward = (spin: Spin) => spin.win?.pay === 0
 
 const HELLO: Record<MachineId, readonly string[]> = {
   caps: [
@@ -33,11 +40,10 @@ const HELLO: Record<MachineId, readonly string[]> = {
 /** As you sit down. */
 export const helloCall = (machine: MachineId, rng: Rng): string => pick(HELLO[machine], rng)
 
-/** A big win: yours, or someone's down the row. */
-export function winCall(who: string | null, caps: number, rng: Rng): string {
+/** A big win on your machine. */
+export function winCall(caps: number, rng: Rng): string {
   const amount = caps.toLocaleString()
-  if (who === null) return pick([`Winner! ${amount} caps. Nice pull, hon.`, `Ooh, winner on your machine! ${amount}!`, `There it is! ${amount} caps for you, sugar.`], rng)
-  return pick([`Winner down the row! ${amount} for ${who}.`, `${who} hits for ${amount}!`], rng)
+  return pick([`Winner! ${amount} caps. Nice pull, hon.`, `Ooh, winner on your machine! ${amount}!`, `There it is! ${amount} caps for you, sugar.`], rng)
 }
 
 /** A top award, called for the whole floor. */

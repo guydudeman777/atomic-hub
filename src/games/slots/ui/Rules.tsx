@@ -27,8 +27,8 @@ export function RulesText() {
         </li>
         <li>
           <strong>Moon Rocket</strong>, 25 caps a coin: rockets, saucers and robots. Three rockets on three coins win the jackpot meter,
-          which starts at 100,000 caps and grows by 2% of every three-coin bet on the row, yours and the regulars’. With one or two
-          coins, three rockets pay 1,000 or 2,000 coins instead.
+          which starts at 100,000 caps and grows by 2% of every three-coin bet on the row: yours, and online, your friends’ too. With
+          one or two coins, three rockets pay 1,000 or 2,000 coins instead.
         </li>
       </ul>
 
@@ -50,14 +50,14 @@ export function RulesText() {
           of it own more, which is why the top symbol so often shows just above or below the line. Only the line pays.
         </li>
         <li>
-          Every pull is drawn fresh. A machine is never due, hot or cold, whatever the regulars tell you. The{' '}
+          Every pull is drawn fresh. A machine is never due, hot or cold, whatever anyone tells you. The{' '}
           <Link to="/slots/pays">paytables</Link> list every stop and its numbers, and what each machine gives back.
         </li>
       </ul>
 
       <h3>On the row</h3>
       <ul>
-        <li>Two regulars play the machines either side of yours, with caps of their own, each at their own pace.</li>
+        <li>Online, up to two friends play the machines either side of yours, with caps of their own, each at their own pace.</li>
         <li>Dottie, the change girl, walks the row and calls the big winners. Each pull goes on your record, with what it won or lost.</li>
         <li>Getting up mid-spin is fine: the reels finish and anything they win is paid.</li>
       </ul>

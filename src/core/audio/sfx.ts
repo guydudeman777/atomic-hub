@@ -49,26 +49,36 @@ export type Sfx =
   // Roulette
   | 'ball-spin'
   | 'ball-drop'
+  // Slots
+  | 'lever'
+  | 'reels'
+  | 'reel-stop'
+  | 'credit'
+  | 'payout'
+  | 'jackpot'
 
 export interface SfxOptions {
   /** Stereo position, -1 (left) to 1 (right). */
   pan?: number
   /** Seconds from now, timed on the audio clock so sequences stay tight. */
   delay?: number
+  /** Loudness, 0 to 1: a machine down the row plays quieter than your own. */
+  level?: number
 }
 
-export function playSfx(name: Sfx, { pan = 0, delay = 0 }: SfxOptions = {}) {
+export function playSfx(name: Sfx, { pan = 0, delay = 0, level = 1 }: SfxOptions = {}) {
   const { sound, volume } = useSave.getState().settings
   // Hidden, the audio is paused: everything played meanwhile would come out at once when the tab came back.
   if (!sound || volume <= 0 || document.hidden) return
   const m = liveMixer()
   if (!m) return
-  renderSfx(m, name, m.ctx.currentTime + 0.01 + delay, pan)
+  renderSfx(m, name, m.ctx.currentTime + 0.01 + delay, pan, level)
 }
 
 /** Schedule an effect on any mixer, live or offline. */
-export function renderSfx(m: Mixer, name: Sfx, t: number, pan = 0) {
-  const out = pan ? connect(panner(m.ctx, pan), m.sfx) : m.sfx
+export function renderSfx(m: Mixer, name: Sfx, t: number, pan = 0, level = 1) {
+  const quiet = level !== 1 ? connect(amp(m.ctx, level), m.sfx) : m.sfx
+  const out = pan ? connect(panner(m.ctx, pan), quiet) : quiet
   EFFECTS[name](m, out, t)
 }
 
@@ -223,6 +233,19 @@ const PLASTIC = [1, 1.89, 3.05, 4.2]
 
 /** Partials of a roulette ball: hard phenolic, bright and quick against brass frets. */
 const PHENOLIC = [1, 2.21, 3.73]
+
+/** Partials of a slot machine's bell: a cast bowl, rich and long. */
+const BELL = [1, 2.76, 5.4, 8.93]
+
+/** Partials of the steel inside a slot machine: the ratchet, the stops, the tray. */
+const STEEL = [1, 1.93, 3.12, 4.6]
+
+/**
+ * When each reel stops after the reels start, in seconds: in step with
+ * REEL_STOP_MS in games/slots/ui/session.ts and the reel animations in
+ * slots.css.
+ */
+const REEL_STOPS = [1, 1.45, 1.9]
 
 /** One die striking the table: a click on the felt with a little thump under it. */
 function knock(m: Mixer, out: AudioNode, t: number, level: number, pitch: number) {
@@ -545,6 +568,100 @@ const EFFECTS: Record<Sfx, Effect> = {
     rumble.gain.exponentialRampToValueAtTime(0.1, start + 0.3)
     rumble.gain.exponentialRampToValueAtTime(SILENT, start + roll - 0.3)
     noise(m, start, roll, 'pink').connect(filter(ctx, 'lowpass', 260)).connect(rumble).connect(out)
+  },
+
+  lever: (m, out, t) => {
+    // The handle pulled down: the pawl clicking over the ratchet, a clunk as
+    // it bottoms out and lets the reels go, and the spring hauling it back up.
+    for (let i = 0; i < 7; i++) metal(m, out, t + i * vary(0.034, 0.15), vary(2100 + i * 60, 0.05), 0.07, STEEL, 0.02)
+    const { ctx } = m
+    const clunk = amp(ctx)
+    strike(clunk.gain, t + 0.27, 0.5, 0.16, 0.002)
+    const body = osc(ctx, 'sine', vary(130, 0.08), t + 0.27, 0.2)
+    body.frequency.exponentialRampToValueAtTime(70, t + 0.42)
+    body.connect(clunk).connect(out)
+    metal(m, out, t + 0.27, vary(1500, 0.06), 0.12, STEEL, 0.06)
+    // The spring: a short metallic twang, rising as it rebounds.
+    const twang = amp(ctx)
+    strike(twang.gain, t + 0.36, 0.05, 0.3, 0.01)
+    const coil = osc(ctx, 'triangle', 340, t + 0.36, 0.32)
+    coil.frequency.exponentialRampToValueAtTime(520, t + 0.6)
+    coil.connect(filter(ctx, 'bandpass', 900, 3)).connect(twang).connect(out)
+    land(m, out, t + 0.62, 0.22, 0.4)
+  },
+
+  reels: (m, out, t) => {
+    // Three drums whirring round on their spindle, the stops ticking past
+    // an index finger, each going quiet as its reel is braked (REEL_STOPS).
+    const { ctx } = m
+    REEL_STOPS.forEach((stop, i) => {
+      const end = t + stop
+      const tick = amp(ctx)
+      tick.gain.setValueAtTime(SILENT, t)
+      tick.gain.exponentialRampToValueAtTime(0.05, t + 0.12)
+      tick.gain.setValueAtTime(0.05, end - 0.04)
+      tick.gain.exponentialRampToValueAtTime(SILENT, end)
+      // Stops passing: the band pulses some 20 times a second.
+      const rate = osc(ctx, 'square', vary(19 + i * 2.5, 0.05), t, stop + 0.05)
+      const depth = amp(ctx, 0.035)
+      rate.connect(depth).connect(tick.gain)
+      noise(m, t, stop + 0.05).connect(filter(ctx, 'bandpass', vary(1900 + i * 250, 0.05), 3)).connect(tick).connect(out)
+      const whir = amp(ctx)
+      whir.gain.setValueAtTime(SILENT, t)
+      whir.gain.exponentialRampToValueAtTime(0.07, t + 0.15)
+      whir.gain.setValueAtTime(0.07, end - 0.05)
+      whir.gain.exponentialRampToValueAtTime(SILENT, end)
+      noise(m, t, stop + 0.05, 'pink').connect(filter(ctx, 'lowpass', 220 + i * 40)).connect(whir).connect(out)
+    })
+  },
+
+  'reel-stop': (m, out, t) => {
+    // A reel braked onto its stop: a solid thock through the cabinet, the
+    // latch clicking home, and a little rattle as the drum settles.
+    const { ctx } = m
+    const thock = amp(ctx)
+    strike(thock.gain, t, 0.55, 0.12, 0.002)
+    const body = osc(ctx, 'sine', vary(190, 0.06), t, 0.15)
+    body.frequency.exponentialRampToValueAtTime(95, t + 0.1)
+    body.connect(thock).connect(out)
+    metal(m, out, t, vary(2600, 0.05), 0.16, STEEL, 0.03)
+    land(m, out, t, 0.3, 0.3)
+    metal(m, out, t + vary(0.06, 0.2), vary(2900, 0.08), 0.05, STEEL, 0.02)
+  },
+
+  credit: (m, out, t) => {
+    // One credit counted up on the meter: a bright little ding.
+    metal(m, out, t, vary(2700, 0.02), 0.14, [1, 2.41], 0.1)
+  },
+
+  payout: (m, out, t) => {
+    // Caps tumbling down the chute into a steel tray, the tray ringing under them.
+    for (let i = 0; i < 9; i++) {
+      const at = t + i * vary(0.055, 0.4)
+      metal(m, out, at, vary(3000, 0.12), vary(0.13, 0.3) * (1 - i / 14), [1, 1.47, 2.09, 2.76], 0.12)
+    }
+    metal(m, out, t + 0.04, vary(820, 0.04), 0.05, STEEL, 0.5)
+  },
+
+  jackpot: (m, out, t) => {
+    // The bell on top of the cabinet: an electric striker hammering a cast
+    // bowl some 17 times a second, ringing for a good three seconds. One
+    // set of partials, struck over and over by a falling sawtooth.
+    const { ctx } = m
+    const length = 3.2
+    const env = amp(ctx)
+    env.gain.setValueAtTime(0, t)
+    env.gain.linearRampToValueAtTime(1, t + 0.02)
+    env.gain.setValueAtTime(1, t + length * 0.78)
+    env.gain.linearRampToValueAtTime(0, t + length)
+    env.connect(out)
+    const striker = osc(ctx, 'sawtooth', 17, t, length)
+    BELL.forEach((ratio, i) => {
+      const level = 0.18 / (i + 1)
+      const strike = amp(ctx, level / 2)
+      striker.connect(amp(ctx, -level / 2)).connect(strike.gain)
+      osc(ctx, 'sine', 1180 * ratio, t, length).connect(strike).connect(env)
+    })
   },
 
   'ball-drop': (m, out, t) => {

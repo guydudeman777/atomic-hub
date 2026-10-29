@@ -76,14 +76,16 @@ describe('save store', () => {
     useSave.getState().updateConnect4({ threats: true })
     useSave.getState().updateTicTacToe({ variant: 'ultimate' })
     useSave.getState().updateRoulette({ guide: false })
-    const { draw, craps, reversi, connect4, tictactoe, roulette, ...old } = snapshot(useSave.getState())
-    expect({ draw, craps, reversi, connect4, tictactoe, roulette }).toEqual({
+    useSave.getState().updateSlots({ guide: false, meter: 12_345_678 })
+    const { draw, craps, reversi, connect4, tictactoe, roulette, slots, ...old } = snapshot(useSave.getState())
+    expect({ draw, craps, reversi, connect4, tictactoe, roulette, slots }).toEqual({
       draw: { hints: false },
       craps: { guide: false },
       reversi: { showMoves: false, beaten: {} },
       connect4: { threats: true, beaten: {} },
       tictactoe: { variant: 'ultimate', beaten: {} },
       roulette: { guide: false },
+      slots: { guide: false, meter: 12_345_678 },
     })
     expect(useSave.getState().importSave(JSON.stringify(old))).toEqual({ ok: true })
     const fresh = newSave()
@@ -93,6 +95,7 @@ describe('save store', () => {
     expect(useSave.getState().connect4).toEqual(fresh.connect4)
     expect(useSave.getState().tictactoe).toEqual(fresh.tictactoe)
     expect(useSave.getState().roulette).toEqual(fresh.roulette)
+    expect(useSave.getState().slots).toEqual(fresh.slots)
   })
 
   it('rejects files that are not saves', () => {

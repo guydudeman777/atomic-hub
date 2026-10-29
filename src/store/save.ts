@@ -101,6 +101,13 @@ export interface RouletteSave {
   guide: boolean
 }
 
+export interface SlotsSave {
+  /** What each pay is worth and how often it comes up, and the machine's return, in the terminal. */
+  guide: boolean
+  /** Moon Rocket's jackpot meter, in hundredths of a cap, where the row left it; null at its reset. */
+  meter: number | null
+}
+
 export interface SaveData {
   version: 1
   wallet: WalletState
@@ -114,6 +121,7 @@ export interface SaveData {
   connect4: Connect4Save
   tictactoe: TicTacToeSave
   roulette: RouletteSave
+  slots: SlotsSave
 }
 
 export type GameResult = 'win' | 'loss' | 'draw'
@@ -138,6 +146,7 @@ interface SaveActions {
   updateConnect4: (patch: Partial<Connect4Save>) => void
   updateTicTacToe: (patch: Partial<TicTacToeSave>) => void
   updateRoulette: (patch: Partial<RouletteSave>) => void
+  updateSlots: (patch: Partial<SlotsSave>) => void
   importSave: (json: string) => { ok: true } | { ok: false; error: string }
   resetSave: () => void
 }
@@ -173,12 +182,13 @@ export const newSave = (): SaveData => ({
   connect4: { threats: false, beaten: {} },
   tictactoe: { variant: 'classic', beaten: {} },
   roulette: { guide: true },
+  slots: { guide: true, meter: null },
 })
 
 /** Just the data fields, for export. */
 export function snapshot(state: SaveData): SaveData {
-  const { version, wallet, settings, stats, caravan, blackjack, draw, craps, reversi, connect4, tictactoe, roulette } = state
-  return { version, wallet, settings, stats, caravan, blackjack, draw, craps, reversi, connect4, tictactoe, roulette }
+  const { version, wallet, settings, stats, caravan, blackjack, draw, craps, reversi, connect4, tictactoe, roulette, slots } = state
+  return { version, wallet, settings, stats, caravan, blackjack, draw, craps, reversi, connect4, tictactoe, roulette, slots }
 }
 
 function isSaveData(value: unknown): value is SaveData {
@@ -278,6 +288,8 @@ export const useSave = create<SaveData & SaveActions>()(
 
       updateRoulette: (patch) => set((s) => ({ roulette: { ...s.roulette, ...patch } })),
 
+      updateSlots: (patch) => set((s) => ({ slots: { ...s.slots, ...patch } })),
+
       importSave: (json) => {
         let parsed: unknown
         try {
@@ -297,6 +309,7 @@ export const useSave = create<SaveData & SaveActions>()(
           connect4: { ...base.connect4, ...parsed.connect4 },
           tictactoe: { ...base.tictactoe, ...parsed.tictactoe },
           roulette: { ...base.roulette, ...parsed.roulette },
+          slots: { ...base.slots, ...parsed.slots },
         })
         return { ok: true }
       },
@@ -328,6 +341,7 @@ export const useSave = create<SaveData & SaveActions>()(
           connect4: { ...current.connect4, ...p.connect4 },
           tictactoe: { ...current.tictactoe, ...p.tictactoe },
           roulette: { ...current.roulette, ...p.roulette },
+          slots: { ...current.slots, ...p.slots },
         }
       },
     },

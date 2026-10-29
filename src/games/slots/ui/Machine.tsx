@@ -337,12 +337,10 @@ interface NeighborProps {
   seed: number
   /** Their name plate. */
   plate: ReactNode
-  /** Anything they say, over their machine. */
-  bubble?: ReactNode
   empty?: boolean
 }
 
-export function NeighborMachine({ id, name, rules, pull, coins, meter, jackpot, seed, plate, bubble, empty }: NeighborProps) {
+export function NeighborMachine({ id, name, rules, pull, coins, meter, jackpot, seed, plate, empty }: NeighborProps) {
   const won = pull?.settled ? pull.spin : null
   return (
     <section className={`sl-cabinet is-neighbor${empty ? ' is-empty' : ''}`} data-machine={id}>
@@ -360,7 +358,6 @@ export function NeighborMachine({ id, name, rules, pull, coins, meter, jackpot, 
         <span className="sl-handle__hub" />
       </span>
       {plate}
-      {bubble}
     </section>
   )
 }

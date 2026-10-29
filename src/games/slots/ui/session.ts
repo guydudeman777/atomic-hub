@@ -1,51 +1,36 @@
 /**
- * The machine you're at: your reels and your bet, the regulars at the
- * machines either side, the jackpot meter, the log, and what the change
- * girl and the regulars say. Not persisted, but for the meter. Caps leave
- * your wallet as the coins go in and come back when a win is paid.
+ * The machine you're at: your reels and your bet, the jackpot meter, the
+ * log, and what the change girl says. Not persisted, but for the meter.
+ * Caps leave your wallet as the coins go in and come back when a win is
+ * paid.
  *
  * A pull is decided as the handle comes down but only paid when the last
  * reel stops: `pull` holds it until then, and `settle` (on a timer, or at
  * once if you get up mid-spin) pays it.
  *
- * The regulars pull at their own pace, on timers of their own, with caps
- * of their own, through the same engine. On Moon Rocket every three-coin
- * pull on the row feeds the one meter, and anyone can win it. The meter is
- * saved, so it's where the row left it next time.
+ * Offline you have the row to yourself. On Moon Rocket every three-coin
+ * pull feeds the meter, and the meter is saved, so it's where you left it
+ * next time.
  *
  * Online, friends play the machines either side of yours, each with their
  * own caps. Every browser plays the same pulls in the same order
  * (net/link.ts). A pull carries its stops, picked by the browser that
  * pulled, so nobody can read the next spin off a seed, and every browser's
- * meter comes out the same. Online play starts the meter at its reset and
- * leaves the saved one alone. The regulars stay home.
+ * meter comes out the same. Anyone's three-coin pull feeds the one meter,
+ * and anyone can win it. Online play starts the meter at its reset and
+ * leaves the saved one alone.
  */
 
 import { create } from 'zustand'
 import { crowdReaction } from '../../../core/audio/live'
 import { type Sfx, playSfx } from '../../../core/audio/sfx'
-import { createRng, randInt, randomSeed } from '../../../core/rng'
+import { createRng, randomSeed } from '../../../core/rng'
 import { type Entry, isSys } from '../../../net/link'
 import { useSave } from '../../../store/save'
-import { CHANGE_GIRL, changeCall, helloCall, jackpotCall, meterCall, winCall } from '../calls'
+import { BIG_WIN, CHANGE_GIRL, changeCall, helloCall, isTopAward, jackpotCall, meterCall, winCall } from '../calls'
 import { SYMBOLS, buyInOf, machineInfo, payName } from '../content'
 import { type Rules, type Spin, type Stops, MAX_COINS, isStops, meterCaps, meterReset, spin, spinStops } from '../engine'
 import { MACHINES, type MachineId } from '../machines'
-import {
-  BIG_WIN,
-  type Memory,
-  REGULARS,
-  type Regular,
-  RowTalk,
-  type Talker,
-  afterSpin,
-  coinsFor,
-  freshMemory,
-  isTopAward,
-  momentsOf,
-  nextPullIn,
-  pickRegulars,
-} from '../regulars'
 
 export interface SitConfig {
   machine: MachineId
@@ -62,16 +47,6 @@ export interface Pull {
   at: number
   /** The reels have stopped and the win is paid. */
   settled: boolean
-}
-
-/** A regular at a machine beside yours: their caps, their style's memory, and their latest pull. */
-export interface Seat {
-  regular: Regular
-  stack: number
-  memory: Memory
-  pull: Pull | null
-  /** Coins in on their machine. */
-  coins: number
 }
 
 /** A friend at a machine beside yours, online. */
@@ -101,17 +76,12 @@ export interface LogEntry {
   text: string
 }
 
-/** Something someone says. */
+/** Something Dottie says. */
 export interface Remark {
   id: number
   text: string
   /** Milliseconds to wait before showing it. */
   delay: number
-}
-
-/** Something a regular says, by their seat. */
-export interface SeatRemark extends Remark {
-  seat: number
 }
 
 /** A word about your bet: why the handle won't come down, or what changed. */
@@ -132,19 +102,13 @@ interface SessionStore {
   pull: Pull | null
   /** Pulls you've made this sitting. */
   pulls: number
-  /** Your losing pulls in a row. */
-  dry: number
   /** Caps won less caps played this sitting, for the terminal. */
   net: number
   /** The jackpot meter, in hundredths of a cap; null on a machine without one. */
   meter: number | null
-  /** The regulars beside you: left and right. An empty machine is null. */
-  seats: (Seat | null)[]
   log: LogEntry[]
   /** The change girl's latest call. */
   call: Remark | null
-  /** The regulars' latest remark. */
-  talk: SeatRemark | null
   notice: Notice | null
   /** Online: your pull is on its way to the table and back. */
   waiting: boolean
@@ -175,20 +139,16 @@ export const REEL_STOP_MS = [1000, 1450, 1900] as const
 /** The last reel stops, bounces and settles; then the win is paid. */
 export const SETTLE_MS = 2150
 const HELLO_DELAY_MS = 900
-/** A regular's remark waits a moment for the reels and the change girl. */
-const TALK_DELAY_MS = 700
 /** Dottie comes back down the row every so often. */
 const WALK_MS: readonly [number, number] = [70_000, 130_000]
-/** Before someone takes an empty machine. */
-const EMPTY_MS: readonly [number, number] = [15_000, 40_000]
 /** Moon Rocket's meter is worth a word from Dottie past this share over its reset. */
 const METER_WORTH_MENTIONING = 1.25
 
-/** Neighbors' machines: quieter than yours, and off to the side. */
+/** Friends' machines, online: quieter than yours, and off to the side. */
 const NEIGHBOR_LEVEL = 0.32
 const NEIGHBOR_PAN = [-0.7, 0.7] as const
 
-/** Every timer the row is running: your reels, the regulars' pulls and settles, empty stools, and Dottie. */
+/** Every timer the row is running: your reels, your friends' reels, and Dottie. */
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
 const after = (key: string, ms: number, fn: () => void) => {
   clearTimeout(timers.get(key))
@@ -215,11 +175,8 @@ export function sendThrough(fn: ((input: Input) => void) | null) {
   send = fn
 }
 
-let talk: RowTalk | null = null
 /** When Dottie last said something, so she doesn't talk over herself on her walk. */
 let lastCallAt = -Infinity
-/** Regulars who went broke this sitting: they don't come back with a fresh stack. */
-const broke = new Set<string>()
 
 const caps = () => useSave.getState().wallet.caps
 const rulesOf = (machine: MachineId | null): Rules | null => (machine ? MACHINES[machine] : null)
@@ -269,8 +226,6 @@ export const useSession = create<SessionStore>()((set, get) => {
     set({ call: { id: ++remarkId, text, delay } })
   }
 
-  const talkers = (): Talker[] => get().seats.flatMap((seat, i) => (seat ? [{ seat: i, regular: seat.regular }] : []))
-
   /** The meter after a pull feeds it or is won, and saved where the row leaves it, offline. */
   const setMeter = (meter: number | null) => {
     set({ meter })
@@ -295,9 +250,9 @@ export const useSession = create<SessionStore>()((set, get) => {
     else after('mine', SETTLE_MS, settleMine)
   }
 
-  /** Your reels have stopped: pay the win, call it, and let the row have its say. */
+  /** Your reels have stopped: pay the win, and Dottie calls it if it's big. */
   const settleMine = () => {
-    const { pull, machine, dry } = get()
+    const { pull, machine } = get()
     const rules = rulesOf(machine)
     if (!pull || pull.settled || !rules || !machine) return
     clearTimeout(timers.get('mine'))
@@ -320,13 +275,10 @@ export const useSession = create<SessionStore>()((set, get) => {
     if (s.win) lines.push({ mine: true, text: `${winText(rules, s)}. ${s.win.meter ? '' : `${s.win.coins.toLocaleString()} coins, `}${s.paid.toLocaleString()} caps.` })
     addLog(...lines)
 
-    const nextDry = s.paid > 0 ? 0 : dry + 1
-    set({ pull: { ...pull, settled: true }, dry: nextDry })
+    set({ pull: { ...pull, settled: true } })
     if (quiet) return
     if (top) sayCall(jackpotCall(machineInfo(machine).name, null, s.paid, rng), 300)
-    else if (big) sayCall(winCall(null, s.paid, rng), 500)
-    const said = talk?.react(momentsOf(rules, s, null, nextDry), talkers(), performance.now(), s.paid)
-    if (said) set({ talk: { id: ++remarkId, seat: said.seat, text: said.text, delay: TALK_DELAY_MS + (top || big ? 1600 : 0) } })
+    else if (big) sayCall(winCall(s.paid, rng), 500)
   }
 
   /** Whether your machine can take a pull now, and if not, why not. */
@@ -334,85 +286,6 @@ export const useSession = create<SessionStore>()((set, get) => {
     const { pull, waiting } = get()
     if (waiting || (pull && !pull.settled)) return 'The reels are still turning.'
     return null
-  }
-
-  // ---- The regulars -----------------------------------------------------------
-
-  const setSeat = (i: number, seat: Seat | null) => set((s) => ({ seats: s.seats.map((x, j) => (j === i ? seat : x)) }))
-
-  /** A regular pulls their handle, or gets up if they can't cover a coin. */
-  const regularPull = (i: number) => {
-    const { seats, machine, meter } = get()
-    const seat = seats[i]
-    const rules = rulesOf(machine)
-    if (!seat || !rules) return
-    const coins = coinsFor(seat.regular, seat.memory, rules, seat.stack)
-    if (coins === 0) {
-      getUp(i)
-      return
-    }
-    const s = spin(rules, spinStops(rng, rules), coins, meter)
-    setSeat(i, { ...seat, stack: seat.stack - s.bet, coins, pull: { id: (seat.pull?.id ?? 0) + 1, spin: s, at: performance.now(), settled: false } })
-    setMeter(s.meter)
-    reelSounds(NEIGHBOR_PAN[i], NEIGHBOR_LEVEL)
-    after(`settle-${i}`, SETTLE_MS, () => settleRegular(i))
-  }
-
-  /** A regular's reels stop: they take their win, and pull again when they're ready. */
-  const settleRegular = (i: number) => {
-    const { seats, machine } = get()
-    const seat = seats[i]
-    const rules = rulesOf(machine)
-    if (!seat?.pull || seat.pull.settled || !rules || !machine) return
-    const s = seat.pull.spin
-    const memory = afterSpin(seat.regular, seat.memory, s, rules)
-    setSeat(i, { ...seat, stack: seat.stack + s.paid, memory, pull: { ...seat.pull, settled: true } })
-    const top = isTopAward(s)
-    const big = s.paid >= s.bet * BIG_WIN
-    if (s.paid > 0) sound('payout', { pan: NEIGHBOR_PAN[i], level: NEIGHBOR_LEVEL * (big ? 1.6 : 1) })
-    if (top) {
-      sound('jackpot', { pan: NEIGHBOR_PAN[i] * 0.6, level: 0.6 })
-      crowdReaction('cheer')
-      sayCall(jackpotCall(machineInfo(machine).name, seat.regular.name, s.paid, rng), 300)
-      addLog({ mine: false, text: `Jackpot for ${seat.regular.name}: ${s.paid.toLocaleString()} caps.` })
-    } else if (big) {
-      addLog({ mine: false, text: `${seat.regular.name} hits ${winText(rules, s).charAt(0).toLowerCase()}${winText(rules, s).slice(1)} for ${s.paid.toLocaleString()} caps.` })
-      if (s.paid >= s.bet * 50) sayCall(winCall(seat.regular.name, s.paid, rng), 400)
-    }
-    const said = talk?.react(momentsOf(rules, s, i, memory.dry), talkers(), performance.now(), s.paid)
-    if (said) set({ talk: { id: ++remarkId, seat: said.seat, text: said.text, delay: TALK_DELAY_MS + (top ? 1600 : 0) } })
-    after(`pull-${i}`, nextPullIn(seat.regular, rng), () => regularPull(i))
-  }
-
-  /** Out of caps: they say goodbye and go, and someone else sits down in a while. */
-  const getUp = (i: number) => {
-    const seat = get().seats[i]
-    if (!seat) return
-    broke.add(seat.regular.id)
-    const bye = talk?.say({ seat: i, regular: seat.regular }, 'goodbye', performance.now())
-    if (bye) set({ talk: { id: ++remarkId, seat: i, text: bye, delay: 300 } })
-    addLog({ mine: false, text: `${seat.regular.name} is out of caps and leaves the row.` })
-    // They stay on their stool to say goodbye before they go.
-    after(`leave-${i}`, 4500, () => setSeat(i, null))
-    after(`empty-${i}`, between(EMPTY_MS), () => sitDown(i))
-  }
-
-  /** Someone takes the empty machine: whoever isn't here and hasn't gone broke tonight. */
-  const sitDown = (i: number) => {
-    const { seats, machine } = get()
-    const rules = rulesOf(machine)
-    if (seats[i] || !rules) return
-    const here = new Set(seats.flatMap((s) => (s ? [s.regular.id] : [])))
-    const away = REGULARS.filter((r) => !here.has(r.id))
-    const fresh = away.filter((r) => !broke.has(r.id))
-    const free = fresh.length ? fresh : away
-    if (!free.length) return
-    const regular = free[randInt(rng, free.length)]
-    setSeat(i, seatRegular(regular, rules))
-    addLog({ mine: false, text: `${regular.name} sits down at the machine on your ${i === 0 ? 'left' : 'right'}.` })
-    const hello = talk?.say({ seat: i, regular }, 'hello', performance.now())
-    if (hello) set({ talk: { id: ++remarkId, seat: i, text: hello, delay: TALK_DELAY_MS } })
-    after(`pull-${i}`, 2500 + nextPullIn(regular, rng), () => regularPull(i))
   }
 
   // ---- Dottie -------------------------------------------------------------------
@@ -521,13 +394,10 @@ export const useSession = create<SessionStore>()((set, get) => {
     coins: 1,
     pull: null,
     pulls: 0,
-    dry: 0,
     net: 0,
     meter: null,
-    seats: [],
     log: [],
     call: null,
-    talk: null,
     notice: null,
     waiting: false,
 
@@ -535,23 +405,17 @@ export const useSession = create<SessionStore>()((set, get) => {
       const rules = MACHINES[config.machine]
       if (!rules || (!config.online && caps() < buyInOf(config.machine))) return false
       clearTimers()
-      talk = new RowTalk(createRng(randomSeed()))
-      broke.clear()
       const me = config.online?.me ?? 0
       const players: (Player | null)[] = Array.from({ length: ONLINE_SEATS }, () => null)
       for (const p of config.online?.players ?? []) {
         if (p.seat !== me) players[p.seat] = { seat: p.seat, name: p.name, pull: null, pulls: 0, net: 0 }
       }
-      // The regulars stay home online.
-      const seats: (Seat | null)[] = config.online ? [null, null] : pickRegulars(rng).map((regular) => seatRegular(regular, rules))
       const reset = meterReset(rules)
       const saved = useSave.getState().slots.meter
-      // Online, the row starts its own meter; offline it's where the row left it, never below the reset.
+      // Online, the row starts its own meter; offline it's where you left it, never below the reset.
       const meter = reset === null ? null : config.online || saved === null ? reset : Math.max(reset, Math.floor(saved))
       const info = machineInfo(config.machine)
-      const names = config.online ? players.flatMap((p) => (p ? [p.name] : [])) : seats.flatMap((s) => (s ? [s.regular.name] : []))
-      const greeter = seats.length ? randInt(rng, seats.length) : 0
-      const hello = !config.online && seats[greeter] ? talk.say({ seat: greeter, regular: seats[greeter]!.regular }, 'hello', -Infinity) : null
+      const names = players.flatMap((p) => (p ? [p.name] : []))
       set((s) => ({
         sitting: s.sitting + 1,
         machine: config.machine,
@@ -559,26 +423,20 @@ export const useSession = create<SessionStore>()((set, get) => {
         coins: 1,
         pull: null,
         pulls: 0,
-        dry: 0,
         net: 0,
         meter,
-        seats,
         log: [
           {
             id: ++logId,
             mine: false,
-            text: `You sit down at ${info.name}, ${info.coinText.toLowerCase()}${names.length ? `, ${config.online ? 'beside' : 'between'} ${names.join(' and ')}` : ''}. ${CHANGE_GIRL} is working the row.`,
+            text: `You sit down at ${info.name}, ${info.coinText.toLowerCase()}${names.length ? `, beside ${names.join(' and ')}` : ''}. ${CHANGE_GIRL} is working the row.`,
           },
         ],
         call: { id: ++remarkId, text: helloCall(config.machine, rng), delay: HELLO_DELAY_MS },
-        talk: hello ? { id: ++remarkId, seat: greeter, text: hello, delay: HELLO_DELAY_MS + 3200 } : null,
         notice: null,
         waiting: false,
       }))
       if (meter !== null && !config.online) useSave.getState().updateSlots({ meter })
-      seats.forEach((seat, i) => {
-        if (seat) after(`pull-${i}`, 1800 + i * 1300 + nextPullIn(seat.regular, rng), () => regularPull(i))
-      })
       after('walk', between(WALK_MS), walk)
       return true
     },
@@ -653,8 +511,7 @@ export const useSession = create<SessionStore>()((set, get) => {
       // Reels in motion still pay.
       settleMine()
       clearTimers()
-      talk = null
-      set({ machine: null, online: null, pull: null, seats: [], log: [], call: null, talk: null, notice: null, waiting: false, meter: null })
+      set({ machine: null, online: null, pull: null, log: [], call: null, notice: null, waiting: false, meter: null })
     },
   }
 })
@@ -666,10 +523,4 @@ export const useSession = create<SessionStore>()((set, get) => {
 export function sideOf(online: { me: number; players: (Player | null)[] }, seat: number): 0 | 1 {
   const others = online.players.flatMap((p, i) => (p && i !== online.me ? [i] : []))
   return others.indexOf(seat) === 1 ? 1 : 0
-}
-
-/** A regular sitting down with a fresh buy-in. */
-function seatRegular(regular: Regular, rules: Rules): Seat {
-  const memory = freshMemory(regular, rules)
-  return { regular, stack: regular.bankroll * rules.coin, memory, pull: null, coins: memory.coins }
 }

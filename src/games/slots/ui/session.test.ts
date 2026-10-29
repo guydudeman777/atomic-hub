@@ -3,7 +3,6 @@ import type { Entry } from '../../../net/link'
 import { useSave } from '../../../store/save'
 import type { Stops } from '../engine'
 import { MACHINES } from '../machines'
-import { REGULARS, freshMemory } from '../regulars'
 import { type Input, SETTLE_MS, sendThrough, sideOf, useSession } from './session'
 
 const setCaps = (n: number) => useSave.getState().adjustCaps(n - useSave.getState().wallet.caps)
@@ -124,39 +123,14 @@ describe('the jackpot meter', () => {
   })
 })
 
-describe('the regulars', () => {
-  it('play their own machines on their own time, with their own caps', () => {
-    setCaps(100)
-    useSession.getState().sit({ machine: 'caps' })
-    const seats = useSession.getState().seats
-    expect(seats.filter(Boolean)).toHaveLength(2)
-    const stacks = seats.map((s) => s!.stack)
-    // Nobody waits for you: give them a minute and they've pulled.
-    vi.advanceTimersByTime(60_000)
-    const after = useSession.getState().seats
-    expect(after.some((s, i) => s === null || s.pull !== null || s.stack !== stacks[i])).toBe(true)
-    expect(after.filter((s) => s?.pull).length).toBeGreaterThan(0)
-    expect(wallet()).toBe(100)
-  })
-
-  it('feed Moon Rocket’s meter too', () => {
+describe('offline', () => {
+  it('leaves you the row to yourself: nothing pulls or feeds the meter but you', () => {
     setCaps(1000)
     useSession.getState().sit({ machine: 'rocket' })
-    // Dusty and Sailor Jim: three coins a pull, both of them.
-    const rules = MACHINES.rocket
-    const seat = (id: string) => {
-      const regular = REGULARS.find((r) => r.id === id)!
-      return { regular, stack: regular.bankroll * rules.coin, memory: freshMemory(regular, rules), pull: null, coins: 3 }
-    }
-    useSession.setState({ seats: [seat('dusty'), seat('jim')] })
-    vi.advanceTimersByTime(30_000)
-    const meter = useSession.getState().meter!
-    // Each of their pulls adds 150, unless one of them won it.
-    const pulls = useSession.getState().seats.reduce((n, s) => n + (s?.pull?.id ?? 0), 0)
-    expect(pulls).toBeGreaterThan(2)
-    const won = useSession.getState().seats.some((s) => s?.pull?.spin.win?.meter)
-    if (!won) expect(meter).toBe(10_000_000 + pulls * 150)
-    expect(useSave.getState().slots.meter).toBe(meter)
+    vi.advanceTimersByTime(5 * 60_000)
+    expect(useSession.getState().meter).toBe(10_000_000)
+    expect(useSession.getState().log).toHaveLength(1)
+    expect(wallet()).toBe(1000)
   })
 })
 
@@ -247,11 +221,6 @@ describe('online', () => {
     expect(sideOf({ me: 1, players }, 2)).toBe(1)
     expect(sideOf({ me: 0, players: [null, { seat: 1 } as never, { seat: 2 } as never] }, 1)).toBe(0)
     expect(sideOf({ me: 0, players: [null, { seat: 1 } as never, { seat: 2 } as never] }, 2)).toBe(1)
-  })
-
-  it('keeps the regulars home', () => {
-    sitAsGuest('caps')
-    expect(useSession.getState().seats.every((s) => s === null)).toBe(true)
   })
 })
 

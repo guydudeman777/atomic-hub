@@ -58,9 +58,9 @@ for (const view of ['3D', 'flat'] as const) {
     await page.getByRole('button', { name: 'Sit down' }).click()
     await expect(page.locator('html')).toHaveAttribute('data-table3d', view === '3D' ? 'on' : 'off')
 
-    // Dottie says hello, and two regulars are pulling either side of you.
+    // Dottie says hello, and you have the row to yourself.
     await expect(page.locator('.sl-talk--attendant .sl-talk__bubble')).toContainText('Dottie says:')
-    await expect(page.locator('.sl-plate:not(.is-empty)')).toHaveCount(2)
+    await expect(page.locator('.sl-cabinet')).toHaveCount(1)
     await expect(status(page)).toHaveText('Pull the handle')
     await expect(meter(page, 'Credits')).toHaveText('500')
 
@@ -131,18 +131,34 @@ test('Moon Rocket’s meter climbs with three-coin pulls, and is there next time
   await expect(page.locator('.sl-hud__help')).toContainText('The meter’s at 100,0')
   const start = await caps()
   await pull(page, () => page.getByRole('button', { name: 'Bet max' }).click())
-  // 1.5 caps a three-coin pull, from you and the regulars, unless somebody hit it.
+  // 1.5 caps a three-coin pull, unless it hit.
   const after = await caps()
   expect(after === 100_000 || after > start).toBe(true)
   await page.getByRole('button', { name: 'Leave machine' }).click()
-  // Saved as the row left it: where you saw it, or higher if a regular pulled on the way out.
+  // Saved where you left it.
   const card = page.getByRole('radio', { name: /^Moon Rocket/ })
   await expect(card).toContainText(/The meter’s at [\d,]+ caps/)
   const saved = Number((await card.textContent())!.match(/The meter’s at ([\d,]+) caps/)![1].replace(/,/g, ''))
-  expect(saved).toBeGreaterThanOrEqual(after)
+  expect(saved).toBe(after)
   await page.getByRole('button', { name: 'Sit down' }).click()
-  expect(await caps()).toBeGreaterThanOrEqual(saved)
+  expect(await caps()).toBe(saved)
   expect(errors).toEqual([])
+})
+
+test('the whole machine fits a laptop’s window, buttons and all', async ({ page }) => {
+  // The tallest two: their glass has the most lines and a note under it.
+  for (const machine of ['Moon Rocket', 'Atomic Sevens']) {
+    await sitDown(page, machine)
+    for (const [width, height] of [[1366, 650], [1280, 720], [1366, 768], [1024, 600], [1440, 900]]) {
+      await page.setViewportSize({ width, height })
+      await expect(async () => {
+        const deck = (await yours(page).locator('.sl-deck').boundingBox())!
+        expect(deck.y + deck.height).toBeLessThanOrEqual(height)
+      }, `${machine} at ${width}×${height}`).toPass({ timeout: 2000 })
+    }
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.getByRole('button', { name: 'Leave machine' }).click()
+  }
 })
 
 test('the paytables show every machine’s lines, odds and return', async ({ page }) => {
@@ -170,7 +186,7 @@ test('two friends side by side online: everyone’s reels, and one meter for the
   await host.getByLabel('Machines').selectOption('rocket')
   await host.getByRole('button', { name: 'Start' }).click()
   for (const page of [host, guest]) await expect(yours(page)).toHaveAttribute('data-machine', 'rocket')
-  // No regulars online: the friend next door, and an open machine.
+  // The friend next door, and an open machine.
   await expect(host.locator('.sl-plate:not(.is-empty)')).toHaveText(/Guesty/)
   await expect(guest.locator('.sl-plate:not(.is-empty)')).toHaveText(/Hostess/)
 

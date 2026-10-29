@@ -31,7 +31,7 @@ A browser game hub for desktops and phones in a retro-futurist wasteland style. 
 | Tic-Tac-Toe | AI ladder of 4, hot-seat | Classic 3×3 and Ultimate 9×9 | Classic solved exactly, with trap-setting among drawing moves; Ultimate by Monte Carlo tree search, 150 to 30,000 playouts | **Done (phase 2)** |
 | Roulette | vs house, 3 regulars at the wheel | European, French (la partage) or American; every inside and outside bet | House edges worked out exactly through the engine; 6 regulars with betting systems | **Done (phase 5)** |
 | Craps | vs house, 3 regulars at the rail | Pass/Don’t Pass, Come/Don’t Come, 3-4-5× odds, Field (2× and 3×), Place, Hardways, one-roll bets; dealer units so every payout is whole caps | House edges worked out exactly through the engine; 5 regulars with their own betting styles | **Done (phase 5)** |
-| Slots | Two regulars at the machines beside yours, or friends side by side online | 3 reels, 22 stops on 64-number virtual reels, 1–3 coins; three machines: junk and cherries, sevens with a wild multiplier, and a progressive jackpot | Returns worked out exactly from every stop, about 95% on three coins; 6 regulars with their own coin styles and pace | **Done (phase 5)** |
+| Slots | On your own, or friends side by side online | 3 reels, 22 stops on 64-number virtual reels, 1–3 coins; three machines: junk and cherries, sevens with a wild multiplier, and a progressive jackpot | Returns worked out exactly from every stop, about 95% on three coins | **Done (phase 5)** |
 
 ## Phases (one PR each)
 

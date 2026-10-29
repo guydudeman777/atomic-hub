@@ -1,8 +1,8 @@
 /**
  * Slots rules engine: a three-reel machine with one pay line.
  *
- * Pure and framework-free, like the other casino games' engines: the UI,
- * the regulars and the tests play a machine through `spin`. Caps live
+ * Pure and framework-free, like the other casino games' engines: the UI
+ * and the tests play a machine through `spin`. Caps live
  * outside the engine: a spin reports what it cost and what it paid, and
  * callers move the money. Nor does it choose where the reels stop: a spin
  * names its stops (`spinStops` picks them at random), so an online bank can
